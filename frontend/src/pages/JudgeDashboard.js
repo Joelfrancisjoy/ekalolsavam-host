@@ -2,9 +2,8 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import http from '../services/http-common';
-import eventService from '../services/eventService';
+import { eventServiceAdapter as eventService, userServiceAdapter as userService } from '../services/serviceAdapter';
 import scoreService from '../services/scoreService';
-import userService from '../services/userService';
 import UserInfoHeader from '../components/UserInfoHeader';
 // Simple inline SVG icons to avoid external icon dependency
 const Trophy = ({ className }) => (

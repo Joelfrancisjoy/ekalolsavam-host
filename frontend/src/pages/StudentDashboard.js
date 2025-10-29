@@ -1,8 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useNavigate } from 'react-router-dom';
-import eventService from '../services/eventService';
-import resultService from '../services/resultService';
+import { eventServiceAdapter as eventService, resultServiceAdapter as resultService } from '../services/serviceAdapter';
 import http from '../services/http-common';
 import UserInfoHeader from '../components/UserInfoHeader';
 
@@ -29,34 +27,35 @@ const CATEGORIES = [
   { key: 'theatre', label: 'Theatre / Performance Arts', icon: '🎭', color: 'from-orange-500 to-amber-500' }
 ];
 
-const EVENTS_BY_CATEGORY = {
-  dance: [
-    'Aravana Muttu', 'Bharatanatyam', 'Chakyar Koothu', 'Duffmuttu', 'Folk Dance (Solo & Group)',
-    'Irula Dance', 'Kathakali (Single / Group)', 'Kerala Natanam', 'Kolkali', 'Koodiyattam',
-    'Kuchipudi', 'Malapulayattam', 'Mangalamkali', 'Margamkali', 'Mohiniyattam', 'Nangiar Koothu',
-    'Oppana', 'Paliya Dance', 'Paniya Dance', 'Parichamuttukali', 'Poorakkali', 'Thiruvathirakkali',
-    'Vattappattu', 'Nadodi Nritham', 'Thiruvathira'
-  ],
-  visual_arts: [
-    'Cartoon', 'Collage', 'Painting – Oil Colour', 'Painting – Pencil', 'Painting – Water Colour'
-  ],
-  literary: [
-    'Caption Writing', 'Dictionary Making', 'Essay Writing (Malayalam / English / Hindi / Sanskrit / Urdu / Arabic)',
-    'Poetry Writing', 'Prasnothari', 'Samasyapooranam', 'Story Writing', 'Translation', 'Aksharaslokam',
-    'Ashtapadi', 'Chambuprabhashanam', 'Kadhaprasangam', 'Kavyakeli', 'Lecture', 'Mushaira', 'Pathakam',
-    'Poetry Recitation', 'Speech', 'Quiz', 'Quran Recitation'
-  ],
-  music: [
-    'Chenda / Thayambaka', 'Clarinet / Bugle', 'Band', 'Flute', 'Guitar (Western)', 'Instrumental Music',
-    'Madhalam', 'Mridangam / Kanjira / Ghadam', 'Nadaswaram', 'Panchavadyam', 'Tabla', 'Triple / Jazz (Western)',
-    'Veena / Vichitra Veena', 'Violin (Eastern / Western / Oriental)', 'Arabic Music', 'Classical Music',
-    'Folk Music', 'Ghazal', 'Group Song – Urdu', 'Kathakali Music', 'Light Music', 'Mappila Songs',
-    'Patriotic Song', 'Vanchippattu'
-  ],
-  theatre: [
-    'Chavittu Nadakam', 'Drama', 'Mime', 'Mimicry', 'Mono Act', 'Ottan Thullal', 'Skit (English)', 'Yakshagana'
-  ]
-};
+// Unused - kept for reference
+// const EVENTS_BY_CATEGORY = {
+//   dance: [
+//     'Aravana Muttu', 'Bharatanatyam', 'Chakyar Koothu', 'Duffmuttu', 'Folk Dance (Solo & Group)',
+//     'Irula Dance', 'Kathakali (Single / Group)', 'Kerala Natanam', 'Kolkali', 'Koodiyattam',
+//     'Kuchipudi', 'Malapulayattam', 'Mangalamkali', 'Margamkali', 'Mohiniyattam', 'Nangiar Koothu',
+//     'Oppana', 'Paliya Dance', 'Paniya Dance', 'Parichamuttukali', 'Poorakkali', 'Thiruvathirakkali',
+//     'Vattappattu', 'Nadodi Nritham', 'Thiruvathira'
+//   ],
+//   visual_arts: [
+//     'Cartoon', 'Collage', 'Painting – Oil Colour', 'Painting – Pencil', 'Painting – Water Colour'
+//   ],
+//   literary: [
+//     'Caption Writing', 'Dictionary Making', 'Essay Writing (Malayalam / English / Hindi / Sanskrit / Urdu / Arabic)',
+//     'Poetry Writing', 'Prasnothari', 'Samasyapooranam', 'Story Writing', 'Translation', 'Aksharaslokam',
+//     'Ashtapadi', 'Chambuprabhashanam', 'Kadhaprasangam', 'Kavyakeli', 'Lecture', 'Mushaira', 'Pathakam',
+//     'Poetry Recitation', 'Speech', 'Quiz', 'Quran Recitation'
+//   ],
+//   music: [
+//     'Chenda / Thayambaka', 'Clarinet / Bugle', 'Band', 'Flute', 'Guitar (Western)', 'Instrumental Music',
+//     'Madhalam', 'Mridangam / Kanjira / Ghadam', 'Nadaswaram', 'Panchavadyam', 'Tabla', 'Triple / Jazz (Western)',
+//     'Veena / Vichitra Veena', 'Violin (Eastern / Western / Oriental)', 'Arabic Music', 'Classical Music',
+//     'Folk Music', 'Ghazal', 'Group Song – Urdu', 'Kathakali Music', 'Light Music', 'Mappila Songs',
+//     'Patriotic Song', 'Vanchippattu'
+//   ],
+//   theatre: [
+//     'Chavittu Nadakam', 'Drama', 'Mime', 'Mimicry', 'Mono Act', 'Ottan Thullal', 'Skit (English)', 'Yakshagana'
+//   ]
+// };
 
 // Demo schedule generation for Dance + Music events with random times and venues
 const DEMO_VENUES = ['Main Stage', 'Auditorium A', 'Auditorium B', 'Hall 1', 'Hall 2', 'Open Grounds'];
@@ -423,7 +422,7 @@ const LiveResultsCarousel = ({ results }) => {
       setTriplet((prev) => {
         if (!results.length) return prev;
         if (results.length <= 3) {
-          const [l, m] = prev;
+          const [l] = prev;
           const nextLeft = (l + 1) % results.length;
           return [nextLeft, prev[0], prev[1]];
         }
@@ -621,7 +620,6 @@ const Modal = ({ open, title, onClose, children }) => {
 
 const StudentDashboard = () => {
   const { t } = useTranslation();
-  const navigate = useNavigate();
   const [open, setOpen] = useState(null); // 'register' | 'qr' | 'feedback' | 'results' | 'schedule'
   const [registrations, setRegistrations] = useState([]); // server-side list (unchanged usage)
   const [publishedResults, setPublishedResults] = useState([]);
@@ -725,14 +723,14 @@ const StudentDashboard = () => {
   }, []);
 
   // Build marquee strings from results (kept for future use)
-  const marqueeItems = useMemo(() => {
-    return (publishedResults || []).map((r) => {
-      const eventName = r.event_details?.name || r.event_name || 'Event';
-      const position = r.position ? `#${r.position}` : '';
-      const participant = r.participant_details?.first_name || r.participant_name || '';
-      return `${eventName} ${position} ${participant}`.trim();
-    });
-  }, [publishedResults]);
+  // const marqueeItems = useMemo(() => {
+  //   return (publishedResults || []).map((r) => {
+  //     const eventName = r.event_details?.name || r.event_name || 'Event';
+  //     const position = r.position ? `#${r.position}` : '';
+  //     const participant = r.participant_details?.first_name || r.participant_name || '';
+  //     return `${eventName} ${position} ${participant}`.trim();
+  //   });
+  // }, [publishedResults]);
 
   // Generate QR codes for all registrations
   useEffect(() => {
@@ -1048,7 +1046,7 @@ const StudentDashboard = () => {
       const eventId = Number(selectedEventObj.id);
 
       // Call the registration API with normalized uppercase names (backend requires uppercase, no spaces)
-      const registrationResult = await eventService.registerForEvent(
+      await eventService.registerForEvent(
         eventId,
         String(firstName || '').trim().toUpperCase(),
         String(lastName || '').trim().toUpperCase()

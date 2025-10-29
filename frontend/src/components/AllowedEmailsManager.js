@@ -1,9 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { useTranslation } from 'react-i18next';
 import allowedEmailService from '../services/allowedEmailService';
 
 const AllowedEmailsManager = () => {
-    const { t } = useTranslation();
     const [emails, setEmails] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');

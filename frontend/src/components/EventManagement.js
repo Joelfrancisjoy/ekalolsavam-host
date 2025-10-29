@@ -1,6 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import eventService from '../services/eventService';
-import userService from '../services/userService';
+import { eventServiceAdapter as eventService, userServiceAdapter as userService } from '../services/serviceAdapter';
 
 const CATEGORY_OPTIONS = [
     { value: 'dance', label: 'Dance / Folk Arts', icon: '💃', color: 'from-pink-500 to-rose-500' },
@@ -10,13 +9,14 @@ const CATEGORY_OPTIONS = [
     { value: 'theatre', label: 'Theatre / Drama', icon: '🎭', color: 'from-orange-500 to-amber-500' },
 ];
 
-const EVENTS_BY_CATEGORY = {
-    dance: ['Bharatanatyam', 'Mohiniyattam', 'Kathakali', 'Thiruvathirakkali', 'Oppana'],
-    music: ['Light Music', 'Classical Music', 'Mappila Songs', 'Violin (Eastern)', 'Panchavadyam'],
-    literary: ['Essay Writing (Malayalam)', 'Poetry Recitation', 'Speech (Malayalam)', 'Quiz', 'Aksharaslokam'],
-    visual: ['Cartoon', 'Painting – Water Colour', 'Painting – Oil Colour', 'Collage', 'Painting – Pencil'],
-    theatre: ['Mime', 'Mono Act', 'Drama', 'Mimicry', 'Ottan Thullal']
-};
+// Unused - kept for reference
+// const EVENTS_BY_CATEGORY = {
+//     dance: ['Bharatanatyam', 'Mohiniyattam', 'Kathakali', 'Thiruvathirakkali', 'Oppana'],
+//     music: ['Light Music', 'Classical Music', 'Mappila Songs', 'Violin (Eastern)', 'Panchavadyam'],
+//     literary: ['Essay Writing (Malayalam)', 'Poetry Recitation', 'Speech (Malayalam)', 'Quiz', 'Aksharaslokam'],
+//     visual: ['Cartoon', 'Painting – Water Colour', 'Painting – Oil Colour', 'Collage', 'Painting – Pencil'],
+//     theatre: ['Mime', 'Mono Act', 'Drama', 'Mimicry', 'Ottan Thullal']
+// };
 
 const AVAILABLE_EVENTS = {
     dance: ['Bharatanatyam', 'Mohiniyattam', 'Kathakali', 'Thiruvathirakali', 'Oppana'],
@@ -460,19 +460,20 @@ const EventManagement = () => {
         }
     };
 
-    const handleDelete = async (id) => {
-        if (!window.confirm('Delete this event?')) return;
-        try {
-            await eventService.deleteEvent(id);
-            setSuccess('Event deleted');
-            await reloadAllEvents();
-            setTimeout(() => setSuccess(''), 2000);
-        } catch (err) {
-            console.error('Failed to delete event', err);
-            setError('Failed to delete event');
-            setTimeout(() => setError(''), 3000);
-        }
-    };
+    // Replaced by openDeleteConfirm
+    // const handleDelete = async (id) => {
+    //     if (!window.confirm('Delete this event?')) return;
+    //     try {
+    //         await eventService.deleteEvent(id);
+    //         setSuccess('Event deleted');
+    //         await reloadAllEvents();
+    //         setTimeout(() => setSuccess(''), 2000);
+    //     } catch (err) {
+    //         console.error('Failed to delete event', err);
+    //         setError('Failed to delete event');
+    //         setTimeout(() => setError(''), 3000);
+    //     }
+    // };
 
     const openDeleteConfirm = (id) => {
         setConfirmTargetId(id);

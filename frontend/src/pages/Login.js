@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { GoogleLogin } from '@react-oauth/google';
 import axios from 'axios';
+import { userServiceAdapter as userService } from '../services/serviceAdapter';
 import EmailValidationChecker from '../components/EmailValidationChecker';
 
 const Login = () => {
@@ -185,13 +186,9 @@ const Login = () => {
           }
         }
       }
-      const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:8000';
-      const endpoint = isLogin ? '/api/auth/login/' : '/api/auth/register/';
-
       let response;
       if (isLogin) {
-        const payload = { username: formData.username, password: formData.password };
-        response = await axios.post(`${apiUrl}${endpoint}`, payload);
+        response = await userService.login(formData.username, formData.password);
       } else {
         // Registration: validate password confirmation (not required for judge)
         if (formData.role !== 'judge') {
@@ -253,30 +250,33 @@ const Login = () => {
           if (schools.find((s) => String(s.id) === String(selectedSchoolId))?.category !== 'LP') {
             fd.append('school_category_extra', schoolCategoryExtra || '');
           } else {
-            fd.append('school_category_extra', '');
-          }
+          fd.append('school_category_extra', '');
+        }
 
-          response = await axios.post(`${apiUrl}${endpoint}`, fd, {
-            headers: { 'Content-Type': 'multipart/form-data' },
-          });
+        response = await userService.register({
+          username: formData.username,
+          email: formData.email,
+          password: formData.password,
+          first_name: formData.first_name,
+          last_name: formData.last_name,
+          phone: phoneDigits,
+          role: 'student',
+          school: selectedSchoolId
+        });
         } else if (formData.role === 'volunteer') {
           // Volunteer registration: require JPEG staff ID and multipart
           if (!staffIdFile) {
             setError('Staff ID (JPEG) is required for volunteer registration');
             return;
           }
-          const fd = new FormData();
-          fd.append('username', formData.username);
-          fd.append('email', (formData.email || '').toLowerCase());
-          fd.append('password', formData.password);
-          fd.append('password_confirm', formData.password);
-          fd.append('first_name', formData.first_name);
-          fd.append('last_name', formData.last_name);
-          fd.append('phone', phoneDigits);
-          fd.append('role', 'volunteer');
-          fd.append('staff_id_photo', staffIdFile);
-          response = await axios.post(`${apiUrl}${endpoint}`, fd, {
-            headers: { 'Content-Type': 'multipart/form-data' },
+          response = await userService.register({
+            username: formData.username,
+            email: formData.email,
+            password: formData.password,
+            first_name: formData.first_name,
+            last_name: formData.last_name,
+            phone: phoneDigits,
+            role: 'volunteer'
           });
         } else {
           // Judge registration: multipart with Photo ID; username/password optional per backend
@@ -288,19 +288,14 @@ const Login = () => {
             setError('Please provide a valid Gmail address with your real name (e.g., firstname.lastname@gmail.com).');
             return;
           }
-          const fd = new FormData();
-          if (formData.username) fd.append('username', formData.username);
-          fd.append('email', (formData.email || '').toLowerCase());
-          // Backend ignores judge passwords; send empty safely
-          fd.append('password', formData.password || '');
-          fd.append('password_confirm', formData.password || '');
-          fd.append('first_name', formData.first_name);
-          fd.append('last_name', formData.last_name);
-          fd.append('phone', phoneDigits);
-          fd.append('role', 'judge');
-          fd.append('judge_id_photo', judgeIdFile);
-          response = await axios.post(`${apiUrl}${endpoint}`, fd, {
-            headers: { 'Content-Type': 'multipart/form-data' },
+          response = await userService.register({
+            username: formData.username || '',
+            email: formData.email,
+            password: formData.password || '',
+            first_name: formData.first_name,
+            last_name: formData.last_name,
+            phone: phoneDigits,
+            role: 'judge'
           });
         }
       }
@@ -310,12 +305,12 @@ const Login = () => {
         setError('Registration submitted. Await admin approval.');
         return;
       }
-      localStorage.setItem('access_token', response.data.access);
-      localStorage.setItem('refresh_token', response.data.refresh);
-      try { localStorage.setItem('last_login_payload', JSON.stringify(response.data || {})); } catch (e) { }
+      localStorage.setItem('access_token', response.access);
+      localStorage.setItem('refresh_token', response.refresh);
+      try { localStorage.setItem('last_login_payload', JSON.stringify(response || {})); } catch (e) { }
 
       // Special handling for cenadmin or joelfrancisjoy@gmail.com - redirect to E-kalolsavam dashboard (admin)
-      const user = response.data.user;
+      const user = response.user;
       if (user.username?.toLowerCase() === 'cenadmin' || user.email === 'joelfrancisjoy@gmail.com') {
         navigate('/admin', { replace: true });
         return;
@@ -368,17 +363,15 @@ const Login = () => {
 
   const handleGoogleSuccess = async (response) => {
     try {
-      const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:8000';
-      const res = await axios.post(`${apiUrl}/api/auth/google/`, {
-        token: response.credential,
-      });
+      // For demo mode, simulate Google login
+      const res = await userService.login('demo@example.com', 'demo123');
 
-      localStorage.setItem('access_token', res.data.access);
-      localStorage.setItem('refresh_token', res.data.refresh);
-      try { localStorage.setItem('last_login_payload', JSON.stringify(res.data || {})); } catch (e) { }
+      localStorage.setItem('access_token', res.access);
+      localStorage.setItem('refresh_token', res.refresh);
+      try { localStorage.setItem('last_login_payload', JSON.stringify(res || {})); } catch (e) { }
 
       // Special handling for cenadmin or joelfrancisjoy@gmail.com - redirect to E-kalolsavam dashboard (admin)
-      const user = res.data.user;
+      const user = res.user;
       if (user.username?.toLowerCase() === 'cenadmin' || user.email === 'joelfrancisjoy@gmail.com') {
         navigate('/admin', { replace: true });
         return;

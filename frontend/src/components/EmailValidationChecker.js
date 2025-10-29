@@ -16,6 +16,7 @@ const EmailValidationChecker = ({ email, onValidationChange }) => {
         onValidationChange(null);
       }
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [email]);
 
   const checkEmailAllowed = async (emailToCheck) => {

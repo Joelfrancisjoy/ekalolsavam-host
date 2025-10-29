@@ -2,8 +2,8 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route, useLocation, Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import Header from './components/Header';
+import DemoModeIndicator from './components/DemoModeIndicator';
 import LandingPage from './pages/LandingPage';
-import Dashboard from './pages/Dashboard';
 import Login from './pages/Login';
 import StudentDashboard from './pages/StudentDashboard';
 import JudgeDashboard from './pages/JudgeDashboard';
@@ -16,7 +16,7 @@ import IDBasedRegistration from './pages/IDBasedRegistration';
 import LiveResults from './pages/LiveResults';
 
 function AppContent() {
-  const { t, i18n } = useTranslation();
+  const { i18n } = useTranslation();
   const location = useLocation();
 
   const changeLanguage = (lng) => {
@@ -43,6 +43,7 @@ function AppContent() {
     <div className="min-h-screen bg-gray-50">
       {!isLoginPage && !isLandingPage && <Header changeLanguage={changeLanguage} />}
       <main className={isLoginPage || isLandingPage ? "" : "container mx-auto px-4 py-8"}>
+        <DemoModeIndicator />
         <Routes>
           <Route path="/" element={<LandingPage />} />
           <Route path="/login" element={<Login />} />

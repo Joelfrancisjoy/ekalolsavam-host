@@ -1,14 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
-import userService from '../services/userService';
+import { userServiceAdapter as userService, eventServiceAdapter as eventService } from '../services/serviceAdapter';
 import volunteerService from '../services/volunteerService';
-import eventService from '../services/eventService';
 import http from '../services/http-common';
 import UserInfoHeader from '../components/UserInfoHeader';
 
 const VolunteerDashboard = () => {
-  const { t } = useTranslation();
   const [showPasswordChoice, setShowPasswordChoice] = useState(false);
   const [maskedPending, setMaskedPending] = useState('');
   const [creatingNew, setCreatingNew] = useState(false);
@@ -80,6 +78,7 @@ const VolunteerDashboard = () => {
       }
     };
     loadEventParticipants();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedEventId]);
 
   const loadVolunteerData = async () => {

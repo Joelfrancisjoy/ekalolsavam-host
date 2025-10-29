@@ -28,7 +28,7 @@ const checkEmailRegistered = (email) => {
   return http.get(`/api/auth/allowed-emails/check-registered/?email=${encodeURIComponent(email)}`);
 };
 
-export default {
+const allowedEmailService = {
   getAllowedEmails,
   addAllowedEmail,
   bulkAddAllowedEmails,
@@ -37,3 +37,5 @@ export default {
   checkEmailAllowed,
   checkEmailRegistered
 };
+
+export default allowedEmailService;
