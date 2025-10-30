@@ -37,6 +37,24 @@ api.interceptors.response.use(
 );
 
 export const userService = {
+    login: async (username, password) => {
+        const res = await api.post('/api/auth/login/', { username, password });
+        return res.data;
+    },
+
+    register: async (data) => {
+        const isFormData = (typeof FormData !== 'undefined') && (data instanceof FormData);
+        const headers = isFormData ? { 'Content-Type': 'multipart/form-data' } : { 'Content-Type': 'application/json' };
+        const payload = isFormData ? data : (data || {});
+        const res = await api.post('/api/auth/register/', payload, { headers });
+        return res.data;
+    },
+
+    googleAuth: async (token) => {
+        const res = await api.post('/api/auth/google/', { token });
+        return res.data;
+    },
+
     list: async (params = {}) => {
         const res = await api.get('/api/auth/users/', { params });
         return res.data;

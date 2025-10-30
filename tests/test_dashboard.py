@@ -278,3 +278,6 @@ class TestDashboard:
         except Exception as e:
             take_screenshot_on_failure(driver, "dashboard_logout_functionality")
             raise e
+
+
+

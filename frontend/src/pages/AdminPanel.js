@@ -46,14 +46,25 @@ const AdminPanel = () => {
         return (
           <div className="relative">
             {/* Header with enhanced styling */}
-            <div className="text-center mb-12">
+            <div className="text-center mb-16">
               <div className="inline-block">
-                <h2 className="text-4xl font-bold bg-gradient-to-r from-gray-800 via-blue-800 to-purple-800 bg-clip-text text-transparent mb-2">
-                  {t('admin_panel')}
-                </h2>
-                <div className="w-full h-1 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full"></div>
+                <div className="flex items-center justify-center mb-4">
+                  <div className="w-14 h-14 bg-gradient-to-br from-indigo-600 to-purple-600 rounded-2xl flex items-center justify-center shadow-lg mr-4">
+                    <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                    </svg>
+                  </div>
+                  <h2 className="text-4xl font-bold bg-gradient-to-r from-gray-900 via-indigo-800 to-purple-800 bg-clip-text text-transparent">
+                    {t('admin_panel') || 'Admin Panel'}
+                  </h2>
+                </div>
               </div>
-              <p className="text-gray-600 mt-4 text-lg">Comprehensive management dashboard for E-Kalolsavam</p>
+              <p className="text-gray-600 mt-4 text-lg font-medium">Comprehensive management dashboard for E-Kalolsavam</p>
+              <div className="mt-6 flex items-center justify-center space-x-2">
+                <div className="w-16 h-1 bg-gradient-to-r from-transparent via-indigo-400 to-transparent"></div>
+                <div className="w-2 h-2 bg-indigo-500 rounded-full"></div>
+                <div className="w-16 h-1 bg-gradient-to-r from-transparent via-purple-400 to-transparent"></div>
+              </div>
             </div>
 
             {/* Creative grid layout with staggered animation */}
@@ -127,17 +138,13 @@ const AdminPanel = () => {
                   onClick={() => goTo('ids')}
                 />
               </div>
-
-              {/* Row 4 - Centered single card */}
-              <div className="md:col-span-2 lg:col-span-3 flex justify-center animate-fade-in-up animation-delay-900">
-                <div className="max-w-md w-full">
-                  <AdminCard
-                    title={t('system_settings') || 'System Settings'}
-                    description="Configure portal settings and system preferences"
-                    icon="⚙️"
-                    onClick={() => goTo('settings')}
-                  />
-                </div>
+              <div className="animate-fade-in-up animation-delay-900">
+                <AdminCard
+                  title="System Settings"
+                  description="Configure portal settings and system preferences"
+                  icon="⚙️"
+                  onClick={() => goTo('settings')}
+                />
               </div>
             </div>
 
@@ -180,6 +187,8 @@ const AdminPanel = () => {
                   {activeSection === 'certificates' && 'Certificate Generation'}
                   {activeSection === 'volunteers' && 'Volunteer Coordination'}
                   {activeSection === 'settings' && 'System Settings'}
+                  {activeSection === 'schools' && 'School Management'}
+                  {activeSection === 'ids' && 'ID Management'}
                 </h1>
               </div>
             </div>
@@ -206,37 +215,33 @@ const SectionPlaceholder = ({ title }) => (
 const AdminCard = ({ title, description, icon, onClick }) => {
   return (
     <div
-      className="group relative bg-gradient-to-br from-white via-gray-50 to-gray-100 border border-gray-200/80 p-8 rounded-3xl shadow-lg hover:shadow-2xl transition-all duration-500 cursor-pointer hover:-translate-y-2 hover:scale-105 overflow-hidden"
+      className="group relative bg-white border-2 border-gray-200/60 p-8 rounded-2xl shadow-md hover:shadow-2xl transition-all duration-300 cursor-pointer hover:-translate-y-1 overflow-hidden"
       onClick={onClick}
     >
-      {/* Animated background gradient on hover */}
-      <div className="absolute inset-0 bg-gradient-to-br from-blue-500/10 via-purple-500/10 to-indigo-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+      {/* Subtle gradient overlay on hover */}
+      <div className="absolute inset-0 bg-gradient-to-br from-blue-50/50 via-transparent to-purple-50/50 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
 
-      {/* Floating particles effect */}
-      <div className="absolute top-4 right-4 w-2 h-2 bg-blue-400 rounded-full opacity-0 group-hover:opacity-100 group-hover:animate-ping transition-opacity duration-300"></div>
-      <div className="absolute bottom-6 left-6 w-1 h-1 bg-purple-400 rounded-full opacity-0 group-hover:opacity-100 group-hover:animate-pulse transition-opacity duration-500 delay-100"></div>
+      {/* Left accent bar */}
+      <div className="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-blue-500 to-purple-600 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
 
       <div className="relative z-10">
-        {/* Interactive icon with hover animation */}
-        <div className="text-4xl mb-6 transform group-hover:scale-110 group-hover:rotate-12 transition-all duration-300 group-hover:drop-shadow-lg">
+        {/* Icon with subtle hover effect */}
+        <div className="text-5xl mb-5 transform group-hover:scale-110 transition-transform duration-300">
           {icon}
         </div>
 
-        <h3 className="text-xl font-bold text-gray-800 mb-3 tracking-wide group-hover:text-blue-700 transition-colors duration-300">
+        <h3 className="text-2xl font-bold text-gray-900 mb-3 tracking-tight group-hover:text-indigo-700 transition-colors duration-300">
           {title}
         </h3>
 
-        <p className="text-gray-600 mb-6 leading-relaxed group-hover:text-gray-700 transition-colors duration-300">
+        <p className="text-base text-gray-600 mb-6 leading-relaxed group-hover:text-gray-700 transition-colors duration-300">
           {description}
         </p>
 
-        {/* Enhanced button with ripple effect */}
-        <button className="relative inline-flex items-center px-4 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white font-semibold rounded-xl hover:from-blue-700 hover:to-purple-700 transform hover:scale-105 transition-all duration-300 shadow-md hover:shadow-lg overflow-hidden group/btn">
-          <span className="relative z-10">Manage</span>
+        {/* Clean button design */}
+        <button className="relative inline-flex items-center px-5 py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-semibold rounded-lg hover:from-indigo-700 hover:to-purple-700 transition-all duration-200 shadow-sm hover:shadow-md group/btn">
+          <span className="relative z-10 text-base">Manage</span>
           <span className="ml-2 transform group-hover/btn:translate-x-1 transition-transform duration-300">→</span>
-
-          {/* Ripple effect */}
-          <div className="absolute inset-0 bg-white/20 opacity-0 group-hover/btn:opacity-100 transition-opacity duration-300 rounded-xl"></div>
         </button>
       </div>
     </div>

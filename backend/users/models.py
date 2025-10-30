@@ -52,7 +52,8 @@ class User(AbstractUser):
         ('student', 'Student'),
         ('judge', 'Judge'),
         ('admin', 'Admin'),
-        ('volunteer', 'Volunteer')
+        ('volunteer', 'Volunteer'),
+        ('school', 'School')
     ]
     APPROVAL_STATUS_CHOICES = [
         ('pending', 'Pending'),
@@ -74,7 +75,14 @@ class User(AbstractUser):
     staff_id_photo = models.ImageField(upload_to='staff_id_photos/', blank=True, null=True)
     # Judge-specific
     judge_id_photo = models.ImageField(upload_to='judge_id_photos/', blank=True, null=True)
+    
+    # School-specific (school email contact)
+    contact_email = models.EmailField(blank=True, null=True)
+    
     approval_status = models.CharField(max_length=10, choices=APPROVAL_STATUS_CHOICES, default='pending')
+    
+    # For ID-based signup (volunteers/judges)
+    registration_id = models.CharField(max_length=50, blank=True, null=True, help_text="Admin-issued ID for registration")
     # Temporarily store the password provided during registration (encrypted).
     # This is cleared once the user accepts it or sets a new password after approval.
     pending_password_encrypted = models.TextField(blank=True, null=True)

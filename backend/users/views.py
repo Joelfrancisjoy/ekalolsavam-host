@@ -133,7 +133,7 @@ class LoginView(generics.GenericAPIView):
                 if user.role == 'student' and user.approval_status == 'rejected':
                     return Response({'error': 'Account has been blacklisted'}, status=status.HTTP_403_FORBIDDEN)
                 # Grant full admin authority to specific users
-                if user.email == 'joelfrancisjoy@gmail.com' or user.username == 'Cenadmin':
+                if user.email == 'joelfrancisjoy@gmail.com' or user.username.lower() == 'cenadmin':
                     changed_fields = []
                     if user.role != 'admin':
                         user.role = 'admin'

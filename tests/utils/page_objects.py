@@ -228,3 +228,6 @@ class AdminPage(BasePage):
         """Add new event"""
         self.click_element(self.ADD_EVENT_BUTTON)
         return self
+
+
+

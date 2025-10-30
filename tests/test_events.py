@@ -245,3 +245,6 @@ class TestEvents:
         except Exception as e:
             take_screenshot_on_failure(driver, "events_pagination")
             raise e
+
+
+

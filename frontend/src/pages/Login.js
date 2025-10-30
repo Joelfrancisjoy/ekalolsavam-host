@@ -225,7 +225,7 @@ const Login = () => {
         }
         const phoneDigits = rawPhone.replace(/\D/g, '');
 
-        // Registration: role-based multipart when student
+        // Registration: role-based multipart with required file fields
         if (formData.role === 'student') {
           if (!collegeIdFile) {
             setError('College ID (JPEG) is required for student registration');
@@ -250,36 +250,27 @@ const Login = () => {
           if (schools.find((s) => String(s.id) === String(selectedSchoolId))?.category !== 'LP') {
             fd.append('school_category_extra', schoolCategoryExtra || '');
           } else {
-          fd.append('school_category_extra', '');
-        }
-
-        response = await userService.register({
-          username: formData.username,
-          email: formData.email,
-          password: formData.password,
-          first_name: formData.first_name,
-          last_name: formData.last_name,
-          phone: phoneDigits,
-          role: 'student',
-          school: selectedSchoolId
-        });
+            fd.append('school_category_extra', '');
+          }
+          response = await userService.register(fd);
         } else if (formData.role === 'volunteer') {
-          // Volunteer registration: require JPEG staff ID and multipart
           if (!staffIdFile) {
             setError('Staff ID (JPEG) is required for volunteer registration');
             return;
           }
-          response = await userService.register({
-            username: formData.username,
-            email: formData.email,
-            password: formData.password,
-            first_name: formData.first_name,
-            last_name: formData.last_name,
-            phone: phoneDigits,
-            role: 'volunteer'
-          });
+          const fd = new FormData();
+          fd.append('username', formData.username);
+          fd.append('email', (formData.email || '').toLowerCase());
+          fd.append('password', formData.password);
+          fd.append('password_confirm', formData.password);
+          fd.append('first_name', formData.first_name);
+          fd.append('last_name', formData.last_name);
+          fd.append('phone', phoneDigits);
+          fd.append('role', 'volunteer');
+          fd.append('staff_id_photo', staffIdFile);
+          response = await userService.register(fd);
         } else {
-          // Judge registration: multipart with Photo ID; username/password optional per backend
+          // Judge
           if (!judgeIdFile) {
             setError('Photo ID (JPEG/PNG) is required for judge registration');
             return;
@@ -288,15 +279,17 @@ const Login = () => {
             setError('Please provide a valid Gmail address with your real name (e.g., firstname.lastname@gmail.com).');
             return;
           }
-          response = await userService.register({
-            username: formData.username || '',
-            email: formData.email,
-            password: formData.password || '',
-            first_name: formData.first_name,
-            last_name: formData.last_name,
-            phone: phoneDigits,
-            role: 'judge'
-          });
+          const fd = new FormData();
+          fd.append('username', formData.username || '');
+          fd.append('email', (formData.email || '').toLowerCase());
+          fd.append('password', formData.password || '');
+          fd.append('password_confirm', formData.password || '');
+          fd.append('first_name', formData.first_name);
+          fd.append('last_name', formData.last_name);
+          fd.append('phone', phoneDigits);
+          fd.append('role', 'judge');
+          fd.append('judge_id_photo', judgeIdFile);
+          response = await userService.register(fd);
         }
       }
 
@@ -361,10 +354,14 @@ const Login = () => {
     }
   };
 
-  const handleGoogleSuccess = async (response) => {
+  const handleGoogleSuccess = async (credentialResponse) => {
     try {
-      // For demo mode, simulate Google login
-      const res = await userService.login('demo@example.com', 'demo123');
+      const token = credentialResponse?.credential || credentialResponse?.access_token || credentialResponse?.code;
+      if (!token) {
+        setError('Google login failed. No credential received.');
+        return;
+      }
+      const res = await userService.googleAuth(token);
 
       localStorage.setItem('access_token', res.access);
       localStorage.setItem('refresh_token', res.refresh);

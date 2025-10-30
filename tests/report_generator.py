@@ -295,3 +295,6 @@ reports/
 if __name__ == "__main__":
     generator = TestReportGenerator()
     generator.generate_all_reports()
+
+
+

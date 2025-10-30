@@ -1,5 +1,4 @@
 import React, { useEffect, useState } from 'react';
-import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { userServiceAdapter as userService, eventServiceAdapter as eventService } from '../services/serviceAdapter';
 import volunteerService from '../services/volunteerService';

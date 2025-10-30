@@ -9,6 +9,15 @@ from .views import (
     admin_bulk_activate, admin_bulk_set_approval,
     check_email_exists, check_username_exists,
 )
+from .workflow_views import (
+    AdminCreateSchoolView, AdminGenerateIDView, IDSignupView,
+    IDSignupRequestListView, IDSignupRequestDetailView,
+    SchoolSubmitParticipantsView, SchoolGenerateStudentIDView,
+    VolunteerSchoolParticipantsView,
+    VolunteerVerifyStudentView, AdminAssignVolunteerToSchoolView,
+    SchoolStandingsView, AdminIssuedIDListView, AdminIssuedIDDetailView,
+    check_id_validity
+)
 
 urlpatterns = [
     path('register/', RegisterView.as_view(), name='register'),
@@ -43,4 +52,33 @@ urlpatterns = [
     # Email and username validation
     path('emails/exists/', check_email_exists, name='check-email-exists'),
     path('usernames/exists/', check_username_exists, name='check-username-exists'),
+    
+    # New Workflow Endpoints
+    # Admin: School management
+    path('admin/schools/create/', AdminCreateSchoolView.as_view(), name='admin-create-school'),
+    path('admin/ids/generate/', AdminGenerateIDView.as_view(), name='admin-generate-id'),
+    path('admin/ids/', AdminIssuedIDListView.as_view(), name='admin-issued-ids-list'),
+    path('admin/ids/<int:pk>/', AdminIssuedIDDetailView.as_view(), name='admin-issued-id-detail'),
+    
+    # Public: ID-based signup
+    path('register/with-id/', IDSignupView.as_view(), name='register-with-id'),
+    path('ids/check/', check_id_validity, name='check-id-validity'),
+    
+    # Admin: Manage ID signup requests
+    path('admin/signup-requests/', IDSignupRequestListView.as_view(), name='admin-signup-requests'),
+    path('admin/signup-requests/<int:pk>/', IDSignupRequestDetailView.as_view(), name='admin-signup-request-detail'),
+    
+    # School: Submit participants and generate student IDs
+    path('schools/participants/submit/', SchoolSubmitParticipantsView.as_view(), name='school-submit-participants'),
+    path('schools/students/generate-ids/', SchoolGenerateStudentIDView.as_view(), name='school-generate-student-ids'),
+    
+    # Volunteer: View and verify participants
+    path('volunteer/school-participants/', VolunteerSchoolParticipantsView.as_view(), name='volunteer-school-participants'),
+    path('volunteer/verify-student/', VolunteerVerifyStudentView.as_view(), name='volunteer-verify-student'),
+    
+    # Admin: Assign volunteers to schools
+    path('admin/assign-volunteer/', AdminAssignVolunteerToSchoolView.as_view(), name='admin-assign-volunteer'),
+    
+    # Public: School standings
+    path('standings/', SchoolStandingsView.as_view(), name='school-standings'),
 ]

@@ -11,3 +11,6 @@ pytest-selenium==2.0.1
 pytest-bdd==6.1.1
 faker==20.1.0
 requests==2.31.0
+
+
+

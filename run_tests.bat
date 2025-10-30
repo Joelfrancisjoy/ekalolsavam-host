@@ -88,3 +88,6 @@ echo 📊 Check reports in tests\reports\ directory
 echo 🌐 Open tests\reports\report.html in your browser
 echo.
 pause
+
+
+

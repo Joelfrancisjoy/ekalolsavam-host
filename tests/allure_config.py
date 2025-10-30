@@ -106,3 +106,6 @@ def add_browser_info(driver):
             allure.attach(str(value), name=key, attachment_type=AttachmentType.TEXT)
     except Exception as e:
         allure.attach(f"Failed to get browser info: {e}", name="Browser Info Error", attachment_type=AttachmentType.TEXT)
+
+
+

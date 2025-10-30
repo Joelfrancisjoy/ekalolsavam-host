@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: kalolsavam-frontend
+    env: static
+    plan: free
+    buildCommand: "npm install && npm run build"
+    staticPublishPath: ./build
+    envVars:
+      - key: REACT_APP_API_URL
+        value: "https://your-backend-app.vercel.app"
+      - key: REACT_APP_ENVIRONMENT
+        value: "production"
+
+

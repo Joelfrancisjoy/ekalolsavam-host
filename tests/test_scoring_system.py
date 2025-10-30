@@ -297,3 +297,6 @@ class TestScoringSystem:
         except Exception as e:
             take_screenshot_on_failure(driver, "score_performance_with_large_data")
             raise e
+
+
+

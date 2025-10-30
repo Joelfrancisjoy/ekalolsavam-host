@@ -281,3 +281,6 @@ class TestAdminFunctionality:
         except Exception as e:
             take_screenshot_on_failure(driver, "admin_logout_from_admin_panel")
             raise e
+
+
+

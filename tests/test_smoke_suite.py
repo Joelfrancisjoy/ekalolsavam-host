@@ -211,3 +211,6 @@ class TestSmokeSuite:
         except Exception as e:
             take_screenshot_on_failure(driver, "navigation_works")
             raise e
+
+
+

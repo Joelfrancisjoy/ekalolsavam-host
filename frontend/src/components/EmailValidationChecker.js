@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 
 const EmailValidationChecker = ({ email, onValidationChange }) => {
@@ -16,10 +16,9 @@ const EmailValidationChecker = ({ email, onValidationChange }) => {
         onValidationChange(null);
       }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [email]);
+  }, [email, checkEmailAllowed, onValidationChange]);
 
-  const checkEmailAllowed = async (emailToCheck) => {
+  const checkEmailAllowed = useCallback(async (emailToCheck) => {
     const value = (emailToCheck || '').trim().toLowerCase();
 
     const atIndex = value.indexOf('@');
@@ -73,7 +72,7 @@ const EmailValidationChecker = ({ email, onValidationChange }) => {
     } finally {
       setIsChecking(false);
     }
-  };
+  }, [onValidationChange]);
 
   if (!email || !email.includes('@')) {
     return null;

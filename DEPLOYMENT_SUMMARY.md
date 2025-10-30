@@ -87,3 +87,4 @@ When backend is ready:
 - **Professional demo** ready to share
 
 The frontend is now completely ready for Netlify deployment and will work perfectly as a standalone demo application!
+

@@ -203,3 +203,6 @@ class TestAuthentication:
         except Exception as e:
             take_screenshot_on_failure(driver, "session_persistence")
             raise e
+
+
+
