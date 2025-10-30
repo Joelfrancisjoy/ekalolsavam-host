@@ -4,8 +4,7 @@ import { useTranslation } from 'react-i18next';
 
 const LandingPage = () => {
     const navigate = useNavigate();
-    const { t } = useTranslation();
-    const [currentSlide, setCurrentSlide] = useState(0);
+        const [currentSlide, setCurrentSlide] = useState(0);
     const [showAboutModal, setShowAboutModal] = useState(false);
 
     // Art forms data with authentic Kerala traditional arts
