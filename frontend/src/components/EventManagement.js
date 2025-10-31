@@ -1,5 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { eventServiceAdapter as eventService, userServiceAdapter as userService } from '../services/serviceAdapter';
+import scoreService from '../services/scoreService';
+import AnomalyFlagIndicator from './AnomalyFlagIndicator';
+import AnomalyDetailsModal from './AnomalyDetailsModal';
 
 const CATEGORY_OPTIONS = [
     { value: 'dance', label: 'Dance / Folk Arts', icon: '💃', color: 'from-pink-500 to-rose-500' },
@@ -77,9 +80,24 @@ const EventManagement = () => {
     const [confirmOpen, setConfirmOpen] = useState(false);
     const [confirmTargetId, setConfirmTargetId] = useState(null);
 
+    // Anomaly detection state
+    const [eventAnomalies, setEventAnomalies] = useState({});
+    const [anomalyModalEventId, setAnomalyModalEventId] = useState(null);
+
     useEffect(() => {
         loadAll();
+        loadAnomalies();
     }, []);
+
+    const loadAnomalies = async () => {
+        try {
+            const anomalyData = await scoreService.getEventAnomalies();
+            setEventAnomalies(anomalyData);
+        } catch (err) {
+            console.error('Failed to load anomaly data', err);
+            // Non-critical, don't show error to user
+        }
+    };
 
     const loadAll = async () => {
         try {
@@ -616,6 +634,8 @@ const EventManagement = () => {
                                 columnsVisible={columnsVisible}
                                 density={rowDensity}
                                 onAssignVolunteers={handleAssignVolunteers}
+                                eventAnomalies={eventAnomalies}
+                                onViewAnomalies={setAnomalyModalEventId}
                             />
                             <Pagination
                                 page={page}
@@ -630,6 +650,15 @@ const EventManagement = () => {
                                 <DeleteConfirmModal
                                     onCancel={closeDeleteConfirm}
                                     onConfirm={confirmDelete}
+                                />
+                            )}
+                            {anomalyModalEventId && (
+                                <AnomalyDetailsModal
+                                    eventId={anomalyModalEventId}
+                                    onClose={() => {
+                                        setAnomalyModalEventId(null);
+                                        loadAnomalies(); // Reload after closing modal
+                                    }}
                                 />
                             )}
                         </>
@@ -691,7 +720,7 @@ const Filters = ({ filters, onChange, onApply, search, onSearch, publishedOnly, 
     );
 };
 
-const EventList = ({ events, venues, judges, volunteers = [], onEdit, onDelete, onTogglePublish, selectedIds, onToggleRowSelect, allSelected, onToggleSelectAll, sort, onChangeSort, columnsVisible, density, onAssignVolunteers }) => {
+const EventList = ({ events, venues, judges, volunteers = [], onEdit, onDelete, onTogglePublish, selectedIds, onToggleRowSelect, allSelected, onToggleSelectAll, sort, onChangeSort, columnsVisible, density, onAssignVolunteers, eventAnomalies = {}, onViewAnomalies }) => {
     const venueLabel = (id) => venues.find((v) => v.id === id)?.name || '-';
     const judgeName = (id) => judges.find((u) => u.id === id)?.username || `User#${id}`;
     const volunteerName = (id) => volunteers.find((u) => u.id === id)?.username || `User#${id}`;
@@ -746,9 +775,20 @@ const EventList = ({ events, venues, judges, volunteers = [], onEdit, onDelete, 
                                 <input type="checkbox" checked={selectedIds.includes(ev.id)} onChange={() => onToggleRowSelect(ev.id)} className="w-5 h-5 text-indigo-600 border-slate-300 rounded focus:ring-indigo-500" />
                             </td>
                             {columnsVisible.name && (
-                                <td className={`px-8 ${density === 'compact' ? 'py-3' : 'py-6'} whitespace-nowrap`}>
-                                    <div className="text-base font-bold text-slate-900">{ev.name}</div>
-                                    <div className="text-sm text-slate-600 max-w-xs truncate mt-1">{ev.description}</div>
+                                <td className={`px-8 ${density === 'compact' ? 'py-3' : 'py-6'}`}>
+                                    <div className="flex items-center gap-3">
+                                        <div>
+                                            <div className="text-base font-bold text-slate-900">{ev.name}</div>
+                                            <div className="text-sm text-slate-600 max-w-xs truncate mt-1">{ev.description}</div>
+                                        </div>
+                                        {eventAnomalies[ev.id] && (
+                                            <AnomalyFlagIndicator
+                                                count={eventAnomalies[ev.id].total_flagged}
+                                                unreviewed={eventAnomalies[ev.id].unreviewed}
+                                                onClick={() => onViewAnomalies(ev.id)}
+                                            />
+                                        )}
+                                    </div>
                                 </td>
                             )}
                             {columnsVisible.category && (

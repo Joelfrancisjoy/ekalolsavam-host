@@ -5,6 +5,7 @@ import http from '../services/http-common';
 import { eventServiceAdapter as eventService, userServiceAdapter as userService } from '../services/serviceAdapter';
 import scoreService from '../services/scoreService';
 import UserInfoHeader from '../components/UserInfoHeader';
+import PerformancePrediction from '../components/PerformancePrediction';
 // Simple inline SVG icons to avoid external icon dependency
 const Trophy = ({ className }) => (
   <svg className={className} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -51,6 +52,7 @@ const JudgeDashboard = () => {
   const [creatingNew, setCreatingNew] = useState(false);
   const [newPassword, setNewPassword] = useState('');
   const [pwdError, setPwdError] = useState('');
+  const [showPrediction, setShowPrediction] = useState(false);
 
   useEffect(() => {
     // Inspect last login response cached user if available
@@ -401,8 +403,27 @@ const JudgeDashboard = () => {
                   <CheckCircle className="w-6 h-6" />
                   {submitting ? 'Submitting…' : 'Submit Score'}
                 </button>
+                <button
+                  onClick={() => setShowPrediction(!showPrediction)}
+                  disabled={!selectedParticipantId || !selectedEventId}
+                  className="px-8 py-3 rounded-xl bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white text-lg font-semibold shadow-lg hover:shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-3"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                  </svg>
+                  {showPrediction ? 'Hide AI Prediction' : 'Show AI Prediction'}
+                </button>
               </div>
             </div>
+
+            {/* Performance Prediction */}
+            {showPrediction && selectedParticipantId && selectedEventId && (
+              <PerformancePrediction
+                participantId={selectedParticipantId}
+                eventId={selectedEventId}
+                onClose={() => setShowPrediction(false)}
+              />
+            )}
           </div>
 
           <div className="space-y-6">

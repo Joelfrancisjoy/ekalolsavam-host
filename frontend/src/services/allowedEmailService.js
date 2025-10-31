@@ -38,8 +38,4 @@ const allowedEmailService = {
   checkEmailRegistered
 };
 
-<<<<<<< HEAD
 export default allowedEmailService;
-=======
-export default allowedEmailService;
->>>>>>> 0459f2d6c76b2996f69de121c5e8747cafc4cdd5

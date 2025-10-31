@@ -2,11 +2,7 @@ import React, { useState, useEffect } from 'react';
 import allowedEmailService from '../services/allowedEmailService';
 
 const AllowedEmailsManager = () => {
-<<<<<<< HEAD
     const [emails, setEmails] = useState([]);
-=======
-        const [emails, setEmails] = useState([]);
->>>>>>> 0459f2d6c76b2996f69de121c5e8747cafc4cdd5
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [success, setSuccess] = useState('');

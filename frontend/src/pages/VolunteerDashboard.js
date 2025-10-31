@@ -6,11 +6,7 @@ import http from '../services/http-common';
 import UserInfoHeader from '../components/UserInfoHeader';
 
 const VolunteerDashboard = () => {
-<<<<<<< HEAD
   const [showPasswordChoice, setShowPasswordChoice] = useState(false);
-=======
-    const [showPasswordChoice, setShowPasswordChoice] = useState(false);
->>>>>>> 0459f2d6c76b2996f69de121c5e8747cafc4cdd5
   const [maskedPending, setMaskedPending] = useState('');
   const [creatingNew, setCreatingNew] = useState(false);
   const [newPassword, setNewPassword] = useState('');

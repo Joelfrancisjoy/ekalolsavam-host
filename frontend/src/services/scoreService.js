@@ -38,7 +38,7 @@ api.interceptors.response.use(
 
 const scoreService = {
     submitBundle: async ({ eventId, participantId, items }) => {
-        const res = await api.post('/api/scores/submit-bundle/', {
+        const res = await api.post('/api/scores/submit/', {
             eventId,
             participantId,
             items,
@@ -55,6 +55,27 @@ const scoreService = {
     },
     getEventCriteria: async (eventId) => {
         const res = await api.get('/api/scores/event-criteria/', { params: { event: eventId } });
+        return res.data;
+    },
+    // Student scores with feedback
+    getStudentScores: async () => {
+        const res = await api.get('/api/scores/student/');
+        return res.data;
+    },
+    // Anomaly endpoints
+    getEventAnomalies: async () => {
+        const res = await api.get('/api/scores/event-anomalies/');
+        return res.data;
+    },
+    getFlaggedScores: async (params = {}) => {
+        const res = await api.get('/api/scores/flagged/', { params });
+        return res.data;
+    },
+    reviewFlaggedScore: async (scoreId, approved, notes) => {
+        const res = await api.post(`/api/scores/flagged/${scoreId}/review/`, {
+            approved,
+            notes
+        });
         return res.data;
     },
 };

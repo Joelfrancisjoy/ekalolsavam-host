@@ -5,10 +5,14 @@ from rest_framework.decorators import api_view, permission_classes
 from django.db import transaction
 from .models import Score, Result
 from .serializers import ScoreSerializer, ResultSerializer
-from django.db.models import Avg, Count
+from django.db.models import Avg, Count, Q
 from .scoring_criteria import get_criteria_for_event, validate_score_data
 from events.models import Event
 from django.shortcuts import get_object_or_404
+from .ml_models.anomaly_detector import get_anomaly_detector
+import logging
+
+logger = logging.getLogger(__name__)
 
 class ScoreListCreateView(generics.ListCreateAPIView):
     serializer_class = ScoreSerializer
@@ -125,6 +129,18 @@ def _submit_dynamic_scores(request, user):
         
         notes = "\n".join(notes_parts) if notes_parts else ""
         
+        # Prepare score data for anomaly detection
+        score_data = {
+            'technical_skill': criteria_scores.get('technical_skill', 0),
+            'artistic_expression': criteria_scores.get('artistic_expression', 0),
+            'stage_presence': criteria_scores.get('stage_presence', 0),
+            'overall_impression': criteria_scores.get('overall_impression', 0),
+            'total_score': sum(float(v) for v in criteria_scores.values() if v is not None)
+        }
+        
+        # Anomaly detection
+        is_anomaly, confidence, details = _check_anomaly(score_data)
+        
         with transaction.atomic():
             obj, created = Score.objects.update_or_create(
                 event_id=event_id,
@@ -133,15 +149,27 @@ def _submit_dynamic_scores(request, user):
                 defaults={
                     'criteria_scores': criteria_scores,
                     'notes': notes,
+                    'is_flagged': is_anomaly,
+                    'anomaly_confidence': confidence if is_anomaly else None,
+                    'anomaly_details': details if is_anomaly else {},
                 }
             )
             
             serializer = ScoreSerializer(obj)
-            return Response({
+            response_data = {
                 "status": "ok",
                 "created": created,
                 "score": serializer.data
-            }, status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
+            }
+            
+            # Add anomaly warning if detected
+            if is_anomaly:
+                response_data["anomaly_detected"] = True
+                response_data["anomaly_confidence"] = round(confidence, 3)
+                response_data["anomaly_severity"] = details.get('severity', 'unknown')
+                response_data["message"] = "Score flagged for admin review due to potential anomaly"
+            
+            return Response(response_data, status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
     except Exception as e:
         return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -162,6 +190,18 @@ def _submit_legacy_scores(request, user):
         return Response({"error": "Missing required fields"}, status=status.HTTP_400_BAD_REQUEST)
 
     try:
+        # Prepare score data for anomaly detection
+        score_data = {
+            'technical_skill': float(technical_skill),
+            'artistic_expression': float(artistic_expression),
+            'stage_presence': float(stage_presence),
+            'overall_impression': float(overall_impression),
+            'total_score': float(technical_skill) + float(artistic_expression) + float(stage_presence) + float(overall_impression)
+        }
+        
+        # Anomaly detection
+        is_anomaly, confidence, details = _check_anomaly(score_data)
+        
         with transaction.atomic():
             obj, created = Score.objects.update_or_create(
                 event_id=event_id,
@@ -173,15 +213,27 @@ def _submit_legacy_scores(request, user):
                     'stage_presence': stage_presence,
                     'overall_impression': overall_impression,
                     'notes': notes,
+                    'is_flagged': is_anomaly,
+                    'anomaly_confidence': confidence if is_anomaly else None,
+                    'anomaly_details': details if is_anomaly else {},
                 }
             )
             
             serializer = ScoreSerializer(obj)
-            return Response({
+            response_data = {
                 "status": "ok", 
                 "created": created,
                 "score": serializer.data
-            }, status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
+            }
+            
+            # Add anomaly warning if detected
+            if is_anomaly:
+                response_data["anomaly_detected"] = True
+                response_data["anomaly_confidence"] = round(confidence, 3)
+                response_data["anomaly_severity"] = details.get('severity', 'unknown')
+                response_data["message"] = "Score flagged for admin review due to potential anomaly"
+            
+            return Response(response_data, status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
     except Exception as e:
         return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -273,3 +325,72 @@ def get_event_criteria(request):
         }, status=status.HTTP_200_OK)
     except Exception as e:
         return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def student_scores(request):
+    """
+    Get scores and feedback for the authenticated student.
+    Returns scores with judge feedback for all events the student participated in.
+    """
+    user = request.user
+    
+    # Get all scores for this student
+    scores = Score.objects.filter(participant=user).select_related(
+        'event', 'judge'
+    ).order_by('-submitted_at')
+    
+    # Build response with feedback
+    results = []
+    for score in scores:
+        results.append({
+            'id': score.id,
+            'event': {
+                'id': score.event.id,
+                'name': score.event.name,
+                'category': score.event.category,
+                'date': score.event.date
+            },
+            'judge': {
+                'id': score.judge.id,
+                'name': score.judge.username
+            },
+            'total_score': float(score.total_score),
+            'feedback': score.notes or '',
+            'submitted_at': score.submitted_at.isoformat(),
+            'scores': {
+                'technical_skill': float(score.technical_skill) if score.technical_skill else None,
+                'artistic_expression': float(score.artistic_expression) if score.artistic_expression else None,
+                'stage_presence': float(score.stage_presence) if score.stage_presence else None,
+                'overall_impression': float(score.overall_impression) if score.overall_impression else None,
+            },
+            'criteria_scores': score.criteria_scores if score.criteria_scores else {}
+        })
+    
+    return Response({
+        'count': len(results),
+        'scores': results
+    })
+
+
+# Helper function for anomaly detection
+def _check_anomaly(score_data):
+    """
+    Check if a score is anomalous using the trained ML model.
+    
+    Args:
+        score_data: Dict with score values
+    
+    Returns:
+        Tuple of (is_anomaly, confidence, details)
+    """
+    try:
+        detector = get_anomaly_detector()
+        is_anomaly, confidence, details = detector.detect_anomaly(score_data)
+        logger.info(f"Anomaly check: is_anomaly={is_anomaly}, confidence={confidence:.3f}")
+        return is_anomaly, confidence, details
+    except Exception as e:
+        logger.error(f"Anomaly detection failed: {e}")
+        # Return safe defaults on error
+        return False, 0.0, {'method': 'error', 'error': str(e)}

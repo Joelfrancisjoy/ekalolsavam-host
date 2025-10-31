@@ -27,23 +27,33 @@ class FeedbackCreateView(generics.CreateAPIView):
     permission_classes = [IsAuthenticated]
 
     def perform_create(self, serializer):
-        """Save feedback with automatic sentiment analysis."""
-        # Get the feedback message
-        message = serializer.validated_data.get('message', '')
-        
-        # Analyze sentiment
+        """Save feedback with automatic sentiment analysis (score, label, confidence)."""
+        # Support both 'message' and (legacy) 'text' keys
+        message = serializer.validated_data.get('message') or self.request.data.get('text', '')
+
         sentiment_score = None
+        sentiment_label = 'neutral'
+        sentiment_confidence = 0.5
         try:
             analyzer = get_sentiment_analyzer()
-            sentiment_score = analyzer.calculate_sentiment_score(message)
-            logger.info(f"Sentiment analysis completed: score={sentiment_score:.2f}")
+            # Predict label+confidence for display and storage
+            label, confidence, _ = analyzer.predict_sentiment(message or '')
+            score = analyzer.calculate_sentiment_score(message or '')
+            sentiment_label = label
+            sentiment_confidence = float(confidence)
+            sentiment_score = score
+            logger.info(
+                f"Sentiment analysis completed: label={sentiment_label}, conf={sentiment_confidence:.2f}, score={sentiment_score:.2f}"
+            )
         except Exception as e:
-            logger.warning(f"Sentiment analysis failed: {e}. Saving without sentiment score.")
-        
-        # Save with sentiment score
+            logger.warning(f"Sentiment analysis failed: {e}. Saving without sentiment fields.")
+
+        # Persist feedback with computed fields
         serializer.save(
             user=self.request.user,
-            sentiment_score=sentiment_score
+            sentiment_score=sentiment_score,
+            sentiment_label=sentiment_label,
+            sentiment_confidence=sentiment_confidence,
         )
 
 
@@ -193,3 +203,35 @@ def analyze_text(request):
             {"error": f"Analysis failed: {str(e)}"},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
+
+
+class AdminFeedbackListView(generics.ListAPIView):
+    """
+    Admin-only endpoint to list all feedback with filtering capabilities.
+    """
+    serializer_class = FeedbackSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+        if getattr(user, 'role', None) != 'admin':
+            return Feedback.objects.none()
+        
+        qs = Feedback.objects.all()
+        
+        # Filter by feedback_type
+        feedback_type = self.request.query_params.get('feedback_type')
+        if feedback_type:
+            qs = qs.filter(feedback_type=feedback_type)
+        
+        # Filter by sentiment
+        sentiment = self.request.query_params.get('sentiment')
+        if sentiment in ('positive', 'neutral', 'negative'):
+            qs = qs.filter(sentiment_label=sentiment)
+        
+        # Filter by category
+        category = self.request.query_params.get('category')
+        if category:
+            qs = qs.filter(category=category)
+        
+        return qs

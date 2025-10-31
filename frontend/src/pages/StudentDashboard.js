@@ -3,6 +3,8 @@ import { useTranslation } from 'react-i18next';
 import { eventServiceAdapter as eventService, resultServiceAdapter as resultService } from '../services/serviceAdapter';
 import http from '../services/http-common';
 import UserInfoHeader from '../components/UserInfoHeader';
+import StudentFeedbackDisplay from '../components/StudentFeedbackDisplay';
+import feedbackService from '../services/feedbackService';
 
 // Results from provided CSV (Event + Category combined)
 const csvResults = [
@@ -504,6 +506,15 @@ const TopRightFloatingMenu = ({ onOpen }) => {
       accentColor: 'blue'
     },
     {
+      key: 'scores',
+      label: 'My Scores & Feedback',
+      description: 'View your scores and feedback from judges',
+      icon: 'M9 11.75A.75.75 0 019.75 11h4.5a.75.75 0 010 1.5h-4.5a.75.75 0 01-.75-.75zM9.75 14a.75.75 0 000 1.5h2.5a.75.75 0 000-1.5h-2.5z M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2zM8.5 9.5a1.5 1.5 0 113 0 1.5 1.5 0 01-3 0zm3.5 6.5c-2.5 0-4.5-1-4.5-2.5s2-2.5 4.5-2.5 4.5 1 4.5 2.5-2 2.5-4.5 2.5z',
+      gradient: 'from-pink-400 via-rose-500 to-red-600',
+      shadowColor: 'shadow-pink-500/25',
+      accentColor: 'pink'
+    },
+    {
       key: 'feedback',
       label: 'Share Feedback',
       description: 'Help us improve your experience with valuable insights',
@@ -647,6 +658,17 @@ const StudentDashboard = () => {
   const [selectedRegistrationIndex, setSelectedRegistrationIndex] = useState(0); // Index of selected registration
   const [allRegistrationsWithQR, setAllRegistrationsWithQR] = useState([]); // All registrations with QR codes
   const [isGeneratingQR, setIsGeneratingQR] = useState(false); // Loading state for QR generation
+
+  // Feedback state
+  const [feedbackRating, setFeedbackRating] = useState(0);
+  const [feedbackCategory, setFeedbackCategory] = useState('');
+  const [feedbackText, setFeedbackText] = useState('');
+  const [feedbackEmail, setFeedbackEmail] = useState('');
+  const [feedbackSubmitting, setFeedbackSubmitting] = useState(false);
+  const [feedbackError, setFeedbackError] = useState('');
+  const [showFeedbackPopup, setShowFeedbackPopup] = useState(false);
+  const [feedbackPopupMessage, setFeedbackPopupMessage] = useState('');
+  const [feedbackPopupType, setFeedbackPopupType] = useState('success'); // 'success' | 'positive' | 'negative'
 
   // Group events by category from API data
   const eventsByCategory = useMemo(() => {
@@ -836,6 +858,79 @@ const StudentDashboard = () => {
     setSelectedCategory('');
     setSelectedEvent('');
     setIsRegistering(false);
+    // Reset feedback state
+    setFeedbackRating(0);
+    setFeedbackCategory('');
+    setFeedbackText('');
+    setFeedbackEmail('');
+    setFeedbackError('');
+  };
+
+  const handleSubmitFeedback = async () => {
+    // Validate feedback
+    if (feedbackRating === 0) {
+      setFeedbackError('⭐ Please select a star rating above (1-5 stars)');
+      // Scroll to top of modal to show rating section
+      const modalContent = document.querySelector('.max-h-\\[70vh\\]');
+      if (modalContent) modalContent.scrollTop = 0;
+      return;
+    }
+    if (!feedbackCategory) {
+      setFeedbackError('📋 Please select a feedback category above');
+      // Scroll to show category section
+      const modalContent = document.querySelector('.max-h-\\[70vh\\]');
+      if (modalContent) modalContent.scrollTop = 0;
+      return;
+    }
+    if (!feedbackText.trim()) {
+      setFeedbackError('✍️ Please provide your feedback in the text area');
+      return;
+    }
+
+    try {
+      setFeedbackSubmitting(true);
+      setFeedbackError('');
+
+      // Submit feedback with sentiment analysis
+      const response = await feedbackService.submitFeedback({
+        rating: feedbackRating,
+        category: feedbackCategory,
+        message: feedbackText,
+        contact_email: feedbackEmail || null,
+      });
+
+      // Determine popup message based on rating and sentiment
+      const sentiment = response.sentiment_label || 'neutral';
+      let popupMessage = '';
+      let popupType = 'success';
+
+      if (feedbackRating === 5) {
+        popupMessage = 'Positive Feedback, Thanks for the feedback';
+        popupType = 'positive';
+      } else if (feedbackRating === 1 && sentiment === 'negative') {
+        popupMessage = '😔 Negative feedback, thanks for your feedback!';
+        popupType = 'negative';
+      } else {
+        popupMessage = '✨ Thanks for your feedback!';
+        popupType = 'success';
+      }
+
+      setFeedbackPopupMessage(popupMessage);
+      setFeedbackPopupType(popupType);
+      setShowFeedbackPopup(true);
+
+      // Auto-hide popup after 4 seconds
+      setTimeout(() => {
+        setShowFeedbackPopup(false);
+        handleClose();
+      }, 4000);
+
+    } catch (error) {
+      console.error('Failed to submit feedback:', error);
+      setFeedbackError(error?.response?.data?.error || 'Failed to submit feedback. Please try again.');
+    } finally {
+      setFeedbackSubmitting(false);
+    }
   };
 
   const validateFirstName = (value) => {
@@ -2564,15 +2659,27 @@ const StudentDashboard = () => {
             <div className="space-y-6">
               {/* Rating Section */}
               <div>
-                <label className="block text-green-800 font-bold mb-3 text-lg" style={{ fontFamily: 'Cinzel, serif' }}>How would you rate your experience?</label>
+                <label className="block text-green-800 font-bold mb-3 text-lg" style={{ fontFamily: 'Cinzel, serif' }}>
+                  How would you rate your experience? <span className="text-red-600">*</span>
+                </label>
                 <div className="flex items-center justify-center gap-2">
                   {[1, 2, 3, 4, 5].map((star) => (
                     <button
                       key={star}
-                      className="w-12 h-12 rounded-full bg-white border-2 border-green-200 hover:border-green-400 hover:bg-green-50 transition-all duration-200 flex items-center justify-center group"
+                      type="button"
+                      onClick={() => setFeedbackRating(star)}
+                      className={`w-12 h-12 rounded-full border-2 transition-all duration-200 flex items-center justify-center group ${
+                        feedbackRating >= star
+                          ? 'bg-green-500 border-green-600'
+                          : 'bg-white border-green-200 hover:border-green-400 hover:bg-green-50'
+                      }`}
                     >
                       <svg
-                        className="w-6 h-6 text-green-400 group-hover:text-green-600 transition-colors duration-200"
+                        className={`w-6 h-6 transition-colors duration-200 ${
+                          feedbackRating >= star
+                            ? 'text-white'
+                            : 'text-green-400 group-hover:text-green-600'
+                        }`}
                         fill="currentColor"
                         viewBox="0 0 20 20"
                       >
@@ -2581,11 +2688,18 @@ const StudentDashboard = () => {
                     </button>
                   ))}
                 </div>
+                {feedbackRating > 0 && (
+                  <div className="text-center mt-2 text-green-700 font-semibold">
+                    {feedbackRating} star{feedbackRating > 1 ? 's' : ''} selected
+                  </div>
+                )}
               </div>
 
               {/* Category Selection */}
               <div>
-                <label className="block text-green-800 font-bold mb-3 text-lg" style={{ fontFamily: 'Cinzel, serif' }}>What aspect would you like to provide feedback on?</label>
+                <label className="block text-green-800 font-bold mb-3 text-lg" style={{ fontFamily: 'Cinzel, serif' }}>
+                  What aspect would you like to provide feedback on? <span className="text-red-600">*</span>
+                </label>
                 <div className="grid grid-cols-2 gap-3">
                   {[
                     { id: 'registration', label: 'Registration Process', icon: '📝' },
@@ -2597,12 +2711,20 @@ const StudentDashboard = () => {
                   ].map((category) => (
                     <button
                       key={category.id}
-                      className="p-4 rounded-xl bg-white border-2 border-green-200 hover:border-green-400 hover:bg-green-50 transition-all duration-200 text-left group"
+                      type="button"
+                      onClick={() => setFeedbackCategory(category.id)}
+                      className={`p-4 rounded-xl border-2 transition-all duration-200 text-left group ${
+                        feedbackCategory === category.id
+                          ? 'bg-green-500 border-green-600'
+                          : 'bg-white border-green-200 hover:border-green-400 hover:bg-green-50'
+                      }`}
                     >
                       <div className="flex items-center gap-3">
                         <span className="text-2xl">{category.icon}</span>
                         <div>
-                          <div className="font-semibold text-green-900 text-sm">{category.label}</div>
+                          <div className={`font-semibold text-sm ${
+                            feedbackCategory === category.id ? 'text-white' : 'text-green-900'
+                          }`}>{category.label}</div>
                         </div>
                       </div>
                     </button>
@@ -2612,8 +2734,12 @@ const StudentDashboard = () => {
 
               {/* Feedback Text */}
               <div>
-                <label className="block text-green-800 font-bold mb-3 text-lg" style={{ fontFamily: 'Cinzel, serif' }}>Your Feedback</label>
+                <label className="block text-green-800 font-bold mb-3 text-lg" style={{ fontFamily: 'Cinzel, serif' }}>
+                  Your Feedback <span className="text-red-600">*</span>
+                </label>
                 <textarea
+                  value={feedbackText}
+                  onChange={(e) => setFeedbackText(e.target.value)}
                   className="w-full p-4 border-2 border-green-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-400 focus:border-transparent transition-all duration-200 resize-none"
                   rows={6}
                   placeholder="Please share your detailed feedback, suggestions, or any issues you encountered. Your input helps us improve future events..."
@@ -2636,6 +2762,8 @@ const StudentDashboard = () => {
                 </div>
                 <input
                   type="email"
+                  value={feedbackEmail}
+                  onChange={(e) => setFeedbackEmail(e.target.value)}
                   placeholder="your.email@example.com"
                   className="w-full p-3 border border-green-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-400 focus:border-transparent transition-all duration-200"
                 />
@@ -2643,11 +2771,24 @@ const StudentDashboard = () => {
             </div>
           </div>
 
+          {/* Error Display */}
+          {feedbackError && (
+            <div className="bg-red-50 border-2 border-red-200 rounded-xl p-4">
+              <div className="flex items-center gap-3">
+                <svg className="w-6 h-6 text-red-600 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                </svg>
+                <p className="text-red-800 font-semibold">{feedbackError}</p>
+              </div>
+            </div>
+          )}
+
           {/* Action Buttons */}
           <div className="flex flex-col sm:flex-row gap-4">
             <button
               onClick={handleClose}
-              className="flex-1 px-6 py-4 rounded-xl bg-gradient-to-r from-gray-500 to-gray-600 hover:from-gray-600 hover:to-gray-700 text-white font-bold text-lg transition-all duration-300 hover:scale-105 shadow-lg hover:shadow-xl flex items-center justify-center gap-3"
+              disabled={feedbackSubmitting}
+              className="flex-1 px-6 py-4 rounded-xl bg-gradient-to-r from-gray-500 to-gray-600 hover:from-gray-600 hover:to-gray-700 text-white font-bold text-lg transition-all duration-300 hover:scale-105 shadow-lg hover:shadow-xl flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
                 <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd"></path>
@@ -2655,13 +2796,27 @@ const StudentDashboard = () => {
               Cancel
             </button>
             <button
-              className="flex-1 px-6 py-4 rounded-xl bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white font-bold text-lg transition-all duration-300 hover:scale-105 shadow-lg hover:shadow-xl flex items-center justify-center gap-3"
+              onClick={handleSubmitFeedback}
+              disabled={feedbackSubmitting}
+              className="flex-1 px-6 py-4 rounded-xl bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white font-bold text-lg transition-all duration-300 hover:scale-105 shadow-lg hover:shadow-xl flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
-                <path d="M2.003 5.884L10 9.882l7.997-3.998A2 2 0 0016 4H4a2 2 0 00-1.997 1.884z"></path>
-                <path d="M18 8.118l-8 4-8-4V14a2 2 0 002 2h12a2 2 0 002-2V8.118z"></path>
-              </svg>
-              Submit Feedback
+              {feedbackSubmitting ? (
+                <>
+                  <svg className="w-6 h-6 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  Submitting...
+                </>
+              ) : (
+                <>
+                  <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M2.003 5.884L10 9.882l7.997-3.998A2 2 0 0016 4H4a2 2 0 00-1.997 1.884z"></path>
+                    <path d="M18 8.118l-8 4-8-4V14a2 2 0 002 2h12a2 2 0 002-2V8.118z"></path>
+                  </svg>
+                  Submit Feedback
+                </>
+              )}
             </button>
           </div>
 
@@ -3014,6 +3169,106 @@ const StudentDashboard = () => {
           )}
         </div>
       </Modal>
+
+      {/* Scores & Feedback Modal */}
+      <Modal open={open === 'scores'} title="My Scores & Feedback" onClose={handleClose}>
+        <StudentFeedbackDisplay />
+      </Modal>
+
+      {/* Feedback Success Popup */}
+      {showFeedbackPopup && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 animate-fadeIn">
+          <div className={`bg-white rounded-2xl shadow-2xl p-8 max-w-md mx-4 transform transition-all duration-300 animate-scaleIn ${
+            feedbackPopupType === 'positive' ? 'border-4 border-green-500' :
+            feedbackPopupType === 'negative' ? 'border-4 border-red-500' :
+            'border-4 border-blue-500'
+          }`}>
+            <div className="text-center">
+              {/* Icon */}
+              <div className={`w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4 ${
+                feedbackPopupType === 'positive' ? 'bg-gradient-to-br from-green-400 to-emerald-500' :
+                feedbackPopupType === 'negative' ? 'bg-gradient-to-br from-red-400 to-rose-500' :
+                'bg-gradient-to-br from-blue-400 to-indigo-500'
+              }`}>
+                {feedbackPopupType === 'positive' && (
+                  <svg className="w-12 h-12 text-white" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                  </svg>
+                )}
+                {feedbackPopupType === 'negative' && (
+                  <svg className="w-12 h-12 text-white" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                  </svg>
+                )}
+                {feedbackPopupType === 'success' && (
+                  <svg className="w-12 h-12 text-white" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M2.003 5.884L10 9.882l7.997-3.998A2 2 0 0016 4H4a2 2 0 00-1.997 1.884z"></path>
+                    <path d="M18 8.118l-8 4-8-4V14a2 2 0 002 2h12a2 2 0 002-2V8.118z"></path>
+                  </svg>
+                )}
+              </div>
+
+              {/* Message */}
+              <h3 className={`text-2xl font-bold mb-2 ${
+                feedbackPopupType === 'positive' ? 'text-green-800' :
+                feedbackPopupType === 'negative' ? 'text-red-800' :
+                'text-blue-800'
+              }`} style={{ fontFamily: 'Cinzel, serif' }}>
+                {feedbackPopupMessage}
+              </h3>
+
+              {/* Star Rating Display */}
+              <div className="flex items-center justify-center gap-1 mb-4">
+                {[1, 2, 3, 4, 5].map((star) => (
+                  <svg
+                    key={star}
+                    className={`w-6 h-6 ${
+                      feedbackRating >= star ? 'text-yellow-400' : 'text-gray-300'
+                    }`}
+                    fill="currentColor"
+                    viewBox="0 0 20 20"
+                  >
+                    <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"></path>
+                  </svg>
+                ))}
+              </div>
+
+              <p className="text-gray-600 mb-6">
+                Your feedback has been submitted successfully and will help us improve the E-Kalolsavam experience.
+              </p>
+
+              {/* Auto-close indicator */}
+              <div className="w-full bg-gray-200 rounded-full h-2 mb-4 overflow-hidden">
+                <div className="bg-gradient-to-r from-blue-500 to-indigo-500 h-2 rounded-full animate-progress" style={{ animation: 'progress 4s linear' }}></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <style jsx>{`
+        @keyframes fadeIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+        @keyframes scaleIn {
+          from { transform: scale(0.9); opacity: 0; }
+          to { transform: scale(1); opacity: 1; }
+        }
+        @keyframes progress {
+          from { width: 0%; }
+          to { width: 100%; }
+        }
+        .animate-fadeIn {
+          animation: fadeIn 0.3s ease-out;
+        }
+        .animate-scaleIn {
+          animation: scaleIn 0.3s ease-out;
+        }
+        .animate-progress {
+          animation: progress 4s linear;
+        }
+      `}</style>
     </div>
   );
 };

@@ -60,6 +60,23 @@ class Score(models.Model):
     notes = models.TextField(blank=True, null=True, help_text="Additional comments from judge")
     submitted_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    
+    # Anomaly detection fields
+    is_flagged = models.BooleanField(default=False, help_text="Flagged as potentially anomalous")
+    anomaly_confidence = models.DecimalField(
+        max_digits=4, 
+        decimal_places=3,
+        null=True,
+        blank=True,
+        help_text="Anomaly confidence score (0.0-1.0)"
+    )
+    anomaly_details = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text="Details about anomaly detection"
+    )
+    admin_reviewed = models.BooleanField(default=False, help_text="Admin has reviewed this flagged score")
+    admin_notes = models.TextField(blank=True, null=True, help_text="Admin notes about flagged score")
 
     class Meta:
         db_table = 'score_scores'
