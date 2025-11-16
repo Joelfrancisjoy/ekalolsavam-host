@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>E-Kalolsavam • Test Automation Results • T02</title>
+  <style>
+    :root { --bg:#0e131b; --panel:#151b23; --panel-2:#0f1720; --text:#e5ecf4; --muted:#9ab0c3; --brand:#55d17c; --brand-2:#2ea44f; --blue:#4ea1ff; --red:#ff6b6b; --yellow:#ffd166; --border:#223042; }
+    *{box-sizing:border-box} body{margin:0;font-family:Inter,ui-sans-serif,system-ui,Segoe UI,Roboto,Arial;background:var(--bg);color:var(--text)}
+    .wrap{display:grid;grid-template-columns:300px 1fr 280px;gap:16px;padding:20px}
+    .card{background:linear-gradient(180deg,var(--panel),var(--panel-2));border:1px solid var(--border);border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,.35)}
+    .side{padding:16px}.brand{padding:16px;font-weight:700;border-bottom:1px solid var(--border);font-size:14px;letter-spacing:.4px;opacity:.9}
+    .suite{list-style:none;padding:0;margin:0}
+    .suite li{display:flex;align-items:center;gap:10px;padding:12px 10px;border-radius:8px;cursor:default;color:var(--muted);border:1px solid transparent}
+    .suite li.active{background:#101720;border-color:var(--border);color:var(--text)}
+    .suite .dot{width:20px;height:20px;border-radius:100%;background:radial-gradient(circle at 30% 30%,#6ff3a3,var(--brand-2));display:inline-block}
+    .content{padding:18px 22px}
+    .header{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid var(--border)}
+    .id{font-size:13px;letter-spacing:.6px;color:var(--muted)} .title{font-size:18px;font-weight:800}
+    .status{display:inline-flex;align-items:center;gap:8px;color:#0a2e17;background:linear-gradient(180deg,#7cf0a8,#4cd47f);border:1px solid #4bcc7a;padding:6px 10px;font-weight:700;border-radius:999px}
+    .status svg{width:16px;height:16px}
+    .panel{padding:16px;border-top:1px solid var(--border)} h3{margin:0 0 10px;font-size:16px}
+    .kv{display:grid;grid-template-columns:180px 1fr;gap:10px;row-gap:6px;font-size:13px;color:var(--muted)} .kv b{color:var(--text)}
+    .steps{margin:0;padding:0;list-style:none}
+    .steps li{display:grid;grid-template-columns:26px 1fr;gap:12px;padding:10px 0;border-bottom:1px dashed var(--border)} .steps li:last-child{border-bottom:0}
+    .chk{width:20px;height:20px;border-radius:50%;background:#0f2b1c;border:2px solid #3ad07a;display:flex;align-items:center;justify-content:center}
+    .pill{display:inline-block;padding:6px 10px;border-radius:8px;font-size:12px;font-weight:700}
+    .pill.expected{background:rgba(78,161,255,.15);color:#9bd0ff;border:1px solid rgba(78,161,255,.4)}
+    .pill.actual{background:rgba(85,209,124,.15);color:#b0f1c6;border:1px solid rgba(85,209,124,.4)}
+    .timeline{padding:16px}
+    .tl-item{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px dashed var(--border)} .tl-item:last-child{border-bottom:0}
+    .ok{color:#9feab9} .muted{color:var(--muted);font-size:12px}
+    .footer{display:flex;justify-content:space-between;padding:10px 16px;border-top:1px solid var(--border);color:var(--muted);font-size:12px}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <aside class="card side">
+      <div class="brand">E-Kalolsavam — Test Automation Results</div>
+      <ul class="suite">
+        <li><span class="dot"></span><span>T01 - Admin: Create New Event</span></li>
+        <li class="active"><span class="dot"></span><span>T02 - Invalid Login</span></li>
+        <li><span class="dot"></span><span>T03 – Admin Toggle Event Publish Status</span></li>
+        <li><span class="dot"></span><span>T04 – Live Results Page Rendering</span></li>
+      </ul>
+    </aside>
+
+    <main class="card">
+      <div class="header">
+        <div>
+          <div class="id">Test Case ID: T02</div>
+          <div class="title">Invalid Login</div>
+        </div>
+        <div class="status" title="Passed">
+          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M20 7L9 18L4 13" stroke="#0a2e17" stroke-width="3"/></svg>
+          Passed
+        </div>
+      </div>
+
+      <div class="content">
+        <section class="panel">
+          <h3>Objective</h3>
+          <p class="muted">Verify that a user cannot log in with an invalid/non-Gmail email and that a specific error message is shown.</p>
+        </section>
+
+        <section class="panel">
+          <h3>Precondition</h3>
+          <div class="kv">
+            <div>Base URL</div><b>http://localhost:3000</b>
+            <div>Account</div><b>No valid Gmail account used</b>
+            <div>Expected Error</div><b>"Please provide a valid Gmail address"</b>
+          </div>
+        </section>
+
+        <section class="panel">
+          <h3>Test Steps</h3>
+          <ul class="steps">
+            <li><span class="chk">✓</span><div>Navigate to <b>/login</b>.</div></li>
+            <li><span class="chk">✓</span><div>Enter email <b>user@notgmail.com</b>.</div></li>
+            <li><span class="chk">✓</span><div>Enter password <b>WrongPass123!</b>.</div></li>
+            <li><span class="chk">✓</span><div>Click <b>Login</b>.</div></li>
+            <li><span class="chk">✓</span><div>Verify error banner shows <b>"Please provide a valid Gmail address"</b>.</div></li>
+            <li><span class="chk">✓</span><div>Verify user remains on <b>/login</b>.</div></li>
+          </ul>
+        </section>
+
+        <section class="panel">
+          <span class="pill expected">Expected Result: Error message is displayed, no redirect</span>
+          &nbsp;
+          <span class="pill actual">Actual Result: Error shown and user stays on /login</span>
+        </section>
+      </div>
+
+      <div class="footer">
+        <div>Tests: 1 Passed</div>
+        <div>Duration: 1.6s</div>
+      </div>
+    </main>
+
+    <aside class="card timeline">
+      <h3>Timeline</h3>
+      <div class="tl-item"><span class="ok">●</span><div>Open /login <div class="muted">Passed</div></div></div>
+      <div class="tl-item"><span class="ok">●</span><div>Enter credentials <div class="muted">Passed</div></div></div>
+      <div class="tl-item"><span class="ok">●</span><div>Click Login <div class="muted">Passed</div></div></div>
+      <div class="tl-item"><span class="ok">●</span><div>See error message <div class="muted">Passed</div></div></div>
+    </aside>
+  </div>
+</body>
+</html>

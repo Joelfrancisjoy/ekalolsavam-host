@@ -88,3 +88,4 @@ When backend is ready:
 
 The frontend is now completely ready for Netlify deployment and will work perfectly as a standalone demo application!
 
+

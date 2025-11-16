@@ -147,3 +147,4 @@ Then deploy on Netlify with:
 - **Build command**: (auto-detected from netlify.toml)
 - **Publish directory**: `build`
 
+
