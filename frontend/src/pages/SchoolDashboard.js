@@ -26,11 +26,26 @@ const SchoolDashboard = () => {
     event_ids: []
   });
 
+  // Fetch participants for the current school user
+  const fetchParticipants = async () => {
+    try {
+      const response = await http.get('/api/auth/schools/participants/');
+      setParticipants(response.data);
+    } catch (err) {
+      console.error('Failed to fetch participants:', err);
+      setError('Failed to load participants');
+      showToast('Failed to load participants', 'error');
+    }
+  };
+
   useEffect(() => {
     const fetchUser = async () => {
       try {
         const response = await http.get('/api/auth/current/');
         setCurrentUser(response.data);
+        
+        // After getting user, fetch their participants
+        fetchParticipants();
       } catch (err) {
         console.error('Failed to fetch user:', err);
         navigate('/login');
@@ -60,12 +75,28 @@ const SchoolDashboard = () => {
     setLoading(true);
 
     try {
+      // Validate form data
+      if (!formData.participant_id || !formData.first_name || !formData.last_name || !formData.student_class) {
+        setError('All fields are required');
+        showToast('All fields are required', 'error');
+        setLoading(false);
+        return;
+      }
+      
+      const studentClassInt = parseInt(formData.student_class);
+      if (isNaN(studentClassInt) || studentClassInt < 1 || studentClassInt > 12) {
+        setError('Student class must be between 1 and 12');
+        showToast('Student class must be between 1 and 12', 'error');
+        setLoading(false);
+        return;
+      }
+      
       const payload = {
         participants: [{
           participant_id: formData.participant_id,
           first_name: formData.first_name,
           last_name: formData.last_name,
-          student_class: parseInt(formData.student_class),
+          student_class: studentClassInt,
           event_ids: formData.event_ids
         }]
       };
@@ -73,7 +104,12 @@ const SchoolDashboard = () => {
       const response = await http.post('/api/auth/schools/participants/submit/', payload);
 
       if (response.data.participants) {
-        setParticipants(prev => [...prev, ...response.data.participants]);
+        // Option 1: Update state with response (as before)
+        // setParticipants(prev => [...prev, ...response.data.participants]);
+        
+        // Option 2: Refresh from server to ensure consistency
+        await fetchParticipants();
+        
         setFormData({
           participant_id: '',
           first_name: '',

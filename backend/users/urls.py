@@ -16,7 +16,7 @@ from .workflow_views import (
     VolunteerSchoolParticipantsView,
     VolunteerVerifyStudentView, AdminAssignVolunteerToSchoolView,
     SchoolStandingsView, AdminIssuedIDListView, AdminIssuedIDDetailView,
-    check_id_validity
+    SchoolViewOwnParticipantsView, check_id_validity
 )
 
 urlpatterns = [
@@ -70,6 +70,7 @@ urlpatterns = [
     
     # School: Submit participants and generate student IDs
     path('schools/participants/submit/', SchoolSubmitParticipantsView.as_view(), name='school-submit-participants'),
+    path('schools/participants/', SchoolViewOwnParticipantsView.as_view(), name='school-view-own-participants'),
     path('schools/students/generate-ids/', SchoolGenerateStudentIDView.as_view(), name='school-generate-student-ids'),
     
     # Volunteer: View and verify participants

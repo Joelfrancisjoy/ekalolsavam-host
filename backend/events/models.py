@@ -53,6 +53,8 @@ class EventRegistration(models.Model):
     registration_date = models.DateTimeField(auto_now_add=True)
     status = models.CharField(max_length=20, default='pending')  # pending, confirmed, cancelled
     chess_number = models.CharField(max_length=20, unique=True, blank=True, null=True)
+    registration_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    amount_paid = models.DecimalField(max_digits=10, decimal_places=2, default=0)
 
     class Meta:
         unique_together = ('event', 'participant')

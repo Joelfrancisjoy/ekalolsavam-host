@@ -62,6 +62,17 @@ const scoreService = {
         const res = await api.get('/api/scores/student/');
         return res.data;
     },
+    // Student re-check workflow endpoints
+    getResultDetails: async (resultId) => {
+        const res = await api.get(`/api/scores/student/results/${resultId}/`);
+        return res.data;
+    },
+    submitRecheckRequest: async (resultId) => {
+        const res = await api.post('/api/scores/student/result-recheck/', {
+            result: resultId
+        });
+        return res.data;
+    },
     // Anomaly endpoints
     getEventAnomalies: async () => {
         const res = await api.get('/api/scores/event-anomalies/');

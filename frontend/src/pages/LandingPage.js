@@ -4,8 +4,9 @@ import { useTranslation } from 'react-i18next';
 
 const LandingPage = () => {
     const navigate = useNavigate();
-        const [currentSlide, setCurrentSlide] = useState(0);
+    const [currentSlide, setCurrentSlide] = useState(0);
     const [showAboutModal, setShowAboutModal] = useState(false);
+    const [showEmergencyModal, setShowEmergencyModal] = useState(false);
 
     // Art forms data with authentic Kerala traditional arts
     const artForms = [
@@ -324,6 +325,253 @@ const LandingPage = () => {
                                         <li>Cultural heritage documentation</li>
                                     </ul>
                                 </section>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Emergency Floating Button */}
+            <button
+                onClick={() => {
+                    try {
+                        navigate('/emergency');
+                    } catch (e) {
+                        window.location.href = '/emergency';
+                    }
+                }}
+                className="fixed bottom-8 right-8 z-50 group"
+                title="Emergency"
+            >
+                <div className="relative">
+                    {/* Pulsing ring effect */}
+                    <div className="absolute inset-0 bg-red-500 rounded-full animate-ping opacity-20"></div>
+                    <div className="absolute inset-0 bg-red-500 rounded-full animate-ping animation-delay-200 opacity-20"></div>
+
+                    {/* Main button with gradient and shadow */}
+                    <div className="relative bg-gradient-to-br from-red-500 to-red-600 rounded-full p-4 shadow-2xl hover:shadow-3xl transform hover:scale-110 transition-all duration-300 group-hover:from-red-600 group-hover:to-red-700 border-2 border-white/50">
+                        {/* Emergency icon */}
+                        <svg className="w-8 h-8 text-white" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2M12,4A8,8 0 0,1 20,12A8,8 0 0,1 12,20A8,8 0 0,1 4,12A8,8 0 0,1 12,4M11,6V13H13V6H11M11,15V17H13V15H11Z" />
+                        </svg>
+                    </div>
+
+                    {/* Hover tooltip */}
+                    <div className="absolute bottom-full right-0 mb-2 px-3 py-1 bg-gray-900 text-white text-sm rounded-lg whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none">
+                        Emergency Help
+                        <div className="absolute top-full right-4 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-900"></div>
+                    </div>
+                </div>
+            </button>
+
+            {/* Emergency Modal */}
+            {showEmergencyModal && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-3xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+                        <div className="p-8">
+                            <div className="flex justify-between items-center mb-6">
+                                <div className="flex items-center space-x-3">
+                                    <div className="w-12 h-12 bg-red-500 rounded-full flex items-center justify-center">
+                                        <svg className="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 24 24">
+                                            <path d="M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2M12,4A8,8 0 0,1 20,12A8,8 0 0,1 12,20A8,8 0 0,1 4,12A8,8 0 0,1 12,4M11,6V13H13V6H11M11,15V17H13V15H11Z" />
+                                        </svg>
+                                    </div>
+                                    <h2 className="text-3xl font-bold text-red-600">Emergency Helplines & Solutions</h2>
+                                </div>
+                                <button
+                                    onClick={() => setShowEmergencyModal(false)}
+                                    className="text-gray-500 hover:text-gray-700 text-3xl font-light"
+                                >
+                                    ×
+                                </button>
+                            </div>
+
+                            <div className="space-y-6">
+                                {/* Emergency Helplines */}
+                                <section>
+                                    <h3 className="text-xl font-semibold text-gray-800 mb-4 flex items-center">
+                                        <svg className="w-5 h-5 mr-2 text-red-500" fill="currentColor" viewBox="0 0 24 24">
+                                            <path d="M6.62,10.79C8.06,13.62 10.38,15.94 13.21,17.38L15.41,15.18C15.69,14.9 16.08,14.82 16.43,14.93C17.55,15.3 18.75,15.5 20,15.5A1,1 0 0,1 21,16.5V20A1,1 0 0,1 20,21A17,17 0 0,1 3,4A1,1 0 0,1 4,3H7.5A1,1 0 0,1 8.5,4C8.5,5.25 8.7,6.45 9.07,7.57C9.18,7.92 9.1,8.31 8.82,8.59L6.62,10.79Z" />
+                                        </svg>
+                                        Emergency Helplines
+                                    </h3>
+                                    <div className="grid md:grid-cols-2 gap-4">
+                                        {/* Police */}
+                                        <div className="bg-blue-50 border-2 border-blue-200 rounded-xl p-5 hover:shadow-lg transition-shadow">
+                                            <div className="flex items-center justify-between mb-3">
+                                                <h4 className="font-bold text-blue-800 text-lg">Police</h4>
+                                                <svg className="w-6 h-6 text-blue-600" fill="currentColor" viewBox="0 0 24 24">
+                                                    <path d="M12,1L8,5H11V14H13V5H16M18,23H6C5.45,23 5,22.55 5,22V9A3,3 0 0,1 8,6H10V4H14V6H16A3,3 0 0,1 19,9V22A1,1 0 0,1 18,23Z" />
+                                                </svg>
+                                            </div>
+                                            <p className="text-2xl font-bold text-blue-700 mb-2">100</p>
+                                            <div className="flex space-x-2">
+                                                <a href="tel:100" className="flex-1 bg-blue-600 text-white px-4 py-2 rounded-lg text-center hover:bg-blue-700 transition-colors font-semibold">
+                                                    Call Now
+                                                </a>
+                                                <a href="sms:100" className="flex-1 bg-blue-500 text-white px-4 py-2 rounded-lg text-center hover:bg-blue-600 transition-colors font-semibold">
+                                                    SMS
+                                                </a>
+                                            </div>
+                                        </div>
+
+                                        {/* Ambulance */}
+                                        <div className="bg-red-50 border-2 border-red-200 rounded-xl p-5 hover:shadow-lg transition-shadow">
+                                            <div className="flex items-center justify-between mb-3">
+                                                <h4 className="font-bold text-red-800 text-lg">Ambulance</h4>
+                                                <svg className="w-6 h-6 text-red-600" fill="currentColor" viewBox="0 0 24 24">
+                                                    <path d="M19,8C20.1,8 21,8.9 21,10V20C21,21.1 20.1,22 19,22H5C3.9,22 3,21.1 3,20V10C3,8.9 3.9,8 5,8H6V6C6,4.9 6.9,4 8,4H16C17.1,4 18,4.9 18,6V8H19M8,6V8H16V6H8M5,10V20H19V10H5M10,12H14V14H16V16H14V18H10V16H8V14H10V12Z" />
+                                                </svg>
+                                            </div>
+                                            <p className="text-2xl font-bold text-red-700 mb-2">108</p>
+                                            <div className="flex space-x-2">
+                                                <a href="tel:108" className="flex-1 bg-red-600 text-white px-4 py-2 rounded-lg text-center hover:bg-red-700 transition-colors font-semibold">
+                                                    Call Now
+                                                </a>
+                                                <a href="sms:108" className="flex-1 bg-red-500 text-white px-4 py-2 rounded-lg text-center hover:bg-red-600 transition-colors font-semibold">
+                                                    SMS
+                                                </a>
+                                            </div>
+                                        </div>
+
+                                        {/* Fire Department */}
+                                        <div className="bg-orange-50 border-2 border-orange-200 rounded-xl p-5 hover:shadow-lg transition-shadow">
+                                            <div className="flex items-center justify-between mb-3">
+                                                <h4 className="font-bold text-orange-800 text-lg">Fire Department</h4>
+                                                <svg className="w-6 h-6 text-orange-600" fill="currentColor" viewBox="0 0 24 24">
+                                                    <path d="M17.66,11.2C17.43,10.9 17.15,10.64 16.89,10.38L16.89,10.38C16.22,9.78 15.46,9.35 14.64,9.07L13.65,7.83C13.4,7.55 13.09,7.35 12.75,7.24C12.41,7.13 12.04,7.13 11.7,7.24C11.36,7.35 11.05,7.55 10.8,7.83L9.81,9.07C9,9.35 8.23,9.78 7.56,10.38L7.56,10.38C7.3,10.64 7.02,10.9 6.79,11.2C6.56,11.5 6.38,11.83 6.27,12.18C6.16,12.53 6.12,12.89 6.15,13.25C6.18,13.61 6.28,13.96 6.45,14.28C6.62,14.6 6.85,14.88 7.13,15.11C7.41,15.34 7.73,15.51 8.08,15.62C8.43,15.73 8.79,15.77 9.15,15.74C9.51,15.71 9.86,15.61 10.18,15.44L10.18,15.44L17.66,11.2M12,2C12,2 9,4 9,7C9,7 7,7 7,9C7,9 4,9 4,12C4,12 2,12 2,15C2,15 4,15 4,18C4,18 7,18 7,20C7,20 9,20 9,22H15C15,20 17,20 17,18C17,18 20,18 20,15C20,15 22,15 22,12C22,12 20,12 20,9C20,9 17,9 17,7C17,7 15,7 15,4C15,4 12,2 12,2Z" />
+                                                </svg>
+                                            </div>
+                                            <p className="text-2xl font-bold text-orange-700 mb-2">101</p>
+                                            <div className="flex space-x-2">
+                                                <a href="tel:101" className="flex-1 bg-orange-600 text-white px-4 py-2 rounded-lg text-center hover:bg-orange-700 transition-colors font-semibold">
+                                                    Call Now
+                                                </a>
+                                                <a href="sms:101" className="flex-1 bg-orange-500 text-white px-4 py-2 rounded-lg text-center hover:bg-orange-600 transition-colors font-semibold">
+                                                    SMS
+                                                </a>
+                                            </div>
+                                        </div>
+
+                                        {/* Women's Helpline */}
+                                        <div className="bg-pink-50 border-2 border-pink-200 rounded-xl p-5 hover:shadow-lg transition-shadow">
+                                            <div className="flex items-center justify-between mb-3">
+                                                <h4 className="font-bold text-pink-800 text-lg">Women's Helpline</h4>
+                                                <svg className="w-6 h-6 text-pink-600" fill="currentColor" viewBox="0 0 24 24">
+                                                    <path d="M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2M12,4A8,8 0 0,1 20,12A8,8 0 0,1 12,20A8,8 0 0,1 4,12A8,8 0 0,1 12,4M12,6A6,6 0 0,0 6,12A6,6 0 0,0 12,18A6,6 0 0,0 18,12A6,6 0 0,0 12,6M12,8A4,4 0 0,1 16,12A4,4 0 0,1 12,16A4,4 0 0,1 8,12A4,4 0 0,1 12,8M12,10A2,2 0 0,0 10,12A2,2 0 0,0 12,14A2,2 0 0,0 14,12A2,2 0 0,0 12,10Z" />
+                                                </svg>
+                                            </div>
+                                            <p className="text-2xl font-bold text-pink-700 mb-2">1091</p>
+                                            <div className="flex space-x-2">
+                                                <a href="tel:1091" className="flex-1 bg-pink-600 text-white px-4 py-2 rounded-lg text-center hover:bg-pink-700 transition-colors font-semibold">
+                                                    Call Now
+                                                </a>
+                                                <a href="sms:1091" className="flex-1 bg-pink-500 text-white px-4 py-2 rounded-lg text-center hover:bg-pink-600 transition-colors font-semibold">
+                                                    SMS
+                                                </a>
+                                            </div>
+                                        </div>
+
+                                        {/* Child Helpline */}
+                                        <div className="bg-green-50 border-2 border-green-200 rounded-xl p-5 hover:shadow-lg transition-shadow">
+                                            <div className="flex items-center justify-between mb-3">
+                                                <h4 className="font-bold text-green-800 text-lg">Child Helpline</h4>
+                                                <svg className="w-6 h-6 text-green-600" fill="currentColor" viewBox="0 0 24 24">
+                                                    <path d="M12,2A3,3 0 0,1 15,5A3,3 0 0,1 12,8A3,3 0 0,1 9,5A3,3 0 0,1 12,2M12,9C14.67,9 20,10.33 20,13V14H18.5L17.5,13H6.5L5.5,14H4V13C4,10.33 9.33,9 12,9M12,10A6,6 0 0,0 6,16A6,6 0 0,0 12,22A6,6 0 0,0 18,16A6,6 0 0,0 12,10Z" />
+                                                </svg>
+                                            </div>
+                                            <p className="text-2xl font-bold text-green-700 mb-2">1098</p>
+                                            <div className="flex space-x-2">
+                                                <a href="tel:1098" className="flex-1 bg-green-600 text-white px-4 py-2 rounded-lg text-center hover:bg-green-700 transition-colors font-semibold">
+                                                    Call Now
+                                                </a>
+                                                <a href="sms:1098" className="flex-1 bg-green-500 text-white px-4 py-2 rounded-lg text-center hover:bg-green-600 transition-colors font-semibold">
+                                                    SMS
+                                                </a>
+                                            </div>
+                                        </div>
+
+                                        {/* Disaster Management */}
+                                        <div className="bg-purple-50 border-2 border-purple-200 rounded-xl p-5 hover:shadow-lg transition-shadow">
+                                            <div className="flex items-center justify-between mb-3">
+                                                <h4 className="font-bold text-purple-800 text-lg">Disaster Management</h4>
+                                                <svg className="w-6 h-6 text-purple-600" fill="currentColor" viewBox="0 0 24 24">
+                                                    <path d="M12,2C6.48,2 2,6.48 2,12C2,17.52 6.48,22 12,22C17.52,22 22,17.52 22,12C22,6.48 17.52,2 12,2M13,17H11V15H13V17M13,13H11V7H13V13Z" />
+                                                </svg>
+                                            </div>
+                                            <p className="text-2xl font-bold text-purple-700 mb-2">1077</p>
+                                            <div className="flex space-x-2">
+                                                <a href="tel:1077" className="flex-1 bg-purple-600 text-white px-4 py-2 rounded-lg text-center hover:bg-purple-700 transition-colors font-semibold">
+                                                    Call Now
+                                                </a>
+                                                <a href="sms:1077" className="flex-1 bg-purple-500 text-white px-4 py-2 rounded-lg text-center hover:bg-purple-600 transition-colors font-semibold">
+                                                    SMS
+                                                </a>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </section>
+
+                                {/* Emergency Solutions & Guidelines */}
+                                <section>
+                                    <h3 className="text-xl font-semibold text-gray-800 mb-4 flex items-center">
+                                        <svg className="w-5 h-5 mr-2 text-red-500" fill="currentColor" viewBox="0 0 24 24">
+                                            <path d="M12,2L13.09,8.26L22,9L13.09,9.74L12,16L10.91,9.74L2,9L10.91,8.26L12,2Z" />
+                                        </svg>
+                                        Emergency Guidelines & Solutions
+                                    </h3>
+                                    <div className="space-y-4">
+                                        <div className="bg-gray-50 border-l-4 border-blue-500 p-4 rounded-lg">
+                                            <h4 className="font-semibold text-blue-800 mb-2">Medical Emergency</h4>
+                                            <ul className="text-sm text-gray-700 space-y-1 list-disc list-inside">
+                                                <li>Call 108 for ambulance immediately</li>
+                                                <li>Keep the patient calm and in a safe position</li>
+                                                <li>Do not move the patient if there's a risk of spinal injury</li>
+                                                <li>Provide first aid if trained, otherwise wait for professionals</li>
+                                            </ul>
+                                        </div>
+
+                                        <div className="bg-gray-50 border-l-4 border-orange-500 p-4 rounded-lg">
+                                            <h4 className="font-semibold text-orange-800 mb-2">Fire Emergency</h4>
+                                            <ul className="text-sm text-gray-700 space-y-1 list-disc list-inside">
+                                                <li>Call 101 for fire department immediately</li>
+                                                <li>Evacuate the area quickly and safely</li>
+                                                <li>Use fire extinguisher only if safe to do so</li>
+                                                <li>Do not use elevators during fire emergencies</li>
+                                                <li>Stay low to avoid smoke inhalation</li>
+                                            </ul>
+                                        </div>
+
+                                        <div className="bg-gray-50 border-l-4 border-red-500 p-4 rounded-lg">
+                                            <h4 className="font-semibold text-red-800 mb-2">Security Emergency</h4>
+                                            <ul className="text-sm text-gray-700 space-y-1 list-disc list-inside">
+                                                <li>Call 100 for police immediately</li>
+                                                <li>Stay calm and provide clear information about the situation</li>
+                                                <li>Move to a safe location if possible</li>
+                                                <li>Do not confront the threat yourself</li>
+                                                <li>Follow instructions from emergency responders</li>
+                                            </ul>
+                                        </div>
+
+                                        <div className="bg-gray-50 border-l-4 border-green-500 p-4 rounded-lg">
+                                            <h4 className="font-semibold text-green-800 mb-2">General Safety Tips</h4>
+                                            <ul className="text-sm text-gray-700 space-y-1 list-disc list-inside">
+                                                <li>Stay calm and assess the situation</li>
+                                                <li>Call the appropriate emergency number</li>
+                                                <li>Provide your exact location clearly</li>
+                                                <li>Follow instructions from emergency services</li>
+                                                <li>Keep emergency contacts saved in your phone</li>
+                                            </ul>
+                                        </div>
+                                    </div>
+                                </section>
+                            </div>
+
+                            <div className="mt-6 pt-6 border-t border-gray-200">
+                                <p className="text-sm text-gray-600 text-center">
+                                    <strong>Remember:</strong> In case of any emergency, stay calm and call the appropriate helpline number immediately.
+                                    Help is always available.
+                                </p>
                             </div>
                         </div>
                     </div>

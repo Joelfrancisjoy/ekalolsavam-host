@@ -27,12 +27,38 @@ const volunteerService = {
 
   // Get volunteer shifts
   getShifts: () => {
-    return http.get('/volunteers/shifts/');
+    return http.get('/api/volunteers/shifts/');
   },
 
   // Get volunteer assignments
   getVolunteerAssignments: () => {
-    return http.get('/volunteers/assignments/');
+    return http.get('/api/volunteers/assignments/');
+  },
+
+  // Volunteer shifts
+  listShifts: () => {
+    return http.get('/api/volunteers/shifts/');
+  },
+
+  createShift: (data) => {
+    return http.post('/api/volunteers/shifts/', data);
+  },
+
+  createAssignment: (data) => {
+    return http.post('/api/volunteers/assignments/', data);
+  },
+
+  // Re-check request endpoints
+  getRecheckRequests: () => {
+    return http.get('/api/scores/volunteer/result-re-evaluation/');
+  },
+
+  getRecheckRequestDetails: (recheckRequestId) => {
+    return http.get(`/api/scores/volunteer/result-re-evaluation/${recheckRequestId}/`);
+  },
+
+  acceptRecheckRequest: (recheckRequestId) => {
+    return http.put(`/api/scores/volunteer/result-re-evaluation/${recheckRequestId}/accept/`);
   }
 };
 

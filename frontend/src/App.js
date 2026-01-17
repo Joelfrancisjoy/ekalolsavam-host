@@ -14,6 +14,9 @@ import SchoolStandings from './pages/SchoolStandings';
 import IDSignup from './pages/IDSignup';
 import IDBasedRegistration from './pages/IDBasedRegistration';
 import LiveResults from './pages/LiveResults';
+import EmergencyMainPage from './pages/EmergencyMainPage';
+import EmergencyDashboard from './pages/EmergencyDashboard';
+import RecheckRequestDetails from './pages/RecheckRequestDetails';
 
 function AppContent() {
   const { i18n } = useTranslation();
@@ -27,9 +30,11 @@ function AppContent() {
   // handle token verification and login here
   });*/
 
-  // Check if current route is login page or landing page
+  // Check if current route is login page, landing page or emergency page
   const isLoginPage = location.pathname === '/login';
   const isLandingPage = location.pathname === '/';
+  const isEmergencyPage = location.pathname === '/emergency';
+  const isVolunteerPage = location.pathname === '/volunteer';
 
   // Read auth state from localStorage on each render
   const isAuthenticated = Boolean(localStorage.getItem('access_token'));
@@ -40,13 +45,15 @@ function AppContent() {
   );
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {!isLoginPage && !isLandingPage && <Header changeLanguage={changeLanguage} />}
-      <main className={isLoginPage || isLandingPage ? "" : "container mx-auto px-4 py-8"}>
+    <div className={(isEmergencyPage || isVolunteerPage) ? "h-screen overflow-hidden bg-gray-50" : "min-h-screen bg-gray-50"}>
+      {!isLoginPage && !isLandingPage && !isEmergencyPage && !isVolunteerPage && <Header changeLanguage={changeLanguage} />}
+      <main className={isLoginPage || isLandingPage || isEmergencyPage || isVolunteerPage ? "" : "container mx-auto px-4 py-8"}>
         <DemoModeIndicator />
         <Routes>
           <Route path="/" element={<LandingPage />} />
           <Route path="/login" element={<Login />} />
+          <Route path="/emergency" element={<EmergencyMainPage />} />
+          <Route path="/emergency-dashboard" element={<ProtectedRoute element={<EmergencyDashboard />} />} />
           <Route path="/dashboard" element={<ProtectedRoute element={<StudentDashboard />} />} />
           <Route path="/student" element={<ProtectedRoute element={<StudentDashboard />} />} />
           <Route path="/judge" element={<ProtectedRoute element={<JudgeDashboard />} />} />
@@ -58,6 +65,7 @@ function AppContent() {
           <Route path="/register-with-id" element={<IDBasedRegistration />} />
           <Route path="/id-signup" element={<IDSignup />} />
           <Route path="/results" element={<LiveResults />} />
+          <Route path="/recheck-request/:recheckRequestId" element={<ProtectedRoute element={<RecheckRequestDetails />} />} />
         </Routes>
       </main>
     </div>

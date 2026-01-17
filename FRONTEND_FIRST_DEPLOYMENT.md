@@ -209,3 +209,10 @@ REACT_APP_API_URL=https://your-backend-url.com
 The frontend is now ready for deployment and will work perfectly without a backend!
 
 
+
+
+
+
+
+
+

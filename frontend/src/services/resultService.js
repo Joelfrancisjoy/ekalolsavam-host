@@ -46,6 +46,34 @@ const resultService = {
         const res = await api.get('/api/scores/judge-results/');
         return res.data;
     },
+    // Student re-check workflow
+    getResultDetails: async (resultId) => {
+        const res = await api.get(`/api/scores/student/results/${resultId}/`);
+        return res.data;
+    },
+    submitRecheckRequest: async (resultId, reason = '') => {
+        const res = await api.post('/api/scores/student/result-recheck/', {
+            result: resultId,
+            reason: reason,
+        });
+        return res.data;
+    },
+
+    // Student accepted re-check details + payment
+    getAcceptedRecheckDetails: async (recheckRequestId) => {
+        const res = await api.get(`/api/scores/student/recheck-request/${recheckRequestId}/`);
+        return res.data;
+    },
+    payForAcceptedRecheck: async (recheckRequestId) => {
+        const res = await api.post(`/api/scores/student/recheck-request/${recheckRequestId}/pay/`);
+        return res.data;
+    },
+
+    // Judge re-check workflow
+    getJudgeRecheckRequests: async () => {
+        const res = await api.get('/api/scores/judge/recheck-requests/');
+        return res.data;
+    },
 };
 
 export default resultService;

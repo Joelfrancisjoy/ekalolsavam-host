@@ -910,12 +910,7 @@ const Login = () => {
             </div>
           </div>
 
-          {/* Footer */}
-          <div className="text-center">
-            <p className="text-amber-700 text-sm font-medium">
-              © 2024 E-Kalolsavam Portal. Celebrating Arts & Culture.
-            </p>
-          </div>
+
         </div>
       </div>
     </div >

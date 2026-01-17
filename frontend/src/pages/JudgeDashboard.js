@@ -6,6 +6,7 @@ import { eventServiceAdapter as eventService, userServiceAdapter as userService 
 import scoreService from '../services/scoreService';
 import UserInfoHeader from '../components/UserInfoHeader';
 import PerformancePrediction from '../components/PerformancePrediction';
+import RecheckRequestsDropdown from '../components/RecheckRequestsDropdown';
 // Simple inline SVG icons to avoid external icon dependency
 const Trophy = ({ className }) => (
   <svg className={className} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -22,13 +23,13 @@ const CheckCircle = ({ className }) => (
 const AlertCircle = ({ className }) => (
   <svg className={className} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
     <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" />
-    <path d="M12 8v4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+    <path d="M12 8v4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
     <circle cx="12" cy="16" r="1" fill="currentColor" />
   </svg>
 );
 
 const JudgeDashboard = () => {
-    const navigate = useNavigate();
+  const navigate = useNavigate();
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [assignedEvents, setAssignedEvents] = useState([]);
@@ -53,6 +54,11 @@ const JudgeDashboard = () => {
   const [newPassword, setNewPassword] = useState('');
   const [pwdError, setPwdError] = useState('');
   const [showPrediction, setShowPrediction] = useState(false);
+
+  // Debug useEffect to track state changes
+  useEffect(() => {
+    console.log('State changed - selectedEventId:', selectedEventId, 'selectedParticipantId:', selectedParticipantId);
+  }, [selectedEventId, selectedParticipantId]);
 
   useEffect(() => {
     // Inspect last login response cached user if available
@@ -112,6 +118,24 @@ const JudgeDashboard = () => {
 
   const currentKey = useMemo(() => `${selectedEventId || ''}:${selectedParticipantId || ''}`, [selectedEventId, selectedParticipantId]);
 
+  // Initialize scores state for current key when it changes
+  useEffect(() => {
+    if (currentKey && !scoresState[currentKey]) {
+      // Initialize scores for all criteria to empty values
+      const initialScores = {};
+      criteria.forEach(c => {
+        initialScores[c.id] = '';
+      });
+
+      setScoresState(prev => ({
+        ...prev,
+        [currentKey]: initialScores
+      }));
+
+      console.log('Initialized scores for key:', currentKey, initialScores);
+    }
+  }, [currentKey, criteria]);
+
   const normalizeDecimal = (val) => {
     if (val === null || val === undefined) return '';
     if (typeof val === 'number') return val;
@@ -122,10 +146,30 @@ const JudgeDashboard = () => {
 
   const handleScoreChange = (criterionId, value) => {
     const parsed = normalizeDecimal(value);
+    console.log('handleScoreChange called:', criterionId, 'value:', value, 'parsed:', parsed, 'currentKey:', currentKey);
+
+    // Ensure scores state is initialized for current key
+    if (!scoresState[currentKey]) {
+      const initialScores = {};
+      criteria.forEach(c => {
+        initialScores[c.id] = '';
+      });
+
+      setScoresState(prev => ({
+        ...prev,
+        [currentKey]: initialScores
+      }));
+    }
+
     setScoresState(prev => ({
       ...prev,
       [currentKey]: { ...(prev[currentKey] || {}), [criterionId]: parsed }
     }));
+
+    // Debug: log the updated scores state
+    setTimeout(() => {
+      console.log('Updated scoresState for key', currentKey, ':', scoresState[currentKey]);
+    }, 0);
   };
 
   const computedTotal = useMemo(() => {
@@ -138,17 +182,79 @@ const JudgeDashboard = () => {
   }, [scoresState, currentKey, criteria]);
 
   const handleSubmitScore = async () => {
-    if (!selectedEventId || !selectedParticipantId) return;
+    console.log('handleSubmitScore called');
+    console.log('selectedEventId:', selectedEventId);
+    console.log('selectedParticipantId:', selectedParticipantId);
+    console.log('scoresState:', scoresState);
+    console.log('currentKey:', currentKey);
+
+    if (!selectedEventId || !selectedParticipantId) {
+      alert('Please select both an event and a participant');
+      return;
+    }
+
     const sc = scoresState[currentKey] || {};
-    const items = criteria.map(c => ({
-      criteria: c.label,
-      score: Math.min(Number((String(sc[c.id] ?? '')).toString().replace(',', '.')) || 0, c.max),
-      comments: (notesState[currentKey] || ''),
-    }));
+
+    // Validate that all criteria have been scored
+    const missingScores = [];
+    for (const c of criteria) {
+      const scoreValue = sc[c.id];
+      console.log(`Criterion ${c.label} score:`, scoreValue);
+      if (scoreValue === undefined || scoreValue === null || scoreValue === '') {
+        missingScores.push(c.label);
+      }
+    }
+
+    if (missingScores.length > 0) {
+      alert(`Please fill in scores for: ${missingScores.join(', ')}`);
+      console.log('Missing scores:', missingScores);
+      return;
+    }
+
+    const items = criteria.map(c => {
+      // Parse and validate the score
+      let scoreValue = sc[c.id];
+
+      // Convert to number and handle various input types
+      if (typeof scoreValue === 'string') {
+        scoreValue = scoreValue.replace(',', '.');
+        scoreValue = parseFloat(scoreValue);
+      } else {
+        scoreValue = Number(scoreValue);
+      }
+
+      // Validate the score is a valid number
+      if (isNaN(scoreValue)) {
+        scoreValue = 0;
+      }
+
+      // Ensure score is within valid range
+      const finalScore = Math.min(Math.max(scoreValue, 0), c.max);
+
+      console.log(`Submitting criterion ${c.label}: ${finalScore}`);
+
+      return {
+        criteria: c.label,
+        score: finalScore,
+        comments: (notesState[currentKey] || ''),
+      };
+    });
+
     try {
       setSubmitting(true);
-      await scoreService.submitBundle({ eventId: selectedEventId, participantId: selectedParticipantId, items });
+
+      console.log('Submitting to API with data:', { eventId: selectedEventId, participantId: selectedParticipantId, items });
+
+      const result = await scoreService.submitBundle({
+        eventId: selectedEventId,
+        participantId: selectedParticipantId,
+        items
+      });
+
+      console.log('Score submission result:', result);
+
       alert('Score submitted successfully');
+
       // refresh summary after submit
       try {
         setLoadingSummary(true);
@@ -158,7 +264,11 @@ const JudgeDashboard = () => {
         setLoadingSummary(false);
       }
     } catch (e) {
-      alert(e?.response?.data?.error || 'Failed to submit score');
+      console.error('Error submitting score:', e);
+
+      // Extract error message from response or provide default
+      const errorMessage = e?.response?.data?.error || e?.response?.data?.message || e?.message || 'Failed to submit score';
+      alert(errorMessage);
     } finally {
       setSubmitting(false);
     }
@@ -169,6 +279,7 @@ const JudgeDashboard = () => {
       try {
         const response = await http.get('/api/auth/current/');
         const userData = response.data;
+        console.log('Current user data:', userData);
 
         // Check if user is a judge
         if (userData.role !== 'judge') {
@@ -177,14 +288,19 @@ const JudgeDashboard = () => {
         }
 
 
-
         setUser(userData);
 
         // Fetch assigned events via dedicated endpoint
         try {
           const myEvents = await eventService.listMyAssignedEvents();
+          console.log('Assigned events:', myEvents);
           setAssignedEvents(myEvents);
-          if (myEvents.length) setSelectedEventId(myEvents[0].id);
+          if (myEvents.length) {
+            console.log('Setting first event as selected:', myEvents[0].id);
+            setSelectedEventId(myEvents[0].id);
+          } else {
+            console.log('No assigned events found');
+          }
         } catch (error) {
           console.error('Failed to fetch assigned events:', error);
         }
@@ -201,19 +317,27 @@ const JudgeDashboard = () => {
 
   useEffect(() => {
     const loadEventData = async () => {
+      console.log('Loading event data for selectedEventId:', selectedEventId);
       if (!selectedEventId) return;
 
       try {
         // Load participants
         const regs = await eventService.listParticipantsForEvent(selectedEventId);
+        console.log('Participants for event:', selectedEventId, regs);
         setParticipants(regs);
-        if (regs.length) setSelectedParticipantId(regs[0].participant);
+        if (regs.length) {
+          console.log('Setting first participant as selected:', regs[0].participant);
+          setSelectedParticipantId(regs[0].participant);
+        } else {
+          console.log('No participants found for event:', selectedEventId);
+        }
 
         // Load event-specific criteria
         setLoadingCriteria(true);
         try {
           const criteriaData = await scoreService.getEventCriteria(selectedEventId);
           if (criteriaData.criteria && criteriaData.criteria.length > 0) {
+            console.log('Setting event-specific criteria:', criteriaData.criteria);
             setCriteria(criteriaData.criteria);
           }
         } catch (criteriaError) {
@@ -399,9 +523,12 @@ const JudgeDashboard = () => {
                   disabled={submitting || !selectedEventId || !selectedParticipantId}
                   onClick={handleSubmitScore}
                   className={`px-8 py-4 rounded-xl text-white text-lg font-semibold flex items-center gap-3 transition-all ${submitting ? 'bg-gray-400' : 'bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 shadow-lg hover:shadow-xl'}`}
+                  onMouseEnter={() => {
+                    console.log('Button state - submitting:', submitting, 'selectedEventId:', selectedEventId, 'selectedParticipantId:', selectedParticipantId);
+                  }}
                 >
                   <CheckCircle className="w-6 h-6" />
-                  {submitting ? 'Submitting…' : 'Submit Score'}
+                  {submitting ? 'Submitting…' : !selectedEventId ? 'Select Event' : !selectedParticipantId ? 'Select Participant' : 'Submit Score'}
                 </button>
                 <button
                   onClick={() => setShowPrediction(!showPrediction)}
@@ -411,8 +538,19 @@ const JudgeDashboard = () => {
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                   </svg>
-                  {showPrediction ? 'Hide AI Prediction' : 'Show AI Prediction'}
+                  {showPrediction ? 'Hide AI Prediction' : !selectedEventId ? 'Select Event' : !selectedParticipantId ? 'Select Participant' : 'Show AI Prediction'}
                 </button>
+              </div>
+
+              {/* Recheck Requests Section - Appears below Submit Score button */}
+              <div className="mt-6">
+                <RecheckRequestsDropdown
+                  selectedEventId={selectedEventId}
+                  onReanalyze={(request) => {
+                    // Set the participant for reanalysis
+                    setSelectedParticipantId(request.participant);
+                  }}
+                />
               </div>
             </div>
 

@@ -40,8 +40,16 @@ const certificateService = {
         const res = await api.get('/api/certificates/');
         return res.data;
     },
-    generate: async ({ participant, event }) => {
-        const res = await api.post('/api/certificates/generate/', { participant, event });
+    generate: async ({ participant, event, school_name, district_name, category, certificate_type, prize }) => {
+        const res = await api.post('/api/certificates/generate/', {
+            participant,
+            event,
+            school_name,
+            district_name,
+            category,
+            certificate_type,
+            prize
+        });
         return res.data;
     },
     downloadPdfUrl: (certificateId) => `${API_BASE_URL}/api/certificates/download/${certificateId}/`,

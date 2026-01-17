@@ -6,19 +6,79 @@ import UserInfoHeader from '../components/UserInfoHeader';
 import StudentFeedbackDisplay from '../components/StudentFeedbackDisplay';
 import feedbackService from '../services/feedbackService';
 
-// Results from provided CSV (Event + Category combined)
-const csvResults = [
-  { event: 'Speech (Malayalam), HS', winner: 'Aishwarya Nair', school: 'Govt HSS, Poojappura', district: 'Thiruvananthapuram' },
-  { event: 'Kathakali (Solo), HSS', winner: 'Rahul K. Menon', school: 'Govt Model GHSS, Irinjalakkuda', district: 'Thrissur' },
-  { event: 'Thiruvathirakali (Group), HS', winner: 'Meera Anil', school: 'St. Marys HSS, Mullenkolly', district: 'Wayanad' },
-  { event: 'Folk Dance (Group), UP', winner: 'Jithin S', school: 'Govt UPS Kumarakom', district: 'Kottayam' },
-  { event: 'Mimicry (Solo), HS', winner: 'Arjun R', school: 'Silver Hills HSS, Chevayur', district: 'Kozhikode' },
-  { event: 'Light Music (Vocal), HSS', winner: 'Divya K', school: 'Kerala Varma Memorial G. Government HSS, Thrissur', district: 'Thrissur' },
-  { event: 'Monoact, HS', winner: 'Sreenath P', school: 'Rajeev Gandhi Memorial HSS, Mokeri', district: 'Kannur' },
-  { event: 'Mridangam (Instrumental), HSS', winner: 'Anoop V', school: 'A K J M HSS, Kanjirappally', district: 'Kottayam' },
-  { event: 'Bharatanatyam, HS', winner: 'Nandana R', school: 'Govt HSS, Edappalli', district: 'Ernakulam' },
-  { event: 'Violin (Instrumental), HS', winner: 'Karthik S', school: 'Govt HSS, Paravur', district: 'Ernakulam' }
+// Static data for Live Results Carousel
+const staticResultsForCarousel = [
+  {
+    event: "Bharatanatyam Solo",
+    winner: "Ananya Nair",
+    school: "Pioneer Public School",
+    district: "Thrissur"
+  },
+  {
+    event: "Kathakali Group Performance",
+    winner: "Krishnanunni Pillai",
+    school: "Saraswati Vidyalaya",
+    district: "Ernakulam"
+  },
+  {
+    event: "Mappila Songs",
+    winner: "Fathima Beevi",
+    school: "Al-Ameen Public School",
+    district: "Malappuram"
+  },
+  {
+    event: "Chakyar Koothu",
+    winner: "Raman Nair",
+    school: "Kairali School",
+    district: "Thrissur"
+  },
+  {
+    event: "Kathak Solo",
+    winner: "Priya Menon",
+    school: "Little Flower School",
+    district: "Kottayam"
+  },
+  {
+    event: "Duffmuttu",
+    winner: "Suresh Kumar",
+    school: "St. Mary's School",
+    district: "Alappuzha"
+  },
+  {
+    event: "Ottan Thullal",
+    winner: "Arun Mohan",
+    school: "Gandhi Memorial School",
+    district: "Kollam"
+  },
+  {
+    event: "Light Music Solo",
+    winner: "Sneha Nair",
+    school: "Sacred Heart School",
+    district: "Idukki"
+  }
 ];
+
+// Transform real results data to match the format expected by the Live Results Carousel component
+const transformResultsForCarousel = (results) => {
+  if (!results || !Array.isArray(results)) return [];
+
+  return results.map(result => {
+    // Extract data from the real results structure
+    const eventName = result.event_details?.name || result.event_name || 'Event';
+    const winnerName = result.participant_details?.first_name
+      ? `${result.participant_details.first_name} ${result.participant_details.last_name || ''}`.trim()
+      : result.participant_name || 'Winner';
+    const schoolName = result.participant_details?.school?.name || 'School';
+    const districtName = result.participant_details?.school?.district?.name || result.participant_details?.district?.name || 'District';
+
+    return {
+      event: eventName,
+      winner: winnerName,
+      school: schoolName,
+      district: districtName
+    };
+  }).filter(result => result.event && result.winner && result.school && result.district);
+};
 
 // Event Registration Data - Updated with comprehensive categories and events
 const CATEGORIES = [
@@ -634,6 +694,7 @@ const StudentDashboard = () => {
   const [open, setOpen] = useState(null); // 'register' | 'qr' | 'feedback' | 'results' | 'schedule'
   const [registrations, setRegistrations] = useState([]); // server-side list (unchanged usage)
   const [publishedResults, setPublishedResults] = useState([]);
+  const transformedResults = useMemo(() => transformResultsForCarousel(publishedResults), [publishedResults]);
   const [loading, setLoading] = useState(true);
   const [demoSchedule, setDemoSchedule] = useState([]); // locally generated schedule for Dance + Music
   const [events, setEvents] = useState([]);
@@ -1330,7 +1391,7 @@ const StudentDashboard = () => {
             <div className="w-10 h-10 bg-gradient-to-br from-red-500 to-pink-500 rounded-full flex items-center justify-center shadow-lg animate-pulse" />
             <h3 className="text-xl font-bold text-amber-800">{t('live_results') || 'Live Results'}</h3>
           </div>
-          <LiveResultsCarousel results={csvResults} />
+          <LiveResultsCarousel results={staticResultsForCarousel} />
         </div>
 
         {/* Ultra-Detailed Professional Kathakali Mask */}
@@ -1700,7 +1761,7 @@ const StudentDashboard = () => {
                 </div>
               </div>
               <div className="text-center p-4 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl border border-blue-100">
-                <div className="text-2xl font-bold text-blue-800 mb-1">{csvResults.length}</div>
+                <div className="text-2xl font-bold text-blue-800 mb-1">{staticResultsForCarousel.length}</div>
                 <div className="text-sm text-blue-600">Live Results</div>
                 <div className="w-full bg-blue-200 rounded-full h-1 mt-2">
                   <div className="bg-blue-500 h-1 rounded-full w-full"></div>
@@ -1751,7 +1812,7 @@ const StudentDashboard = () => {
                 <div className="w-2 h-2 bg-blue-500 rounded-full mt-2"></div>
                 <div className="flex-1">
                   <div className="text-sm font-medium text-amber-900">Live Results Updated</div>
-                  <div className="text-xs text-amber-600">{csvResults.length} events</div>
+                  <div className="text-xs text-amber-600">{staticResultsForCarousel.length} events</div>
                 </div>
               </div>
               <div className="flex items-start gap-3">
@@ -2088,10 +2149,10 @@ const StudentDashboard = () => {
                   onClick={handleIdentityVerification}
                   disabled={!firstName || !lastName || firstNameError || lastNameError || isVerifying || isIdentityVerified}
                   className={`px-8 py-3 rounded-xl font-bold text-base transition-all duration-300 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none ${isIdentityVerified
-                      ? 'bg-gradient-to-r from-green-500 to-emerald-500 text-white shadow-lg'
-                      : firstName && lastName && !firstNameError && !lastNameError && !isVerifying
-                        ? 'bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 text-white shadow-lg hover:shadow-xl'
-                        : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                    ? 'bg-gradient-to-r from-green-500 to-emerald-500 text-white shadow-lg'
+                    : firstName && lastName && !firstNameError && !lastNameError && !isVerifying
+                      ? 'bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 text-white shadow-lg hover:shadow-xl'
+                      : 'bg-gray-300 text-gray-500 cursor-not-allowed'
                     }`}
                 >
                   <span className="flex items-center gap-2">
@@ -2543,8 +2604,8 @@ const StudentDashboard = () => {
                       key={index}
                       onClick={() => setSelectedRegistrationIndex(index)}
                       className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${index === selectedRegistrationIndex
-                          ? 'bg-indigo-600 text-white shadow-md'
-                          : 'bg-white text-indigo-700 hover:bg-indigo-100 border border-indigo-200'
+                        ? 'bg-indigo-600 text-white shadow-md'
+                        : 'bg-white text-indigo-700 hover:bg-indigo-100 border border-indigo-200'
                         }`}
                     >
                       {reg.eventName}
@@ -2668,18 +2729,16 @@ const StudentDashboard = () => {
                       key={star}
                       type="button"
                       onClick={() => setFeedbackRating(star)}
-                      className={`w-12 h-12 rounded-full border-2 transition-all duration-200 flex items-center justify-center group ${
-                        feedbackRating >= star
+                      className={`w-12 h-12 rounded-full border-2 transition-all duration-200 flex items-center justify-center group ${feedbackRating >= star
                           ? 'bg-green-500 border-green-600'
                           : 'bg-white border-green-200 hover:border-green-400 hover:bg-green-50'
-                      }`}
+                        }`}
                     >
                       <svg
-                        className={`w-6 h-6 transition-colors duration-200 ${
-                          feedbackRating >= star
+                        className={`w-6 h-6 transition-colors duration-200 ${feedbackRating >= star
                             ? 'text-white'
                             : 'text-green-400 group-hover:text-green-600'
-                        }`}
+                          }`}
                         fill="currentColor"
                         viewBox="0 0 20 20"
                       >
@@ -2713,18 +2772,16 @@ const StudentDashboard = () => {
                       key={category.id}
                       type="button"
                       onClick={() => setFeedbackCategory(category.id)}
-                      className={`p-4 rounded-xl border-2 transition-all duration-200 text-left group ${
-                        feedbackCategory === category.id
+                      className={`p-4 rounded-xl border-2 transition-all duration-200 text-left group ${feedbackCategory === category.id
                           ? 'bg-green-500 border-green-600'
                           : 'bg-white border-green-200 hover:border-green-400 hover:bg-green-50'
-                      }`}
+                        }`}
                     >
                       <div className="flex items-center gap-3">
                         <span className="text-2xl">{category.icon}</span>
                         <div>
-                          <div className={`font-semibold text-sm ${
-                            feedbackCategory === category.id ? 'text-white' : 'text-green-900'
-                          }`}>{category.label}</div>
+                          <div className={`font-semibold text-sm ${feedbackCategory === category.id ? 'text-white' : 'text-green-900'
+                            }`}>{category.label}</div>
                         </div>
                       </div>
                     </button>
@@ -3178,18 +3235,16 @@ const StudentDashboard = () => {
       {/* Feedback Success Popup */}
       {showFeedbackPopup && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 animate-fadeIn">
-          <div className={`bg-white rounded-2xl shadow-2xl p-8 max-w-md mx-4 transform transition-all duration-300 animate-scaleIn ${
-            feedbackPopupType === 'positive' ? 'border-4 border-green-500' :
-            feedbackPopupType === 'negative' ? 'border-4 border-red-500' :
-            'border-4 border-blue-500'
-          }`}>
+          <div className={`bg-white rounded-2xl shadow-2xl p-8 max-w-md mx-4 transform transition-all duration-300 animate-scaleIn ${feedbackPopupType === 'positive' ? 'border-4 border-green-500' :
+              feedbackPopupType === 'negative' ? 'border-4 border-red-500' :
+                'border-4 border-blue-500'
+            }`}>
             <div className="text-center">
               {/* Icon */}
-              <div className={`w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4 ${
-                feedbackPopupType === 'positive' ? 'bg-gradient-to-br from-green-400 to-emerald-500' :
-                feedbackPopupType === 'negative' ? 'bg-gradient-to-br from-red-400 to-rose-500' :
-                'bg-gradient-to-br from-blue-400 to-indigo-500'
-              }`}>
+              <div className={`w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4 ${feedbackPopupType === 'positive' ? 'bg-gradient-to-br from-green-400 to-emerald-500' :
+                  feedbackPopupType === 'negative' ? 'bg-gradient-to-br from-red-400 to-rose-500' :
+                    'bg-gradient-to-br from-blue-400 to-indigo-500'
+                }`}>
                 {feedbackPopupType === 'positive' && (
                   <svg className="w-12 h-12 text-white" fill="currentColor" viewBox="0 0 20 20">
                     <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
@@ -3209,11 +3264,10 @@ const StudentDashboard = () => {
               </div>
 
               {/* Message */}
-              <h3 className={`text-2xl font-bold mb-2 ${
-                feedbackPopupType === 'positive' ? 'text-green-800' :
-                feedbackPopupType === 'negative' ? 'text-red-800' :
-                'text-blue-800'
-              }`} style={{ fontFamily: 'Cinzel, serif' }}>
+              <h3 className={`text-2xl font-bold mb-2 ${feedbackPopupType === 'positive' ? 'text-green-800' :
+                  feedbackPopupType === 'negative' ? 'text-red-800' :
+                    'text-blue-800'
+                }`} style={{ fontFamily: 'Cinzel, serif' }}>
                 {feedbackPopupMessage}
               </h3>
 
@@ -3222,9 +3276,8 @@ const StudentDashboard = () => {
                 {[1, 2, 3, 4, 5].map((star) => (
                   <svg
                     key={star}
-                    className={`w-6 h-6 ${
-                      feedbackRating >= star ? 'text-yellow-400' : 'text-gray-300'
-                    }`}
+                    className={`w-6 h-6 ${feedbackRating >= star ? 'text-yellow-400' : 'text-gray-300'
+                      }`}
                     fill="currentColor"
                     viewBox="0 0 20 20"
                   >

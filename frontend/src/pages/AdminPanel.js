@@ -146,6 +146,14 @@ const AdminPanel = () => {
                   onClick={() => goTo('settings')}
                 />
               </div>
+              <div className="animate-fade-in-up animation-delay-1000">
+                <AdminCard
+                  title="Emergency Dashboard"
+                  description="Monitor and manage emergency alerts"
+                  icon="🚨"
+                  onClick={() => window.open('/emergency-dashboard', '_blank')}
+                />
+              </div>
             </div>
 
             {/* Background decoration */}

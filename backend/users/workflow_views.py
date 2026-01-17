@@ -1,9 +1,9 @@
 from rest_framework import generics, status
+from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.exceptions import PermissionDenied
-from rest_framework import generics, status
 from django.db.models import Q
 from django.core.mail import send_mail
 import secrets
@@ -19,7 +19,7 @@ from .workflow_serializers import (
     SchoolVolunteerAssignmentSerializer, SchoolStandingSerializer,
     IDSignupRequestSerializer
 )
-from .permissions import IsAdminRole
+from .permissions import IsAdminRole, IsAdminOrVolunteerRole, IsAdminOrStudentSignupVolunteer
 
 
 # Admin: Create School Accounts
@@ -308,17 +308,22 @@ Thank you for joining E-Kalolsavam!
 # Admin: List and approve signup requests
 class IDSignupRequestListView(generics.ListAPIView):
     serializer_class = IDSignupRequestSerializer
-    permission_classes = [IsAuthenticated, IsAdminRole]
+    permission_classes = [IsAuthenticated, IsAdminOrVolunteerRole]
     
     def get_queryset(self):
         status_filter = self.request.query_params.get('status', 'pending')
-        return IDSignupRequest.objects.filter(status=status_filter).order_by('-requested_at')
+        
+        # If status is 'all', return all requests regardless of status
+        if status_filter == 'all':
+            return IDSignupRequest.objects.all().order_by('-requested_at')
+        else:
+            return IDSignupRequest.objects.filter(status=status_filter).order_by('-requested_at')
 
 
 class IDSignupRequestDetailView(generics.RetrieveUpdateAPIView):
     queryset = IDSignupRequest.objects.all()
     serializer_class = IDSignupRequestSerializer
-    permission_classes = [IsAuthenticated, IsAdminRole]
+    permission_classes = [IsAuthenticated, IsAdminOrVolunteerRole]
     
     def update(self, request, *args, **kwargs):
         instance = self.get_object()
@@ -326,6 +331,16 @@ class IDSignupRequestDetailView(generics.RetrieveUpdateAPIView):
         
         if new_status not in ['approved', 'rejected']:
             return Response({'error': 'Invalid status'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Check if the current user is a volunteer trying to approve non-student requests
+        user = request.user
+        if user.role == 'volunteer':
+            # Volunteers can only approve student signup requests
+            if instance.issued_id.role != 'student':
+                return Response(
+                    {'error': 'Volunteers can only approve student registration requests'}, 
+                    status=status.HTTP_403_FORBIDDEN
+                )
         
         instance.status = new_status
         instance.reviewed_by = request.user
@@ -336,13 +351,13 @@ class IDSignupRequestDetailView(generics.RetrieveUpdateAPIView):
         
         # Get the associated ID and user
         issued_id = instance.issued_id
-        user = instance.user
+        user_obj = instance.user
         
         # If approved, activate the user and mark ID as verified
         if new_status == 'approved':
-            user.approval_status = 'approved'
-            user.is_active = True
-            user.save()
+            user_obj.approval_status = 'approved'
+            user_obj.is_active = True
+            user_obj.save()
             
             # Mark the ID as verified
             issued_id.is_verified = True
@@ -352,13 +367,13 @@ class IDSignupRequestDetailView(generics.RetrieveUpdateAPIView):
             
             # Send approval email
             try:
-                subject = f'{user.role.title()} Account Approved - E-Kalolsavam'
-                message = f'''Dear {user.first_name},
+                subject = f'{user_obj.role.title()} Account Approved - E-Kalolsavam'
+                message = f'''Dear {user_obj.first_name},
 
-Congratulations! Your {user.role} account has been approved and activated.
+Congratulations! Your {user_obj.role} account has been approved and activated.
 
 You can now log in to the E-Kalolsavam platform using your credentials:
-Username: {user.username}
+Username: {user_obj.username}
 
 Please keep your login credentials secure and do not share them with anyone.
 
@@ -367,14 +382,14 @@ Welcome to the E-Kalolsavam team!
 Best regards,
 E-Kalolsavam Admin Team
 '''
-                send_mail(subject, message, 'joelfrancisjoy@gmail.com', [user.email], fail_silently=True)
+                send_mail(subject, message, 'joelfrancisjoy@gmail.com', [user_obj.email], fail_silently=True)
             except Exception:
                 pass
                 
         elif new_status == 'rejected':
-            user.approval_status = 'rejected'
-            user.is_active = False
-            user.save()
+            user_obj.approval_status = 'rejected'
+            user_obj.is_active = False
+            user_obj.save()
             
             # Optionally, free up the ID for reuse
             if request.data.get('free_id', False):
@@ -385,11 +400,11 @@ E-Kalolsavam Admin Team
             
             # Send rejection email
             try:
-                subject = f'{user.role.title()} Registration Update - E-Kalolsavam'
+                subject = f'{user_obj.role.title()} Registration Update - E-Kalolsavam'
                 rejection_reason = instance.notes or 'verification failed'
-                message = f'''Dear {user.first_name},
+                message = f'''Dear {user_obj.first_name},
 
-Thank you for your interest in joining E-Kalolsavam as a {user.role}.
+Thank you for your interest in joining E-Kalolsavam as a {user_obj.role}.
 
 After review, we regret to inform you that your registration could not be approved at this time.
 Reason: {rejection_reason}
@@ -401,7 +416,7 @@ Thank you for your understanding.
 Best regards,
 E-Kalolsavam Admin Team
 '''
-                send_mail(subject, message, 'joelfrancisjoy@gmail.com', [user.email], fail_silently=True)
+                send_mail(subject, message, 'joelfrancisjoy@gmail.com', [user_obj.email], fail_silently=True)
             except Exception:
                 pass
         
@@ -412,12 +427,16 @@ E-Kalolsavam Admin Team
 
 
 # School: Submit participant data
-class SchoolSubmitParticipantsView(generics.CreateAPIView):
+class SchoolSubmitParticipantsView(APIView):
     permission_classes = [IsAuthenticated]
     
-    def create(self, request):
-        if request.user.role != 'school':
-            raise PermissionDenied("Only school accounts can submit participants")
+    def post(self, request):
+        # Check if user has school role
+        if not hasattr(request.user, 'role') or request.user.role != 'school':
+            return Response(
+                {'error': 'Only school accounts can submit participants'},
+                status=status.HTTP_403_FORBIDDEN
+            )
         
         participants_data = request.data.get('participants', [])
         
@@ -427,18 +446,53 @@ class SchoolSubmitParticipantsView(generics.CreateAPIView):
         
         created = []
         for p_data in participants_data:
+            # Validate required fields
+            participant_id = p_data.get('participant_id')
+            first_name = p_data.get('first_name')
+            last_name = p_data.get('last_name')
+            student_class = p_data.get('student_class')
+            
+            if not all([participant_id, first_name, last_name, student_class]):
+                return Response({'error': f'Missing required fields for participant {p_data.get("participant_id", "unknown")}'},
+                              status=status.HTTP_400_BAD_REQUEST)
+            
+            # Validate student_class is between 1 and 12
+            try:
+                student_class_int = int(student_class)
+                if student_class_int < 1 or student_class_int > 12:
+                    return Response({'error': f'Student class must be between 1 and 12 for participant {participant_id}'},
+                                  status=status.HTTP_400_BAD_REQUEST)
+            except (ValueError, TypeError):
+                return Response({'error': f'Invalid student class for participant {participant_id}'},
+                              status=status.HTTP_400_BAD_REQUEST)
+            
             participant = SchoolParticipant.objects.create(
                 school=request.user,
-                participant_id=p_data.get('participant_id'),
-                first_name=p_data.get('first_name'),
-                last_name=p_data.get('last_name'),
-                student_class=p_data.get('student_class')
+                participant_id=participant_id,
+                first_name=first_name,
+                last_name=last_name,
+                student_class=student_class_int
             )
             
             # Add events if provided
             event_ids = p_data.get('event_ids', [])
             if event_ids:
-                participant.events.set(event_ids)
+                # Validate that all event IDs are integers
+                try:
+                    event_ids = [int(e_id) for e_id in event_ids]
+                except (ValueError, TypeError):
+                    return Response({'error': f'Invalid event ID format for participant {participant_id}'},
+                                  status=status.HTTP_400_BAD_REQUEST)
+                
+                # Validate that all event IDs exist
+                from events.models import Event
+                valid_event_ids = Event.objects.filter(id__in=event_ids).values_list('id', flat=True)
+                invalid_event_ids = set(event_ids) - set(valid_event_ids)
+                if invalid_event_ids:
+                    return Response({'error': f'Invalid event IDs: {list(invalid_event_ids)} for participant {participant_id}'},
+                                  status=status.HTTP_400_BAD_REQUEST)
+                
+                participant.events.set(valid_event_ids)
             
             created.append(SchoolParticipantSerializer(participant).data)
         
@@ -589,6 +643,19 @@ class VolunteerVerifyStudentView(generics.CreateAPIView):
                             'participant': SchoolParticipantSerializer(school_participant).data})
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+# School: View own submitted participants
+class SchoolViewOwnParticipantsView(generics.ListAPIView):
+    serializer_class = SchoolParticipantSerializer
+    permission_classes = [IsAuthenticated]
+    
+    def get_queryset(self):
+        if self.request.user.role != 'school':
+            return SchoolParticipant.objects.none()
+        
+        # Return participants submitted by this school
+        return SchoolParticipant.objects.filter(school=self.request.user).order_by('-submitted_at')
 
 
 # Admin: Assign volunteers to schools
