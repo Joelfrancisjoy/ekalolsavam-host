@@ -55,10 +55,6 @@ class EventSerializer(serializers.ModelSerializer):
         return super().create(validated_data)
 
     def validate(self, data):
-        # Skip validation for partial updates (like just toggling is_published)
-        if self.partial and len(data) == 1 and 'is_published' in data:
-            return data
-            
         venue = data.get('venue')
         date = data.get('date')
         start_time = data.get('start_time')
@@ -72,12 +68,14 @@ class EventSerializer(serializers.ModelSerializer):
                 # If updating same venue, count remains
                 pass
             elif event_count >= venue.event_limit:
-                raise serializers.ValidationError(f"Venue {venue.name} has reached the maximum limit of {venue.event_limit} events.")
+                raise serializers.ValidationError(
+                    f"Venue {venue.name} has reached the maximum limit of {venue.event_limit} events.")
 
         # Validate time window and duration
         if start_time and end_time:
             if end_time <= start_time:
-                raise serializers.ValidationError("End time must be after start time.")
+                raise serializers.ValidationError(
+                    "End time must be after start time.")
 
             # Enforce max 3 hours duration
             from datetime import datetime, date as date_cls
@@ -86,13 +84,17 @@ class EventSerializer(serializers.ModelSerializer):
             end_dt = datetime.combine(dummy_date, end_time)
             duration_hours = (end_dt - start_dt).total_seconds() / 3600.0
             if duration_hours > 3.0:
-                raise serializers.ValidationError("Event duration cannot exceed 3 hours.")
+                raise serializers.ValidationError(
+                    "Event duration cannot exceed 3 hours.")
 
             # Enforce allowed time window 09:00 to 20:00
-            earliest = datetime.combine(dummy_date, datetime.strptime('09:00', '%H:%M').time())
-            latest = datetime.combine(dummy_date, datetime.strptime('20:00', '%H:%M').time())
+            earliest = datetime.combine(
+                dummy_date, datetime.strptime('09:00', '%H:%M').time())
+            latest = datetime.combine(
+                dummy_date, datetime.strptime('20:00', '%H:%M').time())
             if start_dt < earliest or end_dt > latest:
-                raise serializers.ValidationError("Events must be scheduled between 09:00 and 20:00.")
+                raise serializers.ValidationError(
+                    "Events must be scheduled between 09:00 and 20:00.")
 
         # Check time clash in the same venue/date
         if date and start_time and end_time and venue:
@@ -106,15 +108,18 @@ class EventSerializer(serializers.ModelSerializer):
                 end_time__gt=start_time
             )
             if clashing_events.exists():
-                raise serializers.ValidationError("Time slot clashes with another event in the same venue.")
+                raise serializers.ValidationError(
+                    "Time slot clashes with another event in the same venue.")
 
         return data
 
     def validate_volunteers(self, volunteers):
         # Ensure all assigned users are volunteers
-        invalid = [u for u in volunteers if getattr(u, 'role', None) != 'volunteer']
+        invalid = [u for u in volunteers if getattr(
+            u, 'role', None) != 'volunteer']
         if invalid:
-            raise serializers.ValidationError('All assigned users in volunteers must have role="volunteer"')
+            raise serializers.ValidationError(
+                'All assigned users in volunteers must have role="volunteer"')
         return volunteers
 
 
@@ -158,13 +163,16 @@ class EventRegistrationSerializer(serializers.ModelSerializer):
         name = value.strip()
 
         if ' ' in name:
-            raise serializers.ValidationError("Invalid Format: First name cannot contain spaces.")
+            raise serializers.ValidationError(
+                "Invalid Format: First name cannot contain spaces.")
 
         if not name.isalpha() or not name.isupper():
-            raise serializers.ValidationError("Invalid Character: First name must be uppercase letters only.")
+            raise serializers.ValidationError(
+                "Invalid Character: First name must be uppercase letters only.")
 
         if len(name) < 1 or len(name) > 150:
-            raise serializers.ValidationError("First name must be between 1 and 150 characters.")
+            raise serializers.ValidationError(
+                "First name must be between 1 and 150 characters.")
 
         return name
 
@@ -175,13 +183,16 @@ class EventRegistrationSerializer(serializers.ModelSerializer):
         name = value.strip()
 
         if ' ' in name:
-            raise serializers.ValidationError("Invalid Format: Last name cannot contain spaces.")
+            raise serializers.ValidationError(
+                "Invalid Format: Last name cannot contain spaces.")
 
         if not name.isalpha() or not name.isupper():
-            raise serializers.ValidationError("Invalid Character: Last name must be uppercase letters only.")
+            raise serializers.ValidationError(
+                "Invalid Character: Last name must be uppercase letters only.")
 
         if len(name) < 1 or len(name) > 150:
-            raise serializers.ValidationError("Last name must be between 1 and 150 characters.")
+            raise serializers.ValidationError(
+                "Last name must be between 1 and 150 characters.")
 
         return name
 
@@ -193,7 +204,8 @@ class EventRegistrationSerializer(serializers.ModelSerializer):
         # Ensure the request object is available in the context
         request = self.context.get('request')
         if not request or not hasattr(request, 'user'):
-             raise serializers.ValidationError("Request context is missing for validation.")
+            raise serializers.ValidationError(
+                "Request context is missing for validation.")
 
         user = request.user
         first_name = data.get('first_name')
@@ -201,8 +213,8 @@ class EventRegistrationSerializer(serializers.ModelSerializer):
 
         # Check if names were provided
         if not first_name or not last_name:
-             # This check is technically redundant if the fields are required, but it's good practice
-             return data
+            # This check is technically redundant if the fields are required, but it's good practice
+            return data
 
         # Case-insensitive comparison: normalize both names to uppercase for comparison
         # User's name is stored in title case, input is uppercase letters only
@@ -219,7 +231,8 @@ class EventRegistrationSerializer(serializers.ModelSerializer):
         selected_event = data.get('event')
         if selected_event is None:
             # Attempt to resolve from initial_data if not in validated data yet
-            event_id = self.initial_data.get('event') if hasattr(self, 'initial_data') else None
+            event_id = self.initial_data.get('event') if hasattr(
+                self, 'initial_data') else None
             if event_id:
                 try:
                     from .models import Event
@@ -228,15 +241,19 @@ class EventRegistrationSerializer(serializers.ModelSerializer):
                     selected_event = None
 
         if selected_event is None:
-            raise serializers.ValidationError("A valid event must be provided for registration.")
+            raise serializers.ValidationError(
+                "A valid event must be provided for registration.")
 
-        if getattr(selected_event, 'is_published', False) is not True:
-            raise serializers.ValidationError("Registration is only allowed for published events.")
+        # Check if event is in the right status for registration
+        if getattr(selected_event, 'status', 'draft') != 'published':
+            raise serializers.ValidationError(
+                "Registration is only allowed for published events.")
 
         # Prevent duplicate registrations for the same event/user
         from .models import EventRegistration as ER
         if ER.objects.filter(event=selected_event, participant=user).exists():
-            raise serializers.ValidationError("You are already registered for this event.")
+            raise serializers.ValidationError(
+                "You are already registered for this event.")
 
         return data
 
@@ -251,12 +268,12 @@ class ParticipantVerificationSerializer(serializers.ModelSerializer):
     participant_details = serializers.SerializerMethodField()
     volunteer_details = serializers.SerializerMethodField()
     event_details = serializers.SerializerMethodField()
-    
+
     class Meta:
         model = ParticipantVerification
         fields = '__all__'
         read_only_fields = ['verification_time', 'volunteer']
-    
+
     def get_participant_details(self, obj):
         participant = obj.participant
         return {
@@ -273,10 +290,10 @@ class ParticipantVerificationSerializer(serializers.ModelSerializer):
                 'category': participant.school.category if participant.school else None,
             } if participant.school else None,
         }
-    
+
     def get_volunteer_details(self, obj):
         from users.serializers import UserSerializer
         return UserSerializer(obj.volunteer).data
-    
+
     def get_event_details(self, obj):
         return EventSerializer(obj.event).data

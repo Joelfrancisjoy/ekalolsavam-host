@@ -128,14 +128,41 @@ class Result(models.Model):
     def __str__(self):
         return f"{self.event.name} - {self.participant.username} - Rank: {self.rank}"
 
+    def save(self, *args, **kwargs):
+        # Prevent modification of published results
+        if self.pk:  # If this is an update (not a new record)
+            original = Result.objects.get(pk=self.pk)
+            if original.published and not self.published:
+                # Prevent unpublishing a published result
+                from django.core.exceptions import ValidationError
+                raise ValidationError("Cannot unpublish a published result")
+            elif original.published and self.published:
+                # If the result was already published and we're trying to update it, prevent the change
+                if (original.total_score != self.total_score or 
+                    original.rank != self.rank):
+                    from django.core.exceptions import ValidationError
+                    raise ValidationError("Cannot modify published results")
+        
+        super().save(*args, **kwargs)
+
     @property
     def is_recheck_allowed(self):
         """Check if a recheck request is allowed for this result"""
-        # Check if there's already a recheck request for this result
-        return not RecheckRequest.objects.filter(
+        # Check if there's already a recheck request for this result that has been accepted/completed
+        existing_request = RecheckRequest.objects.filter(
             result=self,
             participant=self.participant
-        ).exists()
+        ).first()
+        
+        # If there's an existing request that's been accepted/completed, recheck is not allowed
+        if existing_request and existing_request.status in ["Accepted", "Completed"]:
+            return False
+        
+        # If there's an existing pending request, recheck is not allowed
+        if existing_request:
+            return False
+        
+        return True
 
     @property
     def chest_number(self):

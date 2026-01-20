@@ -1,6 +1,6 @@
 from django.urls import path
 from .views import (
-    RegisterView, CurrentUserView, LoginView,
+    RegisterView, CurrentUserView, login_view,
     AllowedEmailListCreateView, AllowedEmailDetailView,
     bulk_add_allowed_emails, check_email_allowed, check_email_registered, toggle_email_status,
     google_auth, accept_pending_password, set_new_password,
@@ -21,7 +21,7 @@ from .workflow_views import (
 
 urlpatterns = [
     path('register/', RegisterView.as_view(), name='register'),
-    path('login/', LoginView.as_view(), name='login'),
+    path('login/', login_view, name='login'),
     path('current/', CurrentUserView.as_view(), name='current-user'),
     path('google/', google_auth, name="google_auth"),
 

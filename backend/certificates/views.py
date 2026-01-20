@@ -50,6 +50,15 @@ class GenerateCertificateView(generics.CreateAPIView):
         if not all([participant_id, event_id, school_name, district_name, category, certificate_type]):
             return Response({'detail': 'All fields are required: participant, event, school_name, district_name, category, certificate_type.'}, status=status.HTTP_400_BAD_REQUEST)
 
+        # Enforce certificate rule: Certificates only allowed when event is archived
+        from events.models import Event
+        try:
+            event = Event.objects.get(id=event_id)
+            if event.status != "archived":
+                return Response({'detail': 'Certificates can only be generated after archive'}, status=status.HTTP_400_BAD_REQUEST)
+        except Event.DoesNotExist:
+            return Response({'detail': 'Event not found'}, status=status.HTTP_404_NOT_FOUND)
+
         # Create the certificate with all required fields
         certificate = Certificate.objects.create(
             participant_id=participant_id,

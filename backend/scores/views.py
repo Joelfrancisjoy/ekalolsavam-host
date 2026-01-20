@@ -37,6 +37,12 @@ class ScoreListCreateView(generics.ListCreateAPIView):
     def perform_create(self, serializer):
         user = self.request.user
         if user.role == 'judge':
+            # Enforce scoring rule: Scoring only allowed when event is in progress
+            event = serializer.validated_data['event']
+            if event.status != "in_progress":
+                from django.core.exceptions import ValidationError
+                raise ValidationError("Scoring not open")
+
             serializer.save(judge=user)
         else:
             raise PermissionError("Only judges can submit scores")
@@ -121,6 +127,10 @@ def _submit_dynamic_scores(request, user):
 
     try:
         event = get_object_or_404(Event, pk=event_id)
+
+        # Enforce scoring rule: Scoring only allowed when event is in progress
+        if event.status != "in_progress":
+            return Response({"error": "Scoring not open"}, status=status.HTTP_400_BAD_REQUEST)
 
         # Get expected criteria for this event
         expected_criteria = get_criteria_for_event(event.name, event.category)
@@ -210,6 +220,12 @@ def _submit_legacy_scores(request, user):
         return Response({"error": "Missing required fields"}, status=status.HTTP_400_BAD_REQUEST)
 
     try:
+        event = get_object_or_404(Event, pk=event_id)
+
+        # Enforce scoring rule: Scoring only allowed when event is in progress
+        if event.status != "in_progress":
+            return Response({"error": "Scoring not open"}, status=status.HTTP_400_BAD_REQUEST)
+
         # Prepare score data for anomaly detection
         score_data = {
             'technical_skill': float(technical_skill),

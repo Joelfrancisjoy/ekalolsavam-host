@@ -73,8 +73,13 @@ function AppContent() {
 }
 
 function App() {
+  const routerFuture = {
+    v7_startTransition: true,
+    v7_relativeSplatPath: true,
+  };
+
   return (
-    <Router>
+    <Router future={routerFuture}>
       <AppContent />
     </Router>
   );

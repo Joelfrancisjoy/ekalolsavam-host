@@ -7,8 +7,10 @@ from django.utils.decorators import method_decorator
 from users.permissions import IsAdminRole
 from .models import Event, Venue, EventRegistration, Judge, ParticipantVerification
 from .serializers import EventSerializer, VenueSerializer, EventRegistrationSerializer, JudgeSerializer, ParticipantVerificationSerializer
+from .services.event_state import transition_event, can_transition
 from django.core.mail import send_mail
 from django.shortcuts import get_object_or_404
+
 
 class VenueListCreateView(generics.ListCreateAPIView):
     queryset = Venue.objects.all()
@@ -20,6 +22,7 @@ class VenueListCreateView(generics.ListCreateAPIView):
             return [IsAuthenticated()]
         return [IsAdminRole()]
 
+
 class VenueDetailView(generics.RetrieveUpdateDestroyAPIView):
     queryset = Venue.objects.all()
     serializer_class = VenueSerializer
@@ -30,15 +33,18 @@ class VenueDetailView(generics.RetrieveUpdateDestroyAPIView):
             return [IsAuthenticated()]
         return [IsAdminRole()]
 
+
 class JudgeListCreateView(generics.ListCreateAPIView):
     queryset = Judge.objects.all()
     serializer_class = JudgeSerializer
     permission_classes = [IsAdminRole]
 
+
 class JudgeDetailView(generics.RetrieveUpdateDestroyAPIView):
     queryset = Judge.objects.all()
     serializer_class = JudgeSerializer
     permission_classes = [IsAdminRole]
+
 
 class EventListCreateView(generics.ListCreateAPIView):
     queryset = Event.objects.all()
@@ -55,15 +61,17 @@ class EventListCreateView(generics.ListCreateAPIView):
         category = self.request.query_params.get('category', None)
         date = self.request.query_params.get('date', None)
         published_only = self.request.query_params.get('published_only', None)
-        
+
         if category:
             queryset = queryset.filter(category=category)
         if date:
             queryset = queryset.filter(date=date)
         if published_only and published_only.lower() == 'true':
-            queryset = queryset.filter(is_published=True)
-            
+            queryset = queryset.filter(status__in=[
+                                       "published", "registration_closed", "in_progress", "scoring_closed", "results_published", "archived"])
+
         return queryset
+
 
 @method_decorator(csrf_exempt, name='dispatch')
 class EventDetailView(generics.RetrieveUpdateDestroyAPIView):
@@ -93,16 +101,19 @@ class EventDetailView(generics.RetrieveUpdateDestroyAPIView):
                 emails = set()
                 # Judges (M2M to users)
                 try:
-                    emails.update([u.email for u in instance.judges.all() if u.email])
+                    emails.update(
+                        [u.email for u in instance.judges.all() if u.email])
                 except Exception:
                     pass
                 # Volunteers (new M2M)
                 try:
-                    emails.update([u.email for u in instance.volunteers.all() if u.email])
+                    emails.update(
+                        [u.email for u in instance.volunteers.all() if u.email])
                 except Exception:
                     pass
                 if emails:
-                    send_mail(subject, message, None, list(emails), fail_silently=True)
+                    send_mail(subject, message, None, list(
+                        emails), fail_silently=True)
             except Exception:
                 # Non-blocking - continue deletion even if mail fails
                 pass
@@ -130,7 +141,8 @@ def assign_volunteers(request, pk):
         return Response({'error': 'volunteer_ids must be a list of user IDs'}, status=status.HTTP_400_BAD_REQUEST)
 
     from users.models import User
-    volunteers = list(User.objects.filter(id__in=volunteer_ids, role='volunteer'))
+    volunteers = list(User.objects.filter(
+        id__in=volunteer_ids, role='volunteer'))
     if len(volunteers) != len(set(volunteer_ids)):
         return Response({'error': 'Some users not found or not volunteers'}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -148,7 +160,8 @@ def assign_volunteers(request, pk):
             end_time=event.end_time,
         )
         for v in volunteers:
-            va, _ = VolunteerAssignment.objects.get_or_create(volunteer=v, shift=shift)
+            va, _ = VolunteerAssignment.objects.get_or_create(
+                volunteer=v, shift=shift)
             created_assignments[v.id] = va.shift_id
     except Exception:
         # volunteers app not installed or other issue; continue without shifts
@@ -167,11 +180,13 @@ def assign_volunteers(request, pk):
                 "Please be present on time."
             )
             if v.email:
-                send_mail(subject, message, None, [v.email], fail_silently=True)
+                send_mail(subject, message, None, [
+                          v.email], fail_silently=True)
     except Exception:
         pass
 
     return Response(EventSerializer(event).data)
+
 
 class EventRegistrationView(generics.ListCreateAPIView):
     serializer_class = EventRegistrationSerializer
@@ -185,7 +200,12 @@ class EventRegistrationView(generics.ListCreateAPIView):
 
     def perform_create(self, serializer):
         registration = serializer.save(participant=self.request.user)
-        
+
+        # Enforce registration rule: Registration only allowed when event is published
+        if registration.event.status != "published":
+            from django.core.exceptions import ValidationError
+            raise ValidationError("Registrations are closed for this event")
+
         # Generate a unique chess number for the registration
         if not registration.chess_number:
             import uuid
@@ -193,7 +213,7 @@ class EventRegistrationView(generics.ListCreateAPIView):
             chess_number = f"{registration.event.id:03d}{registration.participant.id:05d}"
             registration.chess_number = chess_number
             registration.save()
-        
+
         # Send a confirmation email to the student; do not block on failures
         try:
             participant = self.request.user
@@ -210,7 +230,8 @@ class EventRegistrationView(generics.ListCreateAPIView):
                 "Thank you for registering. All the best!"
             )
             # From email will use EMAIL_HOST_USER; fallback to None lets Django use default
-            send_mail(subject, message, None, [participant.email], fail_silently=True)
+            send_mail(subject, message, None, [
+                      participant.email], fail_silently=True)
         except Exception:
             # Intentionally ignore email errors
             pass
@@ -265,6 +286,7 @@ class EventRegistrationView(generics.ListCreateAPIView):
         context['request'] = self.request
         return context
 
+
 class UserEventRegistrationsView(generics.ListAPIView):
     serializer_class = EventRegistrationSerializer
     permission_classes = [IsAuthenticated]
@@ -272,46 +294,8 @@ class UserEventRegistrationsView(generics.ListAPIView):
     def get_queryset(self):
         return EventRegistration.objects.filter(participant=self.request.user)
 
-class PublishedEventsView(generics.ListAPIView):
-    """
-    Student-facing endpoint to view only published events
-    """
-    serializer_class = EventSerializer
-    permission_classes = [IsAuthenticated]
-
-    def get_queryset(self):
-        queryset = Event.objects.filter(is_published=True)
-        category = self.request.query_params.get('category', None)
-        date = self.request.query_params.get('date', None)
-        
-        if category:
-            queryset = queryset.filter(category=category)
-        if date:
-            queryset = queryset.filter(date=date)
-            
-        return queryset.order_by('date', 'start_time')
-
-@api_view(['PATCH'])
-@permission_classes([IsAdminRole])
-def toggle_event_publish(request, pk):
-    """
-    Simple endpoint to toggle event publish status without complex validation
-    """
-    try:
-        event = Event.objects.get(pk=pk)
-        event.is_published = not event.is_published
-        event.save()
-        
-        serializer = EventSerializer(event)
-        return Response(serializer.data)
-    except Event.DoesNotExist:
-        return Response({'error': 'Event not found'}, status=status.HTTP_404_NOT_FOUND)
-    except Exception as e:
-        return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
 
 # ---------- Judge helper endpoints ----------
-
 class MyAssignedEventsView(generics.ListAPIView):
     """
     List events assigned to the current judge. Admins get empty by default here
@@ -324,7 +308,11 @@ class MyAssignedEventsView(generics.ListAPIView):
         user = self.request.user
         if getattr(user, 'role', None) == 'judge':
             # Only published events should be visible in the dashboard
-            return Event.objects.filter(judges=user, is_published=True).order_by('date', 'start_time')
+            return Event.objects.filter(
+                judges=user,
+                status__in=["published", "registration_closed", "in_progress",
+                            "scoring_closed", "results_published", "archived"]
+            ).order_by('date', 'start_time')
         return Event.objects.none()
 
 
@@ -332,7 +320,7 @@ class ParticipantsByEventForJudgeView(generics.ListAPIView):
     """
     List participants (registrations) for a given event, only if the current
     judge is assigned to that event. Supports filtering by chess number.
-    
+
     For judges: Only returns verified participants (those verified by volunteers).
     For volunteers: Returns all registered participants.
     """
@@ -345,8 +333,10 @@ class ParticipantsByEventForJudgeView(generics.ListAPIView):
 
         user = self.request.user
         # Allow judges and volunteers assigned to the event
-        is_assigned_judge = getattr(user, 'role', None) == 'judge' and event.judges.filter(pk=user.pk).exists()
-        is_assigned_volunteer = getattr(user, 'role', None) == 'volunteer' and event.volunteers.filter(pk=user.pk).exists()
+        is_assigned_judge = getattr(
+            user, 'role', None) == 'judge' and event.judges.filter(pk=user.pk).exists()
+        is_assigned_volunteer = getattr(
+            user, 'role', None) == 'volunteer' and event.volunteers.filter(pk=user.pk).exists()
 
         if is_assigned_judge:
             # For judges: Only show participants who have been verified by volunteers
@@ -354,7 +344,7 @@ class ParticipantsByEventForJudgeView(generics.ListAPIView):
                 event=event,
                 status='verified'
             ).values_list('participant_id', flat=True).distinct()
-            
+
             queryset = EventRegistration.objects.filter(
                 event=event,
                 participant_id__in=verified_participant_ids
@@ -368,7 +358,8 @@ class ParticipantsByEventForJudgeView(generics.ListAPIView):
             return queryset
         elif is_assigned_volunteer:
             # For volunteers: Show all registered participants
-            queryset = EventRegistration.objects.filter(event=event).select_related('participant', 'participant__school')
+            queryset = EventRegistration.objects.filter(
+                event=event).select_related('participant', 'participant__school')
 
             # Filter by chess number if provided
             chess_number = self.request.query_params.get('chess_number')
@@ -397,6 +388,12 @@ class ParticipantVerificationView(generics.ListCreateAPIView):
         return ParticipantVerification.objects.none()
 
     def perform_create(self, serializer):
+        # Enforce verification rule: Verification only allowed when event is in registration_closed or in_progress status
+        event = serializer.validated_data['event']
+        if event.status not in ["registration_closed", "in_progress"]:
+            from django.core.exceptions import ValidationError
+            raise ValidationError("Verification not allowed at this stage")
+
         serializer.save(volunteer=self.request.user)
 
 
@@ -407,37 +404,43 @@ def verify_participant_by_chess_number(request):
     Verify a participant by chess number for a specific event and send details to assigned judges
     """
     if request.user.role != 'volunteer':
-        return Response({'error': 'Only volunteers can verify participants'}, 
-                      status=status.HTTP_403_FORBIDDEN)
-    
+        return Response({'error': 'Only volunteers can verify participants'},
+                        status=status.HTTP_403_FORBIDDEN)
+
     chess_number = request.data.get('chess_number')
     event_id = request.data.get('event_id')
     notes = request.data.get('notes', '')
-    
+
     if not chess_number or not event_id:
-        return Response({'error': 'Chess number and event_id are required'}, 
-                      status=status.HTTP_400_BAD_REQUEST)
-    
+        return Response({'error': 'Chess number and event_id are required'},
+                        status=status.HTTP_400_BAD_REQUEST)
+
     try:
         # Find the registration with this chess number for the specified event
         registration = EventRegistration.objects.select_related('participant', 'participant__school', 'event').get(
             chess_number=chess_number,
             event_id=event_id
         )
-        
+
+        # Enforce verification rule: Verification only allowed when event is in registration_closed or in_progress status
+        if registration.event.status not in ["registration_closed", "in_progress"]:
+            return Response({
+                'error': 'Verification not allowed at this stage'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
         # Check if already verified by this volunteer
         existing_verification = ParticipantVerification.objects.filter(
             event=registration.event,
             participant=registration.participant,
             volunteer=request.user
         ).first()
-        
+
         if existing_verification:
             return Response({
                 'error': 'Participant already verified by you',
                 'verification': ParticipantVerificationSerializer(existing_verification).data
             }, status=status.HTTP_400_BAD_REQUEST)
-        
+
         # Create verification record
         verification = ParticipantVerification.objects.create(
             event=registration.event,
@@ -447,20 +450,20 @@ def verify_participant_by_chess_number(request):
             status='verified',
             notes=notes
         )
-        
+
         # Send participant details to assigned judges
         try:
             send_participant_details_to_judges(verification)
         except Exception as e:
             # Log the error but don't fail the verification
             print(f"Error sending participant details to judges: {str(e)}")
-        
+
         serializer = ParticipantVerificationSerializer(verification)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
-        
+
     except EventRegistration.DoesNotExist:
-        return Response({'error': 'No participant found with this chess number for the specified event'}, 
-                      status=status.HTTP_404_NOT_FOUND)
+        return Response({'error': 'No participant found with this chess number for the specified event'},
+                        status=status.HTTP_404_NOT_FOUND)
     except Exception as e:
         return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
@@ -471,23 +474,23 @@ def send_participant_details_to_judges(verification):
     """
     from django.core.mail import send_mail
     from django.conf import settings
-    
+
     event = verification.event
     participant = verification.participant
-    
+
     # Get assigned judges for this event
     assigned_judges = event.judges.all()
-    
+
     if not assigned_judges.exists():
         return
-    
+
     # Prepare participant details
     participant_category = participant.section or 'N/A'
     school_name = participant.school.name if participant.school else 'N/A'
     student_class = participant.student_class or 'N/A'
-    
+
     subject = f"Participant Verification - {event.name}"
-    
+
     message = f"""
     A participant has been verified for the event: {event.name}
     
@@ -508,10 +511,10 @@ def send_participant_details_to_judges(verification):
     
     Please prepare for judging this participant.
     """
-    
+
     # Send email to all assigned judges
     judge_emails = [judge.email for judge in assigned_judges if judge.email]
-    
+
     if judge_emails:
         send_mail(
             subject,
@@ -529,9 +532,9 @@ def get_volunteer_assignments(request):
     Get events assigned to the current volunteer
     """
     if request.user.role != 'volunteer':
-        return Response({'error': 'Only volunteers can access this endpoint'}, 
-                      status=status.HTTP_403_FORBIDDEN)
-    
+        return Response({'error': 'Only volunteers can access this endpoint'},
+                        status=status.HTTP_403_FORBIDDEN)
+
     events = []
     # 1) Legacy volunteer shifts (if volunteers app is used)
     try:
@@ -554,7 +557,8 @@ def get_volunteer_assignments(request):
         pass
 
     # 2) New direct assignments via Event.volunteers M2M
-    direct_events = Event.objects.filter(volunteers=request.user).select_related('venue')
+    direct_events = Event.objects.filter(
+        volunteers=request.user).select_related('venue')
     for ev in direct_events:
         events.append({
             'id': ev.id,
@@ -581,34 +585,74 @@ def volunteer_check_in(request):
     Allow volunteers to check in for their shifts
     """
     if request.user.role != 'volunteer':
-        return Response({'error': 'Only volunteers can check in'}, 
-                      status=status.HTTP_403_FORBIDDEN)
-    
+        return Response({'error': 'Only volunteers can check in'},
+                        status=status.HTTP_403_FORBIDDEN)
+
     shift_id = request.data.get('shift_id')
     if not shift_id:
-        return Response({'error': 'shift_id is required'}, 
-                      status=status.HTTP_400_BAD_REQUEST)
-    
+        return Response({'error': 'shift_id is required'},
+                        status=status.HTTP_400_BAD_REQUEST)
+
     try:
         from volunteers.models import VolunteerAssignment
         assignment = VolunteerAssignment.objects.get(
             volunteer=request.user,
             shift_id=shift_id
         )
-        
+
         if assignment.checked_in:
-            return Response({'error': 'Already checked in'}, 
-                          status=status.HTTP_400_BAD_REQUEST)
-        
+            return Response({'error': 'Already checked in'},
+                            status=status.HTTP_400_BAD_REQUEST)
+
         from django.utils import timezone
         assignment.checked_in = True
         assignment.check_in_time = timezone.now()
         assignment.save()
-        
+
         return Response({'message': 'Successfully checked in'}, status=status.HTTP_200_OK)
-        
+
     except VolunteerAssignment.DoesNotExist:
-        return Response({'error': 'Assignment not found'}, 
-                      status=status.HTTP_404_NOT_FOUND)
+        return Response({'error': 'Assignment not found'},
+                        status=status.HTTP_404_NOT_FOUND)
+    except Exception as e:
+        return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['POST'])
+@permission_classes([IsAdminRole])
+def transition_event_status(request, pk):
+    """
+    Transition event to a new status.
+    POST /api/events/{id}/transition/
+    { "to": "published" }
+    """
+    try:
+        event = get_object_or_404(Event, pk=pk)
+        target_status = request.data.get('to')
+
+        if not target_status:
+            return Response(
+                {'error': 'Missing required field: to'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Validate transition
+        if not can_transition(event.status, target_status):
+            return Response(
+                {'error': f'Invalid transition from {event.status} → {target_status}'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Perform transition
+        transition_event(event, target_status)
+
+        return Response({
+            'id': event.id,
+            'status': event.status,
+            'message': f'Event status changed to {target_status}'
+        })
+
+    except ValueError as e:
+        return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
     except Exception as e:
         return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

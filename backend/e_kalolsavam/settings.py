@@ -130,6 +130,8 @@ REST_FRAMEWORK = {
     ),
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.IsAuthenticated',
+        "users.permissions_approval.IsApprovedUser",
+
     ],
 }
 
@@ -186,18 +188,51 @@ AUTHENTICATION_BACKENDS = (
 )
 
 # CORS Configuration
-CORS_ALLOWED_ORIGINS = [
-    "http://localhost:3000",
-    "http://127.0.0.1:3000",
-    "http://localhost:3001",
-    "http://127.0.0.1:3001",
-    "https://kalolsavam-frontend.onrender.com",
-    "https://your-frontend-domain.onrender.com",
-]
-
 CORS_ALLOW_CREDENTIALS = True
 
-CORS_ALLOW_ALL_ORIGINS = DEBUG  # Only allow all origins in debug mode
+if DEBUG:
+    # Explicitly allow common development origins
+    CORS_ALLOWED_ORIGINS = [
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "http://localhost:8000",
+        "http://127.0.0.1:8000",
+        "http://localhost:3001",
+        "http://127.0.0.1:3001",
+    ]
+    # For development, also allow all origins
+    CORS_ORIGIN_ALLOW_ALL = True
+else:
+    CORS_ALLOWED_ORIGINS = [
+        "https://kalolsavam-frontend.onrender.com",
+        "https://your-frontend-domain.onrender.com",
+        # Add your production domains here
+    ]
+
+# Additional CORS settings to handle credentials properly
+CORS_ALLOW_HEADERS = [
+    'accept',
+    'accept-encoding',
+    'authorization',
+    'content-type',
+    'dnt',
+    'origin',
+    'user-agent',
+    'x-csrftoken',
+    'x-requested-with',
+]
+
+CORS_ALLOW_METHODS = [
+    'DELETE',
+    'GET',
+    'OPTIONS',
+    'PATCH',
+    'POST',
+    'PUT',
+]
+
+# Ensure OPTIONS requests are properly handled for CORS preflight
+CORS_PREFLIGHT_MAX_AGE = 86400  # 24 hours
 
 # Social Auth Pipeline
 SOCIAL_AUTH_PIPELINE = (

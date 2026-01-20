@@ -47,10 +47,24 @@ class RecheckRequestService:
             raise ValidationError(
                 "You can only request re-check for your own results.")
 
+        # Enforce recheck rule: Recheck only allowed when event is in results_published status
+        if result.event.status != "results_published":
+            raise ValidationError(
+                "Recheck not available")
+
         # Check if recheck is allowed (no existing request)
         if not result.is_recheck_allowed:
-            raise ValidationError(
-                "Re-check request already exists for this result.")
+            # Check if there's already an accepted/completed recheck request
+            existing_request = RecheckRequest.objects.filter(
+                result=result,
+                participant=participant
+            ).first()
+            if existing_request and existing_request.status in ["Accepted", "Completed"]:
+                raise ValidationError(
+                    "Re-check already processed for this result.")
+            else:
+                raise ValidationError(
+                    "Re-check request already exists for this result.")
 
         # Find assigned volunteer for this event (required by model)
         assigned_volunteer = RecheckRequestService.get_assigned_volunteer(
@@ -194,6 +208,7 @@ class RecheckRequestService:
 
         Allowed transitions:
         - Pending → Accepted (when volunteer accepts)
+        - Accepted → Completed (when recheck is processed)
 
         Args:
             current_status: Current status of the request
@@ -204,7 +219,8 @@ class RecheckRequestService:
         """
         valid_transitions = {
             'Pending': ['Accepted'],
-            'Accepted': []  # No further transitions allowed for now
+            'Accepted': ['Completed'],  # Allow transition to completed
+            'Completed': []  # No further transitions after completion
         }
 
         return new_status in valid_transitions.get(current_status, [])
@@ -278,7 +294,7 @@ class RecheckRequestService:
         Returns:
             dict: Completion confirmation data
         """
-        if recheck_request.status != 'Accepted':
+        if recheck_request.status not in ['Accepted', 'Completed']:
             return {
                 'is_completed': False,
                 'message': 'Request is not yet accepted',
@@ -286,8 +302,8 @@ class RecheckRequestService:
             }
 
         return {
-            'is_completed': True,
-            'message': 'Re-evaluation has been completed successfully',
+            'is_completed': recheck_request.status == 'Completed',
+            'message': 'Re-evaluation has been completed successfully' if recheck_request.status == 'Completed' else 'Re-evaluation has been accepted and is pending completion',
             'status': recheck_request.status,
             'accepted_at': recheck_request.accepted_at.isoformat() if recheck_request.accepted_at else None,
             'accepted_by': recheck_request.assigned_volunteer.username,
@@ -295,6 +311,55 @@ class RecheckRequestService:
             'event': recheck_request.event_name,
             'original_score': float(recheck_request.final_score)
         }
+
+    @staticmethod
+    def complete_recheck_request(
+        recheck_request_id: str,
+        completed_by: User
+    ) -> Tuple[bool, str, Optional[RecheckRequest]]:
+        """
+        Mark a recheck request as completed.
+
+        Args:
+            recheck_request_id: UUID of the recheck request
+            completed_by: The user completing the request (typically the volunteer)
+
+        Returns:
+            Tuple[bool, str, Optional[RecheckRequest]]: 
+                (success, message, updated_request)
+        """
+        try:
+            # Get the recheck request
+            try:
+                recheck_request = RecheckRequest.objects.select_related(
+                    'result', 'participant', 'result__event'
+                ).get(
+                    recheck_request_id=recheck_request_id,
+                    status='Accepted'  # Only allow completing accepted requests
+                )
+            except RecheckRequest.DoesNotExist:
+                return False, "Re-check request not found or already completed", None
+
+            # Validate status transition
+            if not RecheckRequestService.is_valid_status_transition(
+                recheck_request.status, 'Completed'
+            ):
+                return False, f"Cannot complete request with status '{recheck_request.status}'", None
+
+            # Update the request status with transaction safety
+            with transaction.atomic():
+                recheck_request.status = 'Completed'
+                recheck_request.save()
+
+                logger.info(
+                    f"Completed recheck request {recheck_request_id} by user {completed_by.id}")
+
+                return True, "Re-check request completed successfully", recheck_request
+
+        except Exception as e:
+            logger.error(
+                f"Error completing recheck request {recheck_request_id}: {e}")
+            return False, "An error occurred while completing the re-check request", None
 
 
 class VolunteerAssignmentService:

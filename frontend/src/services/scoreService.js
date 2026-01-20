@@ -54,7 +54,7 @@ const scoreService = {
         return res.data;
     },
     getEventCriteria: async (eventId) => {
-        const res = await api.get('/api/scores/event-criteria/', { params: { event: eventId } });
+        const res = await api.get('/api/scores/criteria/', { params: { event: eventId } });
         return res.data;
     },
     // Student scores with feedback
