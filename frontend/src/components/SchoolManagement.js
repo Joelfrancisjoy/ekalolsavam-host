@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import authManager from '../utils/authManager';
 
 const SchoolManagement = () => {
   const [formData, setFormData] = useState({
@@ -40,14 +41,14 @@ const SchoolManagement = () => {
 
     try {
       const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:8000';
-      const token = localStorage.getItem('access_token');
+      const { access } = authManager.getTokens();
 
       const response = await axios.post(
         `${apiUrl}/api/auth/admin/schools/create/`,
         formData,
         {
           headers: {
-            'Authorization': `Bearer ${token}`,
+            'Authorization': `Bearer ${access}`,
             'Content-Type': 'application/json'
           }
         }

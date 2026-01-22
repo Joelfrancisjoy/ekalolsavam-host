@@ -14,6 +14,7 @@ urlpatterns = [
     path('api/notifications/', include('notifications.urls')),
     path('api/volunteers/', include('volunteers.urls')),
     path('api/emergencies/', include('emergencies.urls')),
+    path('api/', include('core.urls')),  # Health check and system info
     path('api/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
     path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
     path('auth/', include('social_django.urls', namespace='social')),

@@ -43,7 +43,7 @@ const SchoolDashboard = () => {
       try {
         const response = await http.get('/api/auth/current/');
         setCurrentUser(response.data);
-        
+
         // After getting user, fetch their participants
         fetchParticipants();
       } catch (err) {
@@ -82,7 +82,7 @@ const SchoolDashboard = () => {
         setLoading(false);
         return;
       }
-      
+
       const studentClassInt = parseInt(formData.student_class);
       if (isNaN(studentClassInt) || studentClassInt < 1 || studentClassInt > 12) {
         setError('Student class must be between 1 and 12');
@@ -90,7 +90,7 @@ const SchoolDashboard = () => {
         setLoading(false);
         return;
       }
-      
+
       const payload = {
         participants: [{
           participant_id: formData.participant_id,
@@ -106,10 +106,10 @@ const SchoolDashboard = () => {
       if (response.data.participants) {
         // Option 1: Update state with response (as before)
         // setParticipants(prev => [...prev, ...response.data.participants]);
-        
+
         // Option 2: Refresh from server to ensure consistency
         await fetchParticipants();
-        
+
         setFormData({
           participant_id: '',
           first_name: '',
@@ -160,11 +160,10 @@ const SchoolDashboard = () => {
             <nav className="flex space-x-1 px-6">
               <button
                 onClick={() => setActiveSection('participants')}
-                className={`px-8 py-5 text-lg font-semibold transition-all duration-300 relative ${
-                  activeSection === 'participants'
-                    ? 'text-white'
-                    : 'text-indigo-200 hover:text-white'
-                }`}
+                className={`px-8 py-5 text-lg font-semibold transition-all duration-300 relative ${activeSection === 'participants'
+                  ? 'text-white'
+                  : 'text-indigo-200 hover:text-white'
+                  }`}
               >
                 📝 Participant Entry
                 {activeSection === 'participants' && (
@@ -173,11 +172,10 @@ const SchoolDashboard = () => {
               </button>
               <button
                 onClick={() => setActiveSection('submitted')}
-                className={`px-8 py-5 text-lg font-semibold transition-all duration-300 relative ${
-                  activeSection === 'submitted'
-                    ? 'text-white'
-                    : 'text-indigo-200 hover:text-white'
-                }`}
+                className={`px-8 py-5 text-lg font-semibold transition-all duration-300 relative ${activeSection === 'submitted'
+                  ? 'text-white'
+                  : 'text-indigo-200 hover:text-white'
+                  }`}
               >
                 📋 Submitted Participants
                 {activeSection === 'submitted' && (
@@ -337,74 +335,173 @@ const SchoolDashboard = () => {
             )}
 
             {activeSection === 'submitted' && (
-              <div className="space-y-8">
-                <div className="flex items-center space-x-3 mb-6">
-                  <div className="w-2 h-12 bg-gradient-to-b from-indigo-500 to-purple-500 rounded-full"></div>
-                  <h2 className="text-3xl font-bold text-gray-800">Submitted Participants</h2>
-                </div>
-
-                <div className="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-2xl p-8 shadow-lg border border-indigo-100">
-                  {participants.length === 0 ? (
-                    <div className="text-center py-16">
-                      <div className="inline-block p-6 bg-white rounded-full shadow-lg mb-6">
-                        <svg className="w-16 h-16 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
-                        </svg>
-                      </div>
-                      <p className="text-2xl text-gray-600 font-medium mb-2">No participants submitted yet</p>
-                      <p className="text-lg text-gray-500">Participants will appear here once you submit them</p>
+              <div className="space-y-6">
+                {/* Header Section */}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-4">
+                    <div className="w-2 h-20 bg-gradient-to-b from-indigo-600 to-purple-600 rounded-full"></div>
+                    <div>
+                      <h2 className="text-5xl font-bold text-gray-900">Submitted Participants</h2>
+                      <p className="text-lg text-gray-600 mt-2">
+                        {participants.length} {participants.length === 1 ? 'participant' : 'participants'} submitted
+                      </p>
                     </div>
-                  ) : (
-                    <div className="overflow-x-auto rounded-xl border border-gray-200">
-                      <table className="min-w-full divide-y divide-gray-200">
-                        <thead className="bg-gradient-to-r from-indigo-600 to-purple-600">
-                          <tr>
-                            <th className="px-8 py-5 text-left text-base font-bold text-white uppercase tracking-wider">Participant ID</th>
-                            <th className="px-8 py-5 text-left text-base font-bold text-white uppercase tracking-wider">Name</th>
-                            <th className="px-8 py-5 text-left text-base font-bold text-white uppercase tracking-wider">Class</th>
-                            <th className="px-8 py-5 text-left text-base font-bold text-white uppercase tracking-wider">Status</th>
-                          </tr>
-                        </thead>
-                        <tbody className="bg-white divide-y divide-gray-200">
-                          {participants.map((p, index) => (
-                            <tr key={index} className="hover:bg-indigo-50 transition-colors duration-150">
-                              <td className="px-8 py-5 whitespace-nowrap">
-                                <span className="text-lg font-semibold text-gray-900">{p.participant_id}</span>
-                              </td>
-                              <td className="px-8 py-5 whitespace-nowrap">
-                                <span className="text-lg text-gray-900">{p.first_name} {p.last_name}</span>
-                              </td>
-                              <td className="px-8 py-5 whitespace-nowrap">
-                                <span className="text-lg text-gray-900">Class {p.student_class}</span>
-                              </td>
-                              <td className="px-8 py-5 whitespace-nowrap">
-                                <span className={`inline-flex items-center px-4 py-2 text-base font-semibold rounded-full ${
-                                  p.verified_by_volunteer
-                                    ? 'bg-green-100 text-green-800 border-2 border-green-300'
-                                    : 'bg-yellow-100 text-yellow-800 border-2 border-yellow-300'
-                                }`}>
-                                  {p.verified_by_volunteer ? '✓ Verified' : '⏳ Pending'}
-                                </span>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
+                  </div>
+
+                  {/* Summary Stats */}
+                  {participants.length > 0 && (
+                    <div className="flex items-center space-x-4">
+                      <div className="bg-yellow-50 border-2 border-yellow-200 rounded-xl px-6 py-4 flex items-center space-x-3">
+                        <div className="w-3 h-3 bg-yellow-500 rounded-full animate-pulse"></div>
+                        <span className="text-lg font-bold text-yellow-800">
+                          {participants.filter(p => !p.verified_by_volunteer).length} Pending
+                        </span>
+                      </div>
+                      <div className="bg-green-50 border-2 border-green-200 rounded-xl px-6 py-4 flex items-center space-x-3">
+                        <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                        <span className="text-lg font-bold text-green-800">
+                          {participants.filter(p => p.verified_by_volunteer).length} Verified
+                        </span>
+                      </div>
                     </div>
                   )}
                 </div>
 
-                <div className="bg-blue-50 border-l-4 border-blue-500 rounded-r-xl p-6 shadow-lg">
-                  <div className="flex items-start space-x-4">
-                    <svg className="w-8 h-8 text-blue-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-                    </svg>
-                    <div>
-                      <p className="text-lg font-semibold text-blue-900 mb-2">Information</p>
-                      <p className="text-base text-blue-800">This data will be sent to your assigned volunteer for verification. Status will update once verification is complete.</p>
+                {/* Main Content */}
+                {participants.length === 0 ? (
+                  <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-16">
+                    <div className="text-center">
+                      <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-indigo-100 to-purple-100 rounded-2xl mb-6">
+                        <svg className="w-10 h-10 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                        </svg>
+                      </div>
+                      <h3 className="text-2xl font-bold text-gray-900 mb-2">No participants submitted yet</h3>
+                      <p className="text-gray-600 mb-6">Start by adding participants in the Participant Entry tab</p>
+                      <button
+                        onClick={() => setActiveSection('participants')}
+                        className="inline-flex items-center px-6 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-semibold rounded-xl hover:from-indigo-700 hover:to-purple-700 transition-all duration-200 shadow-lg hover:shadow-xl"
+                      >
+                        <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                        </svg>
+                        Add Participants
+                      </button>
                     </div>
                   </div>
-                </div>
+                ) : (
+                  <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+                    {/* Table Header */}
+                    <div className="bg-gradient-to-r from-indigo-600 via-indigo-600 to-purple-600 px-8 py-6">
+                      <div className="grid grid-cols-12 gap-4 text-base font-bold text-white uppercase tracking-wider">
+                        <div className="col-span-2">Participant ID</div>
+                        <div className="col-span-2">Name</div>
+                        <div className="col-span-1">Class</div>
+                        <div className="col-span-5">Events</div>
+                        <div className="col-span-2 text-center">Status</div>
+                      </div>
+                    </div>
+
+                    {/* Table Body */}
+                    <div className="divide-y divide-gray-100">
+                      {participants.map((p, index) => (
+                        <div
+                          key={index}
+                          className="grid grid-cols-12 gap-4 px-8 py-6 hover:bg-gradient-to-r hover:from-indigo-50 hover:to-purple-50 transition-all duration-200 group"
+                        >
+                          {/* Participant ID */}
+                          <div className="col-span-2 flex items-center">
+                            <div className="flex items-center space-x-3">
+                              <div className="w-14 h-14 bg-gradient-to-br from-indigo-100 to-purple-100 rounded-lg flex items-center justify-center group-hover:from-indigo-200 group-hover:to-purple-200 transition-colors">
+                                <span className="text-lg font-bold text-indigo-700">
+                                  {p.participant_id.substring(0, 2)}
+                                </span>
+                              </div>
+                              <span className="text-lg font-bold text-gray-900">{p.participant_id}</span>
+                            </div>
+                          </div>
+
+                          {/* Name */}
+                          <div className="col-span-2 flex items-center">
+                            <div>
+                              <p className="text-lg font-semibold text-gray-900">{p.first_name} {p.last_name}</p>
+                              <p className="text-base text-gray-500">Student</p>
+                            </div>
+                          </div>
+
+                          {/* Class */}
+                          <div className="col-span-1 flex items-center">
+                            <span className="inline-flex items-center px-5 py-2.5 rounded-lg bg-gray-100 text-gray-800 text-lg font-semibold">
+                              {p.student_class}
+                            </span>
+                          </div>
+
+                          {/* Events */}
+                          <div className="col-span-5 flex items-center">
+                            <div className="flex flex-wrap gap-2">
+                              {p.events_display && p.events_display.length > 0 ? (
+                                p.events_display.map((event, idx) => (
+                                  <span
+                                    key={idx}
+                                    className="inline-flex items-center px-4 py-2 rounded-lg text-base font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100 transition-colors"
+                                  >
+                                    <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                                    </svg>
+                                    {event.name}
+                                  </span>
+                                ))
+                              ) : (
+                                <span className="text-base text-gray-400 italic">No events selected</span>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Status */}
+                          <div className="col-span-2 flex items-center justify-center">
+                            {p.verified_by_volunteer ? (
+                              <span className="inline-flex items-center px-6 py-3 rounded-lg bg-green-50 text-green-700 border-2 border-green-200 text-lg font-bold">
+                                <svg className="w-6 h-6 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                                </svg>
+                                Verified
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center px-6 py-3 rounded-lg bg-yellow-50 text-yellow-700 border-2 border-yellow-200 text-lg font-bold">
+                                <svg className="w-6 h-6 mr-2 animate-spin" fill="none" viewBox="0 0 24 24">
+                                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                </svg>
+                                Pending
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Info Banner */}
+                {participants.length > 0 && (
+                  <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-200 rounded-xl p-7 shadow-sm">
+                    <div className="flex items-start space-x-5">
+                      <div className="flex-shrink-0">
+                        <div className="w-14 h-14 bg-blue-100 rounded-lg flex items-center justify-center">
+                          <svg className="w-8 h-8 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                          </svg>
+                        </div>
+                      </div>
+                      <div className="flex-1">
+                        <h4 className="text-lg font-bold text-blue-900 mb-2">Verification Process</h4>
+                        <p className="text-lg text-blue-800 leading-relaxed">
+                          Your submitted participants will be reviewed by the assigned volunteer. Once verified, the status will automatically update to "Verified". You'll be notified of any changes.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>

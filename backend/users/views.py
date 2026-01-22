@@ -11,6 +11,7 @@ from django.contrib.auth import authenticate
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.core.mail import send_mail
+from django.db import transaction
 from rest_framework.parsers import MultiPartParser, FormParser
 from django.core import signing
 
@@ -495,6 +496,16 @@ def admin_bulk_set_approval(request):
                     for choice in User._meta.get_field('approval_status').choices]
     if new_status not in valid_status:
         return Response({'error': 'Invalid approval_status'}, status=status.HTTP_400_BAD_REQUEST)
-    updated = User.objects.filter(id__in=ids).update(
-        approval_status=new_status)
-    return Response({'updated': updated, 'approval_status': new_status})
+
+    try:
+        from users.services.admin_user_service import set_user_approval
+        updated = 0
+        with transaction.atomic():
+            for user in User.objects.filter(id__in=ids):
+                set_user_approval(user, new_status, acting_admin=request.user)
+                updated += 1
+        return Response({'updated': updated, 'approval_status': new_status})
+    except ValueError as e:
+        return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+    except Exception:
+        return Response({'error': 'Failed to bulk set approval status'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

@@ -26,6 +26,7 @@ INSTALLED_APPS = [
     'rest_framework_simplejwt.token_blacklist',  # For token blacklisting
     'corsheaders',
     'social_django',
+    'core',  # Core system utilities
     'users',
     'events',
     'scores',
@@ -195,13 +196,13 @@ if DEBUG:
     CORS_ALLOWED_ORIGINS = [
         "http://localhost:3000",
         "http://127.0.0.1:3000",
+        "http://localhost:8001",  # Alternative port for frontend
+        "http://127.0.0.1:8001",  # Alternative port for frontend
         "http://localhost:8000",
         "http://127.0.0.1:8000",
         "http://localhost:3001",
         "http://127.0.0.1:3001",
     ]
-    # For development, also allow all origins
-    CORS_ORIGIN_ALLOW_ALL = True
 else:
     CORS_ALLOWED_ORIGINS = [
         "https://kalolsavam-frontend.onrender.com",
@@ -220,6 +221,7 @@ CORS_ALLOW_HEADERS = [
     'user-agent',
     'x-csrftoken',
     'x-requested-with',
+    'access-control-allow-origin',
 ]
 
 CORS_ALLOW_METHODS = [
@@ -233,6 +235,12 @@ CORS_ALLOW_METHODS = [
 
 # Ensure OPTIONS requests are properly handled for CORS preflight
 CORS_PREFLIGHT_MAX_AGE = 86400  # 24 hours
+
+# Additional security settings for development
+if DEBUG:
+    SESSION_COOKIE_SAMESITE = 'None'
+    CSRF_COOKIE_SAMESITE = 'None'
+    CSRF_COOKIE_SECURE = False  # Set to True in production with HTTPS
 
 # Social Auth Pipeline
 SOCIAL_AUTH_PIPELINE = (

@@ -12,12 +12,15 @@ class IsApprovedUser(BasePermission):
         if not user or not user.is_authenticated:
             return False
 
+        role = (getattr(user, "role", "") or "").strip().lower()
+        approval_status = (getattr(user, "approval_status", "") or "").strip().lower()
+
         # Judges & volunteers must be approved
-        if user.role in ["judge", "volunteer"]:
-            return user.approval_status == "approved"
+        if role in ["judge", "volunteer"]:
+            return approval_status == "approved"
 
         # Rejected students are blocked
-        if user.role == "student":
-            return user.approval_status != "rejected"
+        if role == "student":
+            return approval_status != "rejected"
 
         return True

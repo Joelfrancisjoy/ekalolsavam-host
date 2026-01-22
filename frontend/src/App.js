@@ -17,6 +17,8 @@ import LiveResults from './pages/LiveResults';
 import EmergencyMainPage from './pages/EmergencyMainPage';
 import EmergencyDashboard from './pages/EmergencyDashboard';
 import RecheckRequestDetails from './pages/RecheckRequestDetails';
+import TestDashboard from './pages/TestDashboard';
+import authManager from './utils/authManager';
 
 function AppContent() {
   const { i18n } = useTranslation();
@@ -36,13 +38,30 @@ function AppContent() {
   const isEmergencyPage = location.pathname === '/emergency';
   const isVolunteerPage = location.pathname === '/volunteer';
 
-  // Read auth state from localStorage on each render
-  const isAuthenticated = Boolean(localStorage.getItem('access_token'));
+  // Use consistent auth manager for authentication check
+  const isAuthenticated = React.useMemo(() => {
+    const tokens = authManager.getTokens();
+    const authenticated = authManager.isAuthenticated();
+    console.log('[AuthDebug] AUTH_CHECK:', { 
+        result: authenticated, 
+        reason: `access: ${!!tokens.access} (${tokens.accessExpired ? 'expired' : 'valid'}), refresh: ${!!tokens.refresh} (${tokens.refreshExpired ? 'expired' : 'valid'})`,
+        tokens: tokens,
+        localStorageAccess: !!localStorage.getItem('access_token'),
+        localStorageRefresh: !!localStorage.getItem('refresh_token'),
+        pathname: location.pathname
+    });
+    return authenticated;
+  }, [location.pathname]);
 
-  // Simple protected route wrapper
-  const ProtectedRoute = ({ element }) => (
-    isAuthenticated ? element : <Navigate to="/login" replace />
-  );
+  // Simple protected route wrapper - NO AUTOMATIC REDIRECTS
+  const ProtectedRoute = ({ element }) => {
+    console.log('[AuthDebug] ProtectedRoute check:', { isAuthenticated, currentPath: location.pathname });
+    if (!isAuthenticated) {
+      console.log('User not authenticated, redirecting to login');
+      return <Navigate to="/login" replace />;
+    }
+    return element;
+  };
 
   return (
     <div className={(isEmergencyPage || isVolunteerPage) ? "h-screen overflow-hidden bg-gray-50" : "min-h-screen bg-gray-50"}>
@@ -65,6 +84,7 @@ function AppContent() {
           <Route path="/register-with-id" element={<IDBasedRegistration />} />
           <Route path="/id-signup" element={<IDSignup />} />
           <Route path="/results" element={<LiveResults />} />
+          <Route path="/test" element={<ProtectedRoute element={<TestDashboard />} />} />
           <Route path="/recheck-request/:recheckRequestId" element={<ProtectedRoute element={<RecheckRequestDetails />} />} />
         </Routes>
       </main>

@@ -92,15 +92,26 @@ const VolunteerDashboard = () => {
   }, [navigate]);
 
   const handleSelectEmergency = (emergency) => {
-    setSelectedEmergencyId(emergency.id);
-    setTriageSaveSuccess('');
-    setTriageForm((prev) => ({
-      ...prev,
-      person_role: emergency.person_role || '',
-      person_id_value: emergency.person_id_value || '',
-      cause_description: emergency.cause_description || '',
-      severity: emergency.severity || '',
-    }));
+    // Toggle triage: if same emergency is selected, close it; otherwise open it
+    if (selectedEmergencyId === emergency.id) {
+      setSelectedEmergencyId(null);
+      setTriageForm({
+        person_role: '',
+        person_id_value: '',
+        cause_description: '',
+        severity: '',
+      });
+    } else {
+      setSelectedEmergencyId(emergency.id);
+      setTriageSaveSuccess('');
+      setTriageForm((prev) => ({
+        ...prev,
+        person_role: emergency.person_role || '',
+        person_id_value: emergency.person_id_value || '',
+        cause_description: emergency.cause_description || '',
+        severity: emergency.severity || '',
+      }));
+    }
   };
 
   const handleSaveTriage = async (e) => {
@@ -796,7 +807,7 @@ const VolunteerDashboard = () => {
                 </div>
               )}
 
-              <div className={`flex-1 min-h-0 ${activeTab === 'emergencies' ? 'overflow-hidden' : 'overflow-y-auto'}`}>
+              <div className={`flex-1 min-h-0 ${activeTab === 'emergencies' ? 'overflow-y-auto lg:overflow-hidden' : 'overflow-y-auto'}`}>
                 {/* Tab Content */}
                 {activeTab === 'assignments' && (
                   <AssignmentsTab assignments={assignments} onCheckIn={handleCheckIn} />
@@ -863,6 +874,9 @@ const VolunteerDashboard = () => {
                     onCreateEmergency={handleCreateEmergency}
                     isCreatingEmergency={isCreatingEmergency}
                     createEmergencySuccess={createEmergencySuccess}
+                    // Pass additional handlers for closing triage
+                    setSelectedEmergencyId={setSelectedEmergencyId}
+                    setTriageForm={setTriageForm}
                   />
                 )}
 
@@ -1452,12 +1466,12 @@ const ParticipantsTab = ({ assignments, selectedEventId, setSelectedEventId, eve
   );
 };
 
-const EmergenciesTab = ({ emergencies, selectedEmergencyId, triageForm, setTriageForm, onSelectEmergency, onSaveTriage, isSavingTriage, triageSaveSuccess, showCreateEmergency, setShowCreateEmergency, createEmergencyForm, setCreateEmergencyForm, onCreateEmergency, isCreatingEmergency, createEmergencySuccess }) => {
+const EmergenciesTab = ({ emergencies, selectedEmergencyId, triageForm, setTriageForm, onSelectEmergency, onSaveTriage, isSavingTriage, triageSaveSuccess, showCreateEmergency, setShowCreateEmergency, createEmergencyForm, setCreateEmergencyForm, onCreateEmergency, isCreatingEmergency, createEmergencySuccess, setSelectedEmergencyId, setTriageForm: setTriageFormDirect }) => {
   return (
-    <div className="h-full flex flex-col gap-6">
-      <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-6">
+    <div className="flex flex-col gap-6 lg:h-full">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-6 lg:flex-1 lg:min-h-0">
         <div className={`${selectedEmergencyId ? 'lg:col-span-4' : 'lg:col-span-12'}`}>
-          <div className="bg-white rounded-3xl shadow-xl border border-gray-100 overflow-hidden h-full flex flex-col">
+          <div className="bg-white rounded-3xl shadow-xl border border-gray-100 overflow-hidden flex flex-col lg:h-full">
             <div className="px-6 py-5 bg-gradient-to-r from-slate-900 to-slate-800">
               <div className="flex items-start justify-between">
                 <div>
@@ -1466,7 +1480,19 @@ const EmergenciesTab = ({ emergencies, selectedEmergencyId, triageForm, setTriag
                   <div className="mt-4">
                     <button
                       type="button"
-                      onClick={() => setShowCreateEmergency(!showCreateEmergency)}
+                      onClick={() => {
+                        setShowCreateEmergency(!showCreateEmergency);
+                        // Close triage when opening alert sender
+                        if (!showCreateEmergency) {
+                          setSelectedEmergencyId(null);
+                          setTriageFormDirect({
+                            person_role: '',
+                            person_id_value: '',
+                            cause_description: '',
+                            severity: '',
+                          });
+                        }
+                      }}
                       className="inline-flex items-center px-4 py-2 rounded-xl text-base font-extrabold bg-red-600 text-white hover:bg-red-700"
                     >
                       {showCreateEmergency ? 'Close alert sender' : 'Send alert to volunteers'}
@@ -1555,14 +1581,14 @@ const EmergenciesTab = ({ emergencies, selectedEmergencyId, triageForm, setTriag
               )}
 
               {emergencies.length === 0 ? (
-                <div className="h-full flex items-center justify-center">
+                <div className="lg:h-full flex items-center justify-center">
                   <div className="w-full p-10 text-center border-2 border-dashed border-gray-200 rounded-2xl">
                     <p className="text-lg font-semibold text-gray-700">No active emergencies right now.</p>
                     <p className="text-base text-gray-500 mt-2">When a public alert is triggered, it will appear here automatically.</p>
                   </div>
                 </div>
               ) : (
-                <div className="space-y-4 flex-1 min-h-0 overflow-y-auto pr-1">
+                <div className="space-y-4 pr-1 lg:flex-1 lg:min-h-0 overflow-y-auto max-h-96 lg:max-h-none lg:overflow-y-auto">
                   {emergencies.map((emergency) => (
                     <button
                       key={emergency.id}
@@ -1619,7 +1645,7 @@ const EmergenciesTab = ({ emergencies, selectedEmergencyId, triageForm, setTriag
 
         {selectedEmergencyId && (
           <div className="lg:col-span-8">
-            <div className="bg-white rounded-3xl shadow-xl border border-gray-100 overflow-hidden h-full flex flex-col">
+            <div className="bg-white rounded-3xl shadow-xl border border-gray-100 overflow-hidden flex flex-col lg:h-full">
               <div className="px-6 py-5 bg-gradient-to-r from-red-600 to-red-700">
                 <h3 className="text-2xl font-extrabold text-white tracking-tight">Volunteer Triage</h3>
                 <p className="text-base text-red-100 mt-1">Capture minimal details quickly. Safety and speed first.</p>
@@ -1633,7 +1659,7 @@ const EmergenciesTab = ({ emergencies, selectedEmergencyId, triageForm, setTriag
                 </div>
               )}
 
-              <form onSubmit={onSaveTriage} className="px-6 py-6 flex-1 min-h-0 overflow-y-auto flex flex-col">
+              <form onSubmit={onSaveTriage} className="px-6 py-6 flex flex-col lg:flex-1 lg:min-h-0 lg:overflow-y-auto">
                 <div className="space-y-7 flex-1">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>

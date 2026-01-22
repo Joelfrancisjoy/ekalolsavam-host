@@ -771,15 +771,21 @@ const StudentDashboard = () => {
     let mounted = true;
     (async () => {
       try {
-        const results = await Promise.allSettled([
-          eventService.listMyRegistrations(),
-          resultService.list({}),
-          eventService.listPublishedEvents(),
-          http.get('/api/auth/current/')
-        ]);
+        console.log('StudentDashboard: Starting API calls...');
+
+        // Make API calls with individual error handling
+        const apiCalls = [
+          { name: 'registrations', fn: () => eventService.listMyRegistrations(), fallback: [] },
+          { name: 'results', fn: () => resultService.list({}), fallback: [] },
+          { name: 'events', fn: () => eventService.listPublishedEvents(), fallback: [] },
+          { name: 'user', fn: () => http.get('/api/auth/current/'), fallback: null }
+        ];
+
+        const results = await Promise.allSettled(apiCalls.map(call => call.fn()));
 
         if (!mounted) return;
 
+        // Process results with fallbacks
         const [regsRes, resultsRes, evtsRes, userRes] = results;
 
         const regs = regsRes?.status === 'fulfilled' ? regsRes.value : [];
@@ -787,8 +793,21 @@ const StudentDashboard = () => {
         const evts = evtsRes?.status === 'fulfilled' ? evtsRes.value : [];
         const userData = userRes?.status === 'fulfilled' ? userRes.value?.data : null;
 
-        if (userData) setCurrentUser(userData);
-        console.log('Loaded registrations from API:', regs);
+        console.log('StudentDashboard: API results:', {
+          registrations: regs?.length || 0,
+          results: published?.length || 0,
+          events: evts?.length || 0,
+          user: userData ? 'loaded' : 'failed'
+        });
+
+        // Set data with fallbacks
+        if (userData) {
+          setCurrentUser(userData);
+        } else {
+          console.warn('Failed to load user data, using fallback');
+          // Don't redirect - let the user stay on the page
+        }
+
         setRegistrations(regs || []);
         setPublishedResults(published || []);
 
@@ -798,6 +817,16 @@ const StudentDashboard = () => {
 
         setEvents(eventsData);
         setDemoSchedule(buildDemoSchedule(eventsData));
+
+      } catch (error) {
+        console.error('StudentDashboard: Error loading data:', error);
+        // Don't redirect on error - let the user stay on the page with fallback data
+        if (mounted) {
+          setRegistrations([]);
+          setPublishedResults([]);
+          setEvents([]);
+          setDemoSchedule([]);
+        }
       } finally {
         if (mounted) setLoading(false);
       }
@@ -2730,14 +2759,14 @@ const StudentDashboard = () => {
                       type="button"
                       onClick={() => setFeedbackRating(star)}
                       className={`w-12 h-12 rounded-full border-2 transition-all duration-200 flex items-center justify-center group ${feedbackRating >= star
-                          ? 'bg-green-500 border-green-600'
-                          : 'bg-white border-green-200 hover:border-green-400 hover:bg-green-50'
+                        ? 'bg-green-500 border-green-600'
+                        : 'bg-white border-green-200 hover:border-green-400 hover:bg-green-50'
                         }`}
                     >
                       <svg
                         className={`w-6 h-6 transition-colors duration-200 ${feedbackRating >= star
-                            ? 'text-white'
-                            : 'text-green-400 group-hover:text-green-600'
+                          ? 'text-white'
+                          : 'text-green-400 group-hover:text-green-600'
                           }`}
                         fill="currentColor"
                         viewBox="0 0 20 20"
@@ -2773,8 +2802,8 @@ const StudentDashboard = () => {
                       type="button"
                       onClick={() => setFeedbackCategory(category.id)}
                       className={`p-4 rounded-xl border-2 transition-all duration-200 text-left group ${feedbackCategory === category.id
-                          ? 'bg-green-500 border-green-600'
-                          : 'bg-white border-green-200 hover:border-green-400 hover:bg-green-50'
+                        ? 'bg-green-500 border-green-600'
+                        : 'bg-white border-green-200 hover:border-green-400 hover:bg-green-50'
                         }`}
                     >
                       <div className="flex items-center gap-3">
@@ -3236,14 +3265,14 @@ const StudentDashboard = () => {
       {showFeedbackPopup && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 animate-fadeIn">
           <div className={`bg-white rounded-2xl shadow-2xl p-8 max-w-md mx-4 transform transition-all duration-300 animate-scaleIn ${feedbackPopupType === 'positive' ? 'border-4 border-green-500' :
-              feedbackPopupType === 'negative' ? 'border-4 border-red-500' :
-                'border-4 border-blue-500'
+            feedbackPopupType === 'negative' ? 'border-4 border-red-500' :
+              'border-4 border-blue-500'
             }`}>
             <div className="text-center">
               {/* Icon */}
               <div className={`w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4 ${feedbackPopupType === 'positive' ? 'bg-gradient-to-br from-green-400 to-emerald-500' :
-                  feedbackPopupType === 'negative' ? 'bg-gradient-to-br from-red-400 to-rose-500' :
-                    'bg-gradient-to-br from-blue-400 to-indigo-500'
+                feedbackPopupType === 'negative' ? 'bg-gradient-to-br from-red-400 to-rose-500' :
+                  'bg-gradient-to-br from-blue-400 to-indigo-500'
                 }`}>
                 {feedbackPopupType === 'positive' && (
                   <svg className="w-12 h-12 text-white" fill="currentColor" viewBox="0 0 20 20">
@@ -3265,8 +3294,8 @@ const StudentDashboard = () => {
 
               {/* Message */}
               <h3 className={`text-2xl font-bold mb-2 ${feedbackPopupType === 'positive' ? 'text-green-800' :
-                  feedbackPopupType === 'negative' ? 'text-red-800' :
-                    'text-blue-800'
+                feedbackPopupType === 'negative' ? 'text-red-800' :
+                  'text-blue-800'
                 }`} style={{ fontFamily: 'Cinzel, serif' }}>
                 {feedbackPopupMessage}
               </h3>

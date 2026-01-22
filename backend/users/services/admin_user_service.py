@@ -112,20 +112,28 @@ def set_user_approval(user, new_status, acting_admin=None):
     # Send emails and act based on approval
     try:
         if new_status == 'approved':
-            # Generate a temporary password and set it so judge can log in immediately
-            temp_password = secrets.token_urlsafe(8)
-            user.set_password(temp_password)
-            # Ensure the account is active upon approval
             user.is_active = True
-            user.must_reset_password = True
-            user.save(update_fields=['password',
-                      'is_active', 'must_reset_password'])
 
-            # Inform judge and allow login
-            subject = 'Judge Approval - E-Kalolsavam'
-            message = f'Congrats! You are authorized as a Judge for E-Kalolsavam.\n\nTemporary Password: {temp_password}\nUsername: {user.username}\n\nYou can now sign in with username/password or use Google with this email.'
-            send_mail(subject, message, 'joelfrancisjoy@gmail.com',
-                      [user.email], fail_silently=True)
+            update_fields = ['is_active']
+
+            temp_password = None
+            if not user.has_usable_password():
+                temp_password = secrets.token_urlsafe(8)
+                user.set_password(temp_password)
+                user.must_reset_password = True
+                update_fields.extend(['password', 'must_reset_password'])
+            else:
+                if user.must_reset_password:
+                    user.must_reset_password = False
+                    update_fields.append('must_reset_password')
+
+            user.save(update_fields=update_fields)
+
+            if temp_password:
+                subject = 'Account Approved - E-Kalolsavam'
+                message = f'Your account has been approved.\n\nTemporary Password: {temp_password}\nUsername: {user.username}\n\nPlease sign in and set a new password.'
+                send_mail(subject, message, 'joelfrancisjoy@gmail.com',
+                          [user.email], fail_silently=True)
         elif new_status == 'rejected':
             # Inform judge and delete profile
             subject = 'Judge Registration Rejected - E-Kalolsavam'

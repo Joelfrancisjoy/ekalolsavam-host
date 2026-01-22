@@ -1,0 +1,1 @@
+# Core module for E-Kalolsavam system utilities

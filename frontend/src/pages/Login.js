@@ -5,6 +5,7 @@ import { GoogleLogin } from '@react-oauth/google';
 import axios from 'axios';
 import { userServiceAdapter as userService } from '../services/serviceAdapter';
 import EmailValidationChecker from '../components/EmailValidationChecker';
+import authManager from '../utils/authManager';
 
 const Login = () => {
   const navigate = useNavigate();
@@ -35,10 +36,24 @@ const Login = () => {
   const [loginEmailWarning, setLoginEmailWarning] = useState('');
   const [phoneWarning, setPhoneWarning] = useState('');
 
-  // Do not revoke existing tokens on visiting the login page.
-  // Keeping tokens allows users to navigate here without being logged out unintentionally.
+  // Check authentication state on mount and handle refresh if needed
   useEffect(() => {
-    // Intentionally left blank
+    // Check if user is coming from logout or has invalid tokens
+    const urlParams = new URLSearchParams(window.location.search);
+    const logoutParam = urlParams.get('logout');
+    
+    // If there's a logout parameter or user is authenticated, clear any existing tokens to force refresh
+    if (logoutParam || authManager.isAuthenticated()) {
+      // Clear tokens to reset authentication state
+      authManager.clearTokens();
+      
+      // Remove logout param from URL if present to avoid repeated clearing
+      if (logoutParam) {
+        urlParams.delete('logout');
+        const newUrl = window.location.pathname + (urlParams.toString() ? '?' + urlParams.toString() : '') + window.location.hash;
+        window.history.replaceState({}, document.title, newUrl);
+      }
+    }
   }, []);
 
   // Load schools for registration
@@ -298,12 +313,25 @@ const Login = () => {
         setError('Registration submitted. Await admin approval.');
         return;
       }
-      localStorage.setItem('access_token', response.access);
-      localStorage.setItem('refresh_token', response.refresh);
-      try { localStorage.setItem('last_login_payload', JSON.stringify(response || {})); } catch (e) { }
 
-      // Special handling for cenadmin or joelfrancisjoy@gmail.com - redirect to E-kalolsavam dashboard (admin)
-      const user = response.user;
+      // Debug login response
+      console.log('[LoginDebug] Login response received:', response);
+      console.log('[LoginDebug] Response structure:', Object.keys(response || {}));
+
+      // Use auth manager to handle login success
+      const loginData = authManager.handleLoginSuccess(response);
+
+      // Debug tokens after storage
+      const finalTokens = authManager.getTokens();
+      console.log('[LoginDebug] Tokens after storage:', finalTokens);
+      console.log('[LoginDebug] Authenticated after login:', authManager.isAuthenticated());
+      console.log('[LoginDebug] Final token status:', {
+        accessExists: !!finalTokens.access,
+        accessExpired: finalTokens.accessExpired,
+        refreshExists: !!finalTokens.refresh,
+        refreshExpired: finalTokens.refreshExpired
+      });
+      const user = loginData.user;
       if (user.username?.toLowerCase() === 'cenadmin' || user.email === 'joelfrancisjoy@gmail.com') {
         navigate('/admin', { replace: true });
         return;
@@ -347,7 +375,7 @@ const Login = () => {
           ? apiError
           : apiError?.error || apiError?.detail || 'An error occurred';
       // Map Unauthorized Login to popup-like message
-      if (msg === 'Unauthorized Login') {
+      if (msg === 'Unauthorized Login' || msg === 'Unauthorized login') {
         alert('Unauthorized Login');
       }
       setError(msg);
@@ -363,12 +391,24 @@ const Login = () => {
       }
       const res = await userService.googleAuth(token);
 
-      localStorage.setItem('access_token', res.access);
-      localStorage.setItem('refresh_token', res.refresh);
-      try { localStorage.setItem('last_login_payload', JSON.stringify(res || {})); } catch (e) { }
+      // Debug Google login response
+      console.log('[LoginDebug] Google login response received:', res);
+      console.log('[LoginDebug] Google response structure:', Object.keys(res || {}));
 
-      // Special handling for cenadmin or joelfrancisjoy@gmail.com - redirect to E-kalolsavam dashboard (admin)
-      const user = res.user;
+      // Use auth manager to handle login success
+      const loginData = authManager.handleLoginSuccess(res);
+
+      // Debug tokens after Google login storage
+      const finalTokens = authManager.getTokens();
+      console.log('[LoginDebug] Tokens after Google login storage:', finalTokens);
+      console.log('[LoginDebug] Authenticated after Google login:', authManager.isAuthenticated());
+      console.log('[LoginDebug] Final token status after Google login:', {
+        accessExists: !!finalTokens.access,
+        accessExpired: finalTokens.accessExpired,
+        refreshExists: !!finalTokens.refresh,
+        refreshExpired: finalTokens.refreshExpired
+      });
+      const user = loginData.user;
       if (user.username?.toLowerCase() === 'cenadmin' || user.email === 'joelfrancisjoy@gmail.com') {
         navigate('/admin', { replace: true });
         return;
@@ -865,10 +905,10 @@ const Login = () => {
                     <GoogleLogin
                       onSuccess={handleGoogleSuccess}
                       onError={handleGoogleFailure}
-                      useOneTap
+                      useOneTap={false}
                       theme="outline"
                       size="large"
-                      width="100%"
+                      width={300}
                     />
                   </div>
                 </div>

@@ -4,6 +4,9 @@ def build_auth_response(
     refresh=None,
     message=None,
 ):
+    role = (getattr(user, "role", "") or "").strip().lower()
+    approval_status = (getattr(user, "approval_status", "") or "").strip().lower()
+
     return {
         "user": {
             "id": user.id,
@@ -20,8 +23,8 @@ def build_auth_response(
         } if access or refresh else None,
         "meta": {
             "message": message,
-            "requires_approval": user.role in ["judge", "volunteer"]
-            and user.approval_status != "approved",
+            "requires_approval": role in ["judge", "volunteer"]
+            and approval_status != "approved",
             "must_reset_password": user.must_reset_password,
         }
     }

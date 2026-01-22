@@ -1,6 +1,7 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { userService } from '../services/userService';
 import axios from 'axios';
+import authManager from '../utils/authManager';
 
 // Small utility for classNames
 const cx = (...cls) => cls.filter(Boolean).join(' ');
@@ -9,6 +10,7 @@ const PAGE_SIZE = 10;
 
 const UserManagement = () => {
     const [users, setUsers] = useState([]);
+    const [allUsers, setAllUsers] = useState([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
 
@@ -36,31 +38,87 @@ const UserManagement = () => {
 
     const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
 
-    useEffect(() => {
-        const load = async () => {
+    const loadAllUsers = useCallback(async ({ silent = false } = {}) => {
+        if (!silent) {
             setLoading(true);
-            setError('');
-            try {
-                // Only fetch when a role is selected; we filter student categories client-side
-                if (!selectedRegister) {
-                    setUsers([]);
-                    return;
-                }
-                const data = await userService.list({ role: selectedRegister });
-                setUsers(Array.isArray(data) ? data : data.results || []);
-            } catch (e) {
+        }
+        setError('');
+
+        try {
+            const data = await userService.list();
+            setAllUsers(Array.isArray(data) ? data : data.results || []);
+        } catch (e) {
+            if (!silent) {
                 setError('Failed to load users.');
-            } finally {
+            }
+        } finally {
+            if (!silent) {
                 setLoading(false);
             }
-        };
-        load();
+        }
+    }, []);
+
+    const loadUsers = useCallback(async ({ silent = false } = {}) => {
+        if (!selectedRegister) {
+            setUsers([]);
+            return;
+        }
+
+        if (!silent) {
+            setLoading(true);
+        }
+        setError('');
+
+        try {
+            const data = await userService.list({ role: selectedRegister });
+            setUsers(Array.isArray(data) ? data : data.results || []);
+        } catch (e) {
+            if (!silent) {
+                setError('Failed to load users.');
+            }
+        } finally {
+            if (!silent) {
+                setLoading(false);
+            }
+        }
     }, [selectedRegister]);
+
+    useEffect(() => {
+        loadAllUsers({ silent: true });
+        loadUsers();
+    }, [loadUsers, loadAllUsers]);
+
+    useEffect(() => {
+        const intervalMs = 5000;
+
+        const tick = async () => {
+            if (document.hidden) return;
+            await loadAllUsers({ silent: true });
+            await loadUsers({ silent: true });
+        };
+
+        const onVisibilityChange = () => {
+            if (!document.hidden) {
+                loadAllUsers({ silent: true });
+                loadUsers({ silent: true });
+            }
+        };
+
+        const timer = setInterval(tick, intervalMs);
+        document.addEventListener('visibilitychange', onVisibilityChange);
+
+        return () => {
+            clearInterval(timer);
+            document.removeEventListener('visibilitychange', onVisibilityChange);
+        };
+    }, [selectedRegister, loadUsers, loadAllUsers]);
 
     const updateUser = async (id, patch) => {
         try {
             const updated = await userService.update(id, patch);
             setUsers(prev => prev.map(u => (u.id === id ? { ...u, ...updated } : u)));
+            loadAllUsers({ silent: true });
+            loadUsers({ silent: true });
         } catch (e) {
             setError('Failed to update user.');
         }
@@ -71,6 +129,8 @@ const UserManagement = () => {
         try {
             await userService.remove(id);
             setUsers(prev => prev.filter(u => u.id !== id));
+            loadAllUsers({ silent: true });
+            loadUsers({ silent: true });
         } catch (e) {
             setError('Failed to delete user.');
         }
@@ -95,12 +155,12 @@ const UserManagement = () => {
     const userCounts = useMemo(() => {
         const counts = { student: 0, volunteer: 0, judge: 0, admin: 0 };
         const studentCategories = { LP: 0, UP: 0, HS: 0, HSS: 0 };
-        
-        users.forEach(user => {
+
+        allUsers.forEach(user => {
             if (counts.hasOwnProperty(user.role)) {
                 counts[user.role]++;
             }
-            
+
             // Categorize students by school_category_extra
             if (user.role === 'student') {
                 const category = user.school_category_extra || 'LP';
@@ -109,9 +169,9 @@ const UserManagement = () => {
                 }
             }
         });
-        
+
         return { ...counts, studentCategories };
-    }, [users]);
+    }, [allUsers]);
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
@@ -128,7 +188,7 @@ const UserManagement = () => {
                         <div className="flex flex-wrap gap-4">
                             <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-2xl px-6 py-4 shadow-lg border border-blue-200">
                                 <span className="text-sm font-semibold text-blue-700 uppercase tracking-wide">Total Users</span>
-                                <div className="text-3xl font-bold text-blue-800 mt-1">{users.length}</div>
+                                <div className="text-3xl font-bold text-blue-800 mt-1">{allUsers.length}</div>
                             </div>
                             <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-2xl px-6 py-4 shadow-lg border border-green-200">
                                 <span className="text-sm font-semibold text-green-700 uppercase tracking-wide">Active Students</span>
@@ -161,7 +221,7 @@ const UserManagement = () => {
                                 <span className="w-2 h-8 bg-gradient-to-b from-blue-500 to-purple-500 rounded-full mr-4"></span>
                                 User Statistics
                             </h3>
-                            
+
                             {selectedRegister && (
                                 <div className="mb-8 p-6 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-2xl">
                                     <div className="flex items-center justify-between">
@@ -179,26 +239,26 @@ const UserManagement = () => {
                             )}
 
                             <div className="space-y-6">
-                                <RegisterButton 
-                                    label="Students" 
-                                    role="student" 
-                                    count={userCounts.student} 
-                                    isSelected={selectedRegister === 'student'} 
-                                    onClick={() => handleRegisterClick('student')} 
+                                <RegisterButton
+                                    label="Students"
+                                    role="student"
+                                    count={userCounts.student}
+                                    isSelected={selectedRegister === 'student'}
+                                    onClick={() => handleRegisterClick('student')}
                                 />
-                                <RegisterButton 
-                                    label="Volunteers" 
-                                    role="volunteer" 
-                                    count={userCounts.volunteer} 
-                                    isSelected={selectedRegister === 'volunteer'} 
-                                    onClick={() => handleRegisterClick('volunteer')} 
+                                <RegisterButton
+                                    label="Volunteers"
+                                    role="volunteer"
+                                    count={userCounts.volunteer}
+                                    isSelected={selectedRegister === 'volunteer'}
+                                    onClick={() => handleRegisterClick('volunteer')}
                                 />
-                                <RegisterButton 
-                                    label="Judges" 
-                                    role="judge" 
-                                    count={userCounts.judge} 
-                                    isSelected={selectedRegister === 'judge'} 
-                                    onClick={() => handleRegisterClick('judge')} 
+                                <RegisterButton
+                                    label="Judges"
+                                    role="judge"
+                                    count={userCounts.judge}
+                                    isSelected={selectedRegister === 'judge'}
+                                    onClick={() => handleRegisterClick('judge')}
                                 />
                             </div>
 
@@ -281,9 +341,9 @@ const UserManagement = () => {
                                 ) : (
                                     <div className="divide-y divide-gray-200">
                                         {paged.map(u => (
-                                            <UserCard 
-                                                key={u.id} 
-                                                user={u} 
+                                            <UserCard
+                                                key={u.id}
+                                                user={u}
                                                 onPhoneChange={onPhoneChange}
                                                 onDelete={deleteUser}
                                                 onUpdate={updateUser}
@@ -360,7 +420,7 @@ const UserCard = ({ user, onPhoneChange, onDelete, onUpdate }) => {
             }
             return { status: 'active', color: 'bg-green-100 text-green-800 border-green-200', label: 'Active' };
         }
-        
+
         // For judges and volunteers, show approval status
         if (user.role === 'judge' || user.role === 'volunteer') {
             const statusColors = {
@@ -374,7 +434,7 @@ const UserCard = ({ user, onPhoneChange, onDelete, onUpdate }) => {
                 label: user.approval_status ? user.approval_status.charAt(0).toUpperCase() + user.approval_status.slice(1) : 'Unknown'
             };
         }
-        
+
         // For admins, always show active
         return { status: 'active', color: 'bg-green-100 text-green-800 border-green-200', label: 'Active' };
     };
@@ -391,7 +451,7 @@ const UserCard = ({ user, onPhoneChange, onDelete, onUpdate }) => {
                             {user.first_name ? user.first_name.charAt(0).toUpperCase() : user.username.charAt(0).toUpperCase()}
                         </div>
                     </div>
-                    
+
                     {/* Enhanced User Info */}
                     <div className="flex-1 min-w-0">
                         <div className="flex items-center space-x-4 mb-3">
@@ -405,7 +465,7 @@ const UserCard = ({ user, onPhoneChange, onDelete, onUpdate }) => {
                                 {approvalInfo.label}
                             </span>
                         </div>
-                        
+
                         <div className="text-lg text-gray-600 space-y-2">
                             <div className="flex items-center space-x-3">
                                 <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -480,11 +540,11 @@ const UserCard = ({ user, onPhoneChange, onDelete, onUpdate }) => {
                     {user.role === 'judge' && user.approval_status === 'pending' && (
                         <JudgeActions user={user} onUpdated={(patch) => onUpdate(user.id, patch)} onDeleted={() => onDelete(user.id)} />
                     )}
-                    
+
                     {user.role === 'volunteer' && user.approval_status === 'pending' && (
                         <VolunteerActions user={user} onUpdated={(patch) => onUpdate(user.id, patch)} onDeleted={() => onDelete(user.id)} />
                     )}
-                    
+
                     {user.role === 'student' && (
                         <StudentActions user={user} onUpdated={(patch) => onUpdate(user.id, patch)} />
                     )}
@@ -512,7 +572,7 @@ const JudgeActions = ({ user, onUpdated, onDeleted }) => {
         setBusy(true);
         try {
             const res = await axios.patch(`${apiUrl}/api/auth/users/${user.id}/set-approval/`, { approval_status: 'approved' }, {
-                headers: { Authorization: `Bearer ${localStorage.getItem('access_token')}` }
+                headers: { Authorization: `Bearer ${authManager.getTokens().access}` }
             });
             onUpdated(res.data);
         } finally {
@@ -525,7 +585,7 @@ const JudgeActions = ({ user, onUpdated, onDeleted }) => {
         setBusy(true);
         try {
             const res = await axios.patch(`${apiUrl}/api/auth/users/${user.id}/set-approval/`, { approval_status: 'rejected' }, {
-                headers: { Authorization: `Bearer ${localStorage.getItem('access_token')}` }
+                headers: { Authorization: `Bearer ${authManager.getTokens().access}` }
             });
             if (res.data?.approval_status === 'deleted') onDeleted(); else onUpdated(res.data);
         } finally {
@@ -555,7 +615,7 @@ const VolunteerActions = ({ user, onUpdated, onDeleted }) => {
         setBusy(true);
         try {
             const res = await axios.patch(`${apiUrl}/api/auth/users/${user.id}/set-approval/`, { approval_status: 'approved' }, {
-                headers: { Authorization: `Bearer ${localStorage.getItem('access_token')}` }
+                headers: { Authorization: `Bearer ${authManager.getTokens().access}` }
             });
             onUpdated(res.data);
         } finally {
@@ -568,7 +628,7 @@ const VolunteerActions = ({ user, onUpdated, onDeleted }) => {
         setBusy(true);
         try {
             const res = await axios.patch(`${apiUrl}/api/auth/users/${user.id}/set-approval/`, { approval_status: 'rejected' }, {
-                headers: { Authorization: `Bearer ${localStorage.getItem('access_token')}` }
+                headers: { Authorization: `Bearer ${authManager.getTokens().access}` }
             });
             if (res.data?.approval_status === 'deleted') onDeleted(); else onUpdated(res.data);
         } finally {
@@ -598,7 +658,7 @@ const StudentActions = ({ user, onUpdated }) => {
         setBusy(true);
         try {
             const res = await axios.patch(`${apiUrl}/api/auth/users/${user.id}/set-approval/`, { approval_status: 'rejected' }, {
-                headers: { Authorization: `Bearer ${localStorage.getItem('access_token')}` }
+                headers: { Authorization: `Bearer ${authManager.getTokens().access}` }
             });
             onUpdated(res.data);
         } finally {
@@ -611,7 +671,7 @@ const StudentActions = ({ user, onUpdated }) => {
         setBusy(true);
         try {
             const res = await axios.patch(`${apiUrl}/api/auth/users/${user.id}/set-approval/`, { approval_status: 'pending' }, {
-                headers: { Authorization: `Bearer ${localStorage.getItem('access_token')}` }
+                headers: { Authorization: `Bearer ${authManager.getTokens().access}` }
             });
             onUpdated(res.data);
         } finally {
@@ -639,11 +699,10 @@ const RegisterButton = ({ label, role, count, isSelected, onClick }) => {
     return (
         <button
             onClick={onClick}
-            className={`w-full p-6 rounded-2xl border-2 transition-all duration-300 text-left group ${
-                isSelected
-                    ? 'bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-300 text-blue-800 shadow-lg transform scale-105'
-                    : 'bg-gray-50 border-gray-200 text-gray-700 hover:bg-gradient-to-r hover:from-gray-50 hover:to-blue-50 hover:border-gray-300 hover:shadow-md hover:scale-102'
-            }`}
+            className={`w-full p-6 rounded-2xl border-2 transition-all duration-300 text-left group ${isSelected
+                ? 'bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-300 text-blue-800 shadow-lg transform scale-105'
+                : 'bg-gray-50 border-gray-200 text-gray-700 hover:bg-gradient-to-r hover:from-gray-50 hover:to-blue-50 hover:border-gray-300 hover:shadow-md hover:scale-102'
+                }`}
         >
             <div className="flex items-center justify-between">
                 <div>

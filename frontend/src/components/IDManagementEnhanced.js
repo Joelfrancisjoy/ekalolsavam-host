@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
-import axiosInstance from '../services/axiosInstance';
+import http from '../services/http-common';
+import authManager from '../utils/authManager';
 
 const IDManagementEnhanced = () => {
     const [activeTab, setActiveTab] = useState('generate');
@@ -19,7 +19,7 @@ const IDManagementEnhanced = () => {
     const [searchTerm, setSearchTerm] = useState('');
 
     const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
-    const getToken = () => localStorage.getItem('access_token');
+    const getToken = () => authManager.getTokens().access;
 
     // Generate IDs with name assignments
     const generateIds = async () => {
@@ -38,20 +38,11 @@ const IDManagementEnhanced = () => {
             // Filter out empty assignments
             const validAssignments = assignments.filter(a => a.name.trim());
 
-            const response = await axios.post(
-                `${API_URL}/api/auth/admin/ids/generate/`,
-                {
-                    role,
-                    assignments: validAssignments.length > 0 ? validAssignments : undefined,
-                    count: validAssignments.length > 0 ? validAssignments.length : count
-                },
-                {
-                    headers: {
-                        'Authorization': `Bearer ${token}`,
-                        'Content-Type': 'application/json'
-                    }
-                }
-            );
+            const response = await http.post('/api/auth/admin/ids/generate/', {
+                role,
+                assignments: validAssignments.length > 0 ? validAssignments : undefined,
+                count: validAssignments.length > 0 ? validAssignments.length : count
+            });
 
             setGeneratedIds(response.data.ids);
             setMessage(response.data.message || `Generated ${response.data.count} ID(s) successfully`);
@@ -94,14 +85,7 @@ const IDManagementEnhanced = () => {
             if (filterStatus !== 'all') params.append('status', filterStatus);
             if (searchTerm) params.append('search', searchTerm);
 
-            const response = await axios.get(
-                `${API_URL}/api/auth/admin/ids/?${params.toString()}`,
-                {
-                    headers: {
-                        'Authorization': `Bearer ${token}`
-                    }
-                }
-            );
+            const response = await http.get(`/api/auth/admin/ids/?${params.toString()}`);
 
             setAllIds(response.data);
         } catch (error) {
@@ -134,14 +118,7 @@ const IDManagementEnhanced = () => {
                 params.append('status', status);
             }
 
-            const response = await axios.get(
-                `${API_URL}/api/auth/admin/signup-requests/?${params.toString()}`,
-                {
-                    headers: {
-                        'Authorization': `Bearer ${token}`
-                    }
-                }
-            );
+            const response = await http.get(`/api/auth/admin/signup-requests/?${params.toString()}`);
 
             if (status === 'all') {
                 setAllRequests(response.data);
@@ -171,16 +148,7 @@ const IDManagementEnhanced = () => {
                 return;
             }
 
-            await axios.patch(
-                `${API_URL}/api/auth/admin/signup-requests/${requestId}/`,
-                { status, notes },
-                {
-                    headers: {
-                        'Authorization': `Bearer ${token}`,
-                        'Content-Type': 'application/json'
-                    }
-                }
-            );
+            await http.patch(`/api/auth/admin/signup-requests/${requestId}/`, { status, notes });
 
             setMessage(`Request ${status} successfully`);
             loadSignupRequests('pending'); // Reload pending requests
@@ -221,16 +189,7 @@ const IDManagementEnhanced = () => {
     const toggleIdStatus = async (id, currentStatus) => {
         try {
             const token = getToken();
-            await axios.patch(
-                `${API_URL}/api/auth/admin/ids/${id}/`,
-                { is_active: !currentStatus },
-                {
-                    headers: {
-                        'Authorization': `Bearer ${token}`,
-                        'Content-Type': 'application/json'
-                    }
-                }
-            );
+            await http.patch(`/api/auth/admin/ids/${id}/`, { is_active: !currentStatus });
             setMessage(`ID ${!currentStatus ? 'activated' : 'deactivated'} successfully`);
             loadAllIds();
         } catch (error) {

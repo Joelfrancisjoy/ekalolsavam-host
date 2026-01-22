@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import authManager from '../utils/authManager';
 
 const IDManagement = () => {
   const [activeTab, setActiveTab] = useState('generate');
@@ -16,9 +17,9 @@ const IDManagement = () => {
 
     try {
       const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:8000';
-      const token = localStorage.getItem('access_token');
+      const { access } = authManager.getTokens();
 
-      if (!token) {
+      if (!access) {
         setMessage('Authentication token not found. Please log in again.');
         setLoading(false);
         return;
@@ -29,7 +30,7 @@ const IDManagement = () => {
         { role, count },
         {
           headers: {
-            'Authorization': `Bearer ${token}`,
+            'Authorization': `Bearer ${access}`,
             'Content-Type': 'application/json'
           }
         }
@@ -56,9 +57,9 @@ const IDManagement = () => {
     setLoading(true);
     try {
       const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:8000';
-      const token = localStorage.getItem('access_token');
+      const { access } = authManager.getTokens();
 
-      if (!token) {
+      if (!access) {
         setMessage('Authentication token not found. Please log in again.');
         setLoading(false);
         return;
@@ -68,7 +69,7 @@ const IDManagement = () => {
         `${apiUrl}/api/auth/admin/signup-requests/?status=pending`,
         {
           headers: {
-            'Authorization': `Bearer ${token}`
+            'Authorization': `Bearer ${access}`
           }
         }
       );
@@ -90,9 +91,9 @@ const IDManagement = () => {
   const handleApproveRequest = async (requestId, status) => {
     try {
       const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:8000';
-      const token = localStorage.getItem('access_token');
+      const { access } = authManager.getTokens();
 
-      if (!token) {
+      if (!access) {
         setMessage('Authentication token not found. Please log in again.');
         return;
       }
@@ -102,7 +103,7 @@ const IDManagement = () => {
         { status, notes: `Status changed to ${status}` },
         {
           headers: {
-            'Authorization': `Bearer ${token}`,
+            'Authorization': `Bearer ${access}`,
             'Content-Type': 'application/json'
           }
         }

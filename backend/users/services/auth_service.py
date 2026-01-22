@@ -29,16 +29,21 @@ def login_user(identifier: str, password: str):
         user = authenticate(username=identifier, password=password)
 
         if not user:
-            # fallback: email login
-            user = User.objects.filter(email__iexact=identifier).first()
+            # fallback: case-insensitive username, then email
+            user = User.objects.filter(username__iexact=identifier).first()
+            if not user:
+                user = User.objects.filter(email__iexact=identifier).first()
             if not user or not user.check_password(password):
                 raise DomainError("Invalid credentials")
 
     # ---------- ACCOUNT STATE ENFORCEMENT ----------
-    if user.role in ["judge", "volunteer"] and user.approval_status != "approved":
+    role = (user.role or "").strip().lower()
+    approval_status = (user.approval_status or "").strip().lower()
+
+    if role in ["judge", "volunteer"] and approval_status != "approved":
         raise DomainError("Unauthorized login")
 
-    if user.role == "student" and user.approval_status == "rejected":
+    if role == "student" and approval_status == "rejected":
         raise DomainError("Account has been blacklisted")
 
     if not user.is_active:
