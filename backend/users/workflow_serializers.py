@@ -1,4 +1,5 @@
 from rest_framework import serializers
+from django.core import signing
 from .workflow_models import (
     AdminIssuedID,
     SchoolParticipant,
@@ -50,16 +51,103 @@ class AdminIssuedIDSerializer(serializers.ModelSerializer):
 class SchoolParticipantSerializer(serializers.ModelSerializer):
     school_name = serializers.CharField(source='school.username', read_only=True)
     events_display = serializers.SerializerMethodField()
-    
+    section = serializers.SerializerMethodField()
+    user_account = serializers.SerializerMethodField()
+    status = serializers.SerializerMethodField()
+
     class Meta:
         model = SchoolParticipant
         fields = ['id', 'school', 'school_name', 'participant_id', 'first_name', 'last_name',
-                 'student_class', 'events', 'events_display', 'submitted_at', 
-                 'verified_by_volunteer', 'verified_at', 'volunteer']
+                 'student_class', 'section', 'events', 'events_display', 'submitted_at',
+                 'verified_by_volunteer', 'verified_at', 'volunteer', 'user_account', 'status']
         read_only_fields = ['submitted_at', 'verified_by_volunteer', 'verified_at', 'volunteer']
-    
+
     def get_events_display(self, obj):
         return [{"id": e.id, "name": e.name} for e in obj.events.all()]
+
+    def get_section(self, obj):
+        """Calculate section based on student class"""
+        if 1 <= obj.student_class <= 3:
+            return 'LP'
+        elif 4 <= obj.student_class <= 7:
+            return 'UP'
+        elif 8 <= obj.student_class <= 10:
+            return 'HS'
+        elif 11 <= obj.student_class <= 12:
+            return 'HSS'
+        return None
+
+    def get_user_account(self, obj):
+        """Get user account details if participant has been approved"""
+        try:
+            from .models import User
+            participant_school = getattr(obj.school, 'school', None)
+            if participant_school is None:
+                return None
+
+            spp_registration_id = f"SPP-{obj.pk}"
+
+            school_registration_id = f"SP-{participant_school.id}-{obj.participant_id}"
+
+            # Prefer registration_id match; fall back to username match.
+            user = User.objects.filter(
+                role='student',
+                school=participant_school,
+                registration_id=spp_registration_id
+            ).first()
+            if user is None:
+                user = User.objects.filter(
+                    role='student',
+                    school=participant_school,
+                    registration_id=school_registration_id
+                ).first()
+            if user is None:
+                user = User.objects.filter(
+                    role='student',
+                    school=participant_school,
+                    registration_id=obj.participant_id
+                ).first()
+            if user is None:
+                user = User.objects.filter(
+                    role='student',
+                    school=participant_school,
+                    username=obj.participant_id.lower()
+                ).first()
+
+            if user:
+                temp_password = None
+                try:
+                    request = self.context.get('request')
+                    requester = getattr(request, 'user', None) if request is not None else None
+                    if (
+                        requester is not None
+                        and getattr(requester, 'is_authenticated', False)
+                        and getattr(requester, 'role', None) == 'school'
+                        and requester.id == obj.school_id
+                        and user.must_reset_password
+                        and user.temporary_password_encrypted
+                    ):
+                        payload = signing.loads(user.temporary_password_encrypted)
+                        temp_password = payload.get('p')
+                except Exception:
+                    temp_password = None
+
+                return {
+                    'username': user.username,
+                    'section': user.section,
+                    'is_active': user.is_active,
+                    'user_id': user.id,
+                    'temporary_password': temp_password,
+                }
+        except Exception:
+            pass
+        return None
+
+    def get_status(self, obj):
+        """Get approval status"""
+        if obj.verified_by_volunteer:
+            return 'approved'
+        return 'pending'
 
 
 class SchoolVolunteerAssignmentSerializer(serializers.ModelSerializer):

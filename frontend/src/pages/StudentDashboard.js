@@ -5,6 +5,7 @@ import http from '../services/http-common';
 import UserInfoHeader from '../components/UserInfoHeader';
 import StudentFeedbackDisplay from '../components/StudentFeedbackDisplay';
 import feedbackService from '../services/feedbackService';
+import authManager from '../utils/authManager';
 
 // Static data for Live Results Carousel
 const staticResultsForCarousel = [
@@ -158,9 +159,6 @@ const pickDistinct = (len, n) => {
   }
   return Array.from(set);
 };
-
-// Generate a short Chess No.
-const generateChessNumber = () => `CH-${Math.floor(100000 + Math.random() * 900000)}`;
 
 // Create a QR image Data URL using a public QR service, then draw to canvas (so we get a stable data URL)
 async function generateQRCodeDataUrl(text, size = 256) {
@@ -461,49 +459,52 @@ function downloadRegistrationPDF({ studentName, categoryLabel, eventName, chessN
 
 // Live Results Carousel Component (3 cards: left, middle (highlighted), right)
 // Behavior: Every 3s, a new random card appears on the left, left->middle, middle->right, right disappears.
-const LiveResultsCarousel = ({ results }) => {
+const LiveResultsCarousel = ({ results = [] }) => {
+  const safeResults = Array.isArray(results) ? results : [];
   const [triplet, setTriplet] = useState(() => {
-    const idx = pickDistinct(results.length, 3);
-    if (idx.length < 3 && results.length > 0) {
+    const idx = pickDistinct(safeResults.length, 3);
+    if (idx.length < 3 && safeResults.length > 0) {
       while (idx.length < 3) idx.push(idx[idx.length - 1] ?? 0);
     }
     return idx;
   });
 
   useEffect(() => {
-    const idx = pickDistinct(results.length, 3);
-    if (idx.length < 3 && results.length > 0) {
+    const idx = pickDistinct(safeResults.length, 3);
+    if (idx.length < 3 && safeResults.length > 0) {
       while (idx.length < 3) idx.push(idx[idx.length - 1] ?? 0);
     }
     setTriplet(idx);
-  }, [results.length]);
+  }, [safeResults.length]);
 
   useEffect(() => {
-    if (!results.length) return;
+    if (!safeResults.length) return;
     const interval = setInterval(() => {
       setTriplet((prev) => {
-        if (!results.length) return prev;
-        if (results.length <= 3) {
+        if (!safeResults.length) return prev;
+        if (safeResults.length <= 3) {
           const [l] = prev;
-          const nextLeft = (l + 1) % results.length;
+          const nextLeft = (l + 1) % safeResults.length;
           return [nextLeft, prev[0], prev[1]];
         }
         const exclude = new Set(prev);
-        let newLeft = Math.floor(Math.random() * results.length);
+        let newLeft = Math.floor(Math.random() * safeResults.length);
         let guard = 0;
         while (exclude.has(newLeft) && guard < 50) {
-          newLeft = Math.floor(Math.random() * results.length);
+          newLeft = Math.floor(Math.random() * safeResults.length);
           guard++;
         }
         return [newLeft, prev[0], prev[1]];
       });
     }, 3000);
     return () => clearInterval(interval);
-  }, [results.length]);
+  }, [safeResults.length]);
 
-  if (!results.length) return <p className="text-amber-700">No recent results yet.</p>;
+  if (!safeResults.length) return <p className="text-amber-700">No recent results yet.</p>;
 
-  const visible = triplet.map((i) => results[i]);
+  const visible = triplet
+    .map((i) => (Number.isInteger(i) ? safeResults[i] : undefined))
+    .filter(Boolean);
 
   return (
     <div className="relative py-4">
@@ -512,7 +513,7 @@ const LiveResultsCarousel = ({ results }) => {
           const isMiddle = idx === 1;
           return (
             <div
-              key={`${result.event}-${result.winner}-${idx}`}
+              key={`${result?.event ?? 'event'}-${result?.winner ?? 'winner'}-${idx}`}
               className={`transition-all duration-700 ease-out rounded-2xl p-5 w-[22rem] h-44 flex flex-col justify-center text-center border relative overflow-hidden
                 ${isMiddle
                   ? 'scale-110 bg-gradient-to-br from-yellow-200 to-amber-300 shadow-2xl border-amber-500 ring-4 ring-amber-300/70'
@@ -526,16 +527,16 @@ const LiveResultsCarousel = ({ results }) => {
                 }} />
               )}
               <h4 className={`font-bold ${isMiddle ? 'text-amber-900 text-lg' : 'text-amber-800 text-base'} mb-1`} style={{ fontFamily: 'Cinzel, serif' }}>
-                {result.event}
+                {result?.event}
               </h4>
               <p className={`font-semibold ${isMiddle ? 'text-amber-800' : 'text-amber-700'} mb-0.5`}>
-                Winner: {result.winner}
+                Winner: {result?.winner}
               </p>
               <p className={`text-sm ${isMiddle ? 'text-amber-700' : 'text-amber-600'} mb-0.5`}>
-                School: {result.school}
+                School: {result?.school}
               </p>
               <p className={`text-sm ${isMiddle ? 'text-amber-700' : 'text-amber-600'}`}>
-                District: {result.district}
+                District: {result?.district}
               </p>
             </div>
           );
@@ -700,6 +701,14 @@ const StudentDashboard = () => {
   const [events, setEvents] = useState([]);
   const [currentUser, setCurrentUser] = useState(null);
 
+  const [allowedEventIds, setAllowedEventIds] = useState(null); // null=loading, []=none
+
+  const [mustResetPasswordOpen, setMustResetPasswordOpen] = useState(false);
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [passwordResetError, setPasswordResetError] = useState('');
+  const [passwordResetLoading, setPasswordResetLoading] = useState(false);
+
   // Events are already filtered to published events from the API
   const publishedEvents = useMemo(() => events || [], [events]);
 
@@ -730,6 +739,200 @@ const StudentDashboard = () => {
   const [showFeedbackPopup, setShowFeedbackPopup] = useState(false);
   const [feedbackPopupMessage, setFeedbackPopupMessage] = useState('');
   const [feedbackPopupType, setFeedbackPopupType] = useState('success'); // 'success' | 'positive' | 'negative'
+
+  const currentRegistration = useMemo(() => {
+    if (allRegistrationsWithQR && allRegistrationsWithQR.length > 0) {
+      const idx = Math.max(0, Math.min(selectedRegistrationIndex, allRegistrationsWithQR.length - 1));
+      return allRegistrationsWithQR[idx];
+    }
+    return null;
+  }, [allRegistrationsWithQR, selectedRegistrationIndex]);
+
+  const handleOpen = async (key) => {
+    setOpen(key);
+    if (key === 'qr') {
+      if ((!allRegistrationsWithQR || allRegistrationsWithQR.length === 0) && registrations && registrations.length > 0) {
+        setIsGeneratingQR(true);
+        try {
+          const mapped = await Promise.all((registrations || []).map(async (reg) => {
+            const eventName = reg?.event_details?.name || reg?.event_name || 'Event';
+            const categoryKey = reg?.event_details?.category;
+            const categoryLabel = availableCategories.find(c => c.key === categoryKey)?.label || categoryKey || 'N/A';
+            const chessNumber = reg?.chess_number || reg?.chessNumber || 'N/A';
+            const studentName = `${currentUser?.first_name || ''} ${currentUser?.last_name || ''}`.trim() || 'Student';
+            const qrText = `${studentName} | ${eventName} | ${chessNumber}`;
+            const qrDataUrl = await generateQRCodeDataUrl(qrText);
+            return { studentName, categoryLabel, eventName, chessNumber, qrDataUrl };
+          }));
+          setAllRegistrationsWithQR(mapped.filter(Boolean));
+          setSelectedRegistrationIndex(0);
+        } catch (e) {
+          setAllRegistrationsWithQR([]);
+        } finally {
+          setIsGeneratingQR(false);
+        }
+      }
+    }
+  };
+
+  const handleClose = () => {
+    setOpen(null);
+    setRegistrationError('');
+    setFeedbackError('');
+  };
+
+  const handleFirstNameChange = (e) => {
+    const raw = String(e?.target?.value || '');
+    const v = raw.toUpperCase();
+    setFirstName(v);
+    setIsIdentityVerified(false);
+    setRegistrationError('');
+    if (!v) {
+      setFirstNameError('');
+      return;
+    }
+    if (v.includes(' ')) {
+      setFirstNameError('Invalid Format: First name cannot contain spaces.');
+      return;
+    }
+    if (!/^[A-Z]+$/.test(v)) {
+      setFirstNameError('Invalid Character: First name must be uppercase letters only.');
+      return;
+    }
+    setFirstNameError('');
+  };
+
+  const handleLastNameChange = (e) => {
+    const raw = String(e?.target?.value || '');
+    const v = raw.toUpperCase();
+    setLastName(v);
+    setIsIdentityVerified(false);
+    setRegistrationError('');
+    if (!v) {
+      setLastNameError('');
+      return;
+    }
+    if (v.includes(' ')) {
+      setLastNameError('Invalid Format: Last name cannot contain spaces.');
+      return;
+    }
+    if (!/^[A-Z]+$/.test(v)) {
+      setLastNameError('Invalid Character: Last name must be uppercase letters only.');
+      return;
+    }
+    setLastNameError('');
+  };
+
+  const handleIdentityVerification = async () => {
+    setRegistrationError('');
+    if (!firstName || !lastName || firstNameError || lastNameError) return;
+    setIsVerifying(true);
+    try {
+      const a = `${currentUser?.first_name || ''}`.toUpperCase();
+      const b = `${currentUser?.last_name || ''}`.toUpperCase();
+      if (a && b && (a !== firstName || b !== lastName)) {
+        setIsIdentityVerified(false);
+        setRegistrationError(`Name Mismatch: The provided name '${firstName} ${lastName}' does not match your registered name '${currentUser?.first_name || ''} ${currentUser?.last_name || ''}'. Please use your exact registered name.`);
+      } else {
+        setIsIdentityVerified(true);
+      }
+    } finally {
+      setIsVerifying(false);
+    }
+  };
+
+  const handleRegister = async () => {
+    setRegistrationError('');
+    if (!isIdentityVerified) {
+      setRegistrationError('Please verify your identity before registering.');
+      return;
+    }
+    if (!selectedCategory || !selectedEvent) {
+      setRegistrationError('Please select a category and event.');
+      return;
+    }
+    const selectedEventObj = (filteredCategoryEvents || []).find(e => e?.name === selectedEvent) || (events || []).find(e => e?.name === selectedEvent && e?.category === selectedCategory) || (events || []).find(e => e?.name === selectedEvent);
+    const eventId = selectedEventObj?.id;
+    if (!eventId) {
+      setRegistrationError('Selected event not found. Please refresh and try again.');
+      return;
+    }
+
+    if (allowedEventIdSet && !allowedEventIdSet.has(eventId)) {
+      setRegistrationError('No events available. Your school has not selected this event.');
+      return;
+    }
+
+    setIsRegistering(true);
+    try {
+      const reg = await eventService.registerForEvent(eventId, firstName, lastName);
+      const freshRegs = await eventService.listMyRegistrations();
+      setRegistrations(Array.isArray(freshRegs) ? freshRegs : []);
+
+      const eventName = reg?.event_details?.name || selectedEventObj?.name || selectedEvent;
+      const categoryLabel = availableCategories.find(c => c.key === selectedCategory)?.label || selectedCategory;
+      const chessNumber = reg?.chess_number || reg?.chessNumber || reg?.chessNumber || 'N/A';
+      const studentName = `${currentUser?.first_name || ''} ${currentUser?.last_name || ''}`.trim() || `${firstName} ${lastName}`.trim();
+      const qrText = `${studentName} | ${eventName} | ${chessNumber}`;
+      const qrDataUrl = await generateQRCodeDataUrl(qrText);
+      const card = { studentName, categoryLabel, eventName, chessNumber, qrDataUrl };
+      setLatestRegistration(card);
+      setAllRegistrationsWithQR((prev) => {
+        const base = Array.isArray(prev) ? prev : [];
+        return [card, ...base];
+      });
+      setSelectedRegistrationIndex(0);
+      setSelectedCategory('');
+      setSelectedEvent('');
+    } catch (e) {
+      const msg = e?.response?.data?.detail || e?.response?.data?.error || (typeof e?.response?.data === 'string' ? e.response.data : '') || e?.message || 'Failed to register.';
+      setRegistrationError(msg);
+    } finally {
+      setIsRegistering(false);
+    }
+  };
+
+  const handleSubmitFeedback = async () => {
+    setFeedbackError('');
+    if (!feedbackRating || feedbackRating < 1 || feedbackRating > 5) {
+      setFeedbackError('Please select a rating.');
+      return;
+    }
+    if (!feedbackCategory) {
+      setFeedbackError('Please select a category.');
+      return;
+    }
+    if (!feedbackText || !String(feedbackText).trim()) {
+      setFeedbackError('Please enter your feedback.');
+      return;
+    }
+    setFeedbackSubmitting(true);
+    try {
+      await feedbackService.submitFeedback({
+        feedback_type: 'system',
+        subject: 'Student Feedback',
+        message: String(feedbackText || ''),
+        category: feedbackCategory,
+        rating: feedbackRating,
+        contact_email: feedbackEmail || null,
+      });
+      const popupType = feedbackRating >= 4 ? 'positive' : (feedbackRating <= 2 ? 'negative' : 'success');
+      setFeedbackPopupType(popupType);
+      setFeedbackPopupMessage('Thank you for your feedback!');
+      setShowFeedbackPopup(true);
+      setTimeout(() => setShowFeedbackPopup(false), 4000);
+      setFeedbackText('');
+      setFeedbackCategory('');
+      setFeedbackRating(0);
+      setFeedbackEmail('');
+      setOpen(null);
+    } catch (e) {
+      const msg = e?.response?.data?.detail || e?.response?.data?.error || 'Failed to submit feedback.';
+      setFeedbackError(msg);
+    } finally {
+      setFeedbackSubmitting(false);
+    }
+  };
 
   // Group events by category from API data
   const eventsByCategory = useMemo(() => {
@@ -818,6 +1021,15 @@ const StudentDashboard = () => {
         setEvents(eventsData);
         setDemoSchedule(buildDemoSchedule(eventsData));
 
+        // Fetch allowed events for this student (school-selected)
+        try {
+          const allowedRes = await http.get('/api/auth/students/allowed-events/');
+          const ids = allowedRes?.data?.event_ids;
+          setAllowedEventIds(Array.isArray(ids) ? ids : []);
+        } catch (e) {
+          setAllowedEventIds([]);
+        }
+
       } catch (error) {
         console.error('StudentDashboard: Error loading data:', error);
         // Don't redirect on error - let the user stay on the page with fallback data
@@ -826,6 +1038,7 @@ const StudentDashboard = () => {
           setPublishedResults([]);
           setEvents([]);
           setDemoSchedule([]);
+          setAllowedEventIds([]);
         }
       } finally {
         if (mounted) setLoading(false);
@@ -834,553 +1047,116 @@ const StudentDashboard = () => {
     return () => { mounted = false; };
   }, []);
 
-  // Build marquee strings from results (kept for future use)
-  // const marqueeItems = useMemo(() => {
-  //   return (publishedResults || []).map((r) => {
-  //     const eventName = r.event_details?.name || r.event_name || 'Event';
-  //     const position = r.position ? `#${r.position}` : '';
-  //     const participant = r.participant_details?.first_name || r.participant_name || '';
-  //     return `${eventName} ${position} ${participant}`.trim();
-  //   });
-  // }, [publishedResults]);
+  const allowedEventIdSet = useMemo(() => {
+    if (!Array.isArray(allowedEventIds)) return null;
+    return new Set(allowedEventIds);
+  }, [allowedEventIds]);
 
-  // Generate QR codes for all registrations
+  const filteredCategoryEvents = useMemo(() => {
+    if (!selectedCategory) return [];
+    const categoryEvents = (events || []).filter(event => event?.category === selectedCategory);
+    if (allowedEventIdSet === null) return [];
+    return categoryEvents.filter(event => allowedEventIdSet.has(event.id));
+  }, [events, selectedCategory, allowedEventIdSet]);
+
   useEffect(() => {
-    const generateAllQRs = async () => {
-      console.log('Starting QR generation with:', { registrations: registrations?.length, events: events?.length });
-
-      if (!registrations || registrations.length === 0) {
-        console.log('No registrations found');
-        setAllRegistrationsWithQR([]);
-        setIsGeneratingQR(false);
-        return;
-      }
-
-      if (!events || events.length === 0) {
-        console.log('No events found');
-        setAllRegistrationsWithQR([]);
-        setIsGeneratingQR(false);
-        return;
-      }
-
-      setIsGeneratingQR(true);
-      const registrationsWithQR = [];
-
-      for (const reg of registrations) {
-        try {
-          const event = events.find(e => e.id === reg.event);
-
-          if (event) {
-            const studentName = `${reg.participant_details?.first_name || ''} ${reg.participant_details?.last_name || ''}`.trim();
-            const qrPayload = JSON.stringify({
-              studentName: studentName,
-              eventName: event.name,
-              chessNumber: reg.chess_number,
-              eventId: reg.event,
-              category: event.category
-            });
-
-            const qrDataUrl = await generateQRCodeDataUrl(qrPayload, 320);
-
-            const registrationWithQR = {
-              ...reg,
-              eventName: event.name,
-              categoryLabel: event.category,
-              studentName: studentName,
-              chessNumber: reg.chess_number || reg.chessNumber || 'N/A',
-              qrDataUrl: qrDataUrl
-            };
-
-            console.log('Registration with QR created:', {
-              originalChessNumber: reg.chess_number,
-              mappedChessNumber: registrationWithQR.chessNumber,
-              eventName: registrationWithQR.eventName
-            });
-
-            registrationsWithQR.push(registrationWithQR);
-          }
-        } catch (error) {
-          console.error('Error generating QR for registration:', reg, error);
-        }
-      }
-
-      setAllRegistrationsWithQR(registrationsWithQR);
-      setIsGeneratingQR(false);
-    };
-
-    generateAllQRs();
-  }, [registrations, events]);
-
-  // Get current registration to display - always use QR-enabled registration
-  const currentRegistration = useMemo(() => {
-    console.log('Current registration calculation:', {
-      showAllEvents,
-      allRegistrationsWithQR: allRegistrationsWithQR.length,
-      selectedRegistrationIndex,
-      registrations: registrations.length
-    });
-
-    if (showAllEvents && allRegistrationsWithQR.length > 0) {
-      const selected = allRegistrationsWithQR[selectedRegistrationIndex] || allRegistrationsWithQR[0];
-      console.log('Selected registration (all events):', selected);
-      return selected;
+    if (currentUser && currentUser.role === 'student' && currentUser.must_reset_password) {
+      setMustResetPasswordOpen(true);
+    } else {
+      setMustResetPasswordOpen(false);
     }
-    // Always use the latest registration with QR data
-    if (allRegistrationsWithQR.length > 0) {
-      const latest = allRegistrationsWithQR[allRegistrationsWithQR.length - 1];
-      console.log('Latest registration:', latest);
-      return latest;
-    }
-    console.log('No QR registrations available');
-    return null; // Don't show anything if no QR data is available
-  }, [showAllEvents, allRegistrationsWithQR, selectedRegistrationIndex, registrations.length]);
+  }, [currentUser]);
 
-  const handleOpen = (key) => setOpen(key);
+  const submitPasswordReset = async (e) => {
+    e.preventDefault();
+    setPasswordResetError('');
 
-  const handleClose = () => {
-    setOpen(null);
-    // Reset errors and fields on close
-    setFirstNameError('');
-    setLastNameError('');
-    setRegistrationError('');
-    setFirstName('');
-    setLastName('');
-    setSelectedCategory('');
-    setSelectedEvent('');
-    setIsRegistering(false);
-    // Reset feedback state
-    setFeedbackRating(0);
-    setFeedbackCategory('');
-    setFeedbackText('');
-    setFeedbackEmail('');
-    setFeedbackError('');
-  };
-
-  const handleSubmitFeedback = async () => {
-    // Validate feedback
-    if (feedbackRating === 0) {
-      setFeedbackError('⭐ Please select a star rating above (1-5 stars)');
-      // Scroll to top of modal to show rating section
-      const modalContent = document.querySelector('.max-h-\\[70vh\\]');
-      if (modalContent) modalContent.scrollTop = 0;
+    if (!newPassword || newPassword.length < 8) {
+      setPasswordResetError('Password must be at least 8 characters');
       return;
     }
-    if (!feedbackCategory) {
-      setFeedbackError('📋 Please select a feedback category above');
-      // Scroll to show category section
-      const modalContent = document.querySelector('.max-h-\\[70vh\\]');
-      if (modalContent) modalContent.scrollTop = 0;
-      return;
-    }
-    if (!feedbackText.trim()) {
-      setFeedbackError('✍️ Please provide your feedback in the text area');
+    if (newPassword !== confirmPassword) {
+      setPasswordResetError('Passwords do not match');
       return;
     }
 
+    setPasswordResetLoading(true);
     try {
-      setFeedbackSubmitting(true);
-      setFeedbackError('');
+      const res = await http.post('/api/auth/password/set-new/', { new_password: newPassword });
+      const access = res.data?.access;
+      const refresh = res.data?.refresh;
 
-      // Submit feedback with sentiment analysis
-      const response = await feedbackService.submitFeedback({
-        rating: feedbackRating,
-        category: feedbackCategory,
-        message: feedbackText,
-        contact_email: feedbackEmail || null,
-      });
-
-      // Determine popup message based on rating and sentiment
-      const sentiment = response.sentiment_label || 'neutral';
-      let popupMessage = '';
-      let popupType = 'success';
-
-      if (feedbackRating === 5) {
-        popupMessage = 'Positive Feedback, Thanks for the feedback';
-        popupType = 'positive';
-      } else if (feedbackRating === 1 && sentiment === 'negative') {
-        popupMessage = '😔 Negative feedback, thanks for your feedback!';
-        popupType = 'negative';
-      } else {
-        popupMessage = '✨ Thanks for your feedback!';
-        popupType = 'success';
+      if (access && refresh) {
+        authManager.setTokens(access, refresh);
       }
 
-      setFeedbackPopupMessage(popupMessage);
-      setFeedbackPopupType(popupType);
-      setShowFeedbackPopup(true);
-
-      // Auto-hide popup after 4 seconds
-      setTimeout(() => {
-        setShowFeedbackPopup(false);
-        handleClose();
-      }, 4000);
-
-    } catch (error) {
-      console.error('Failed to submit feedback:', error);
-      setFeedbackError(error?.response?.data?.error || 'Failed to submit feedback. Please try again.');
+      const userRes = await http.get('/api/auth/current/');
+      setCurrentUser(userRes.data);
+      setNewPassword('');
+      setConfirmPassword('');
+      setMustResetPasswordOpen(false);
+    } catch (err) {
+      const msg = err?.response?.data?.error || 'Failed to update password';
+      setPasswordResetError(msg);
     } finally {
-      setFeedbackSubmitting(false);
-    }
-  };
-
-  const validateFirstName = (value) => {
-    if (!value || value.trim() === '') return 'First name is required';
-    if (value.includes(' ')) return 'Invalid Format: No spaces allowed';
-    if (!/^[A-Z]+$/.test(value)) return 'Invalid Character: Only uppercase letters allowed';
-    if (value.length < 2) return 'Too short: Minimum 2 characters required';
-    if (value.length > 50) return 'Too long: Maximum 50 characters allowed';
-    return '';
-  };
-
-  const validateLastName = (value) => {
-    if (!value || value.trim() === '') return 'Last name is required';
-    if (value.includes(' ')) return 'Invalid Format: No spaces allowed';
-    if (!/^[A-Z]+$/.test(value)) return 'Invalid Character: Only uppercase letters allowed';
-    if (value.length < 2) return 'Too short: Minimum 2 characters required';
-    if (value.length > 50) return 'Too long: Maximum 50 characters allowed';
-    return '';
-  };
-
-  // Enhanced name validation against registered user details
-  const validateNameMatch = async (firstName, lastName) => {
-    try {
-      // Ensure we have the current user; fetch on-demand if missing
-      let userForValidation = currentUser;
-      if (!userForValidation) {
-        try {
-          const resp = await http.get('/api/auth/current/');
-          userForValidation = resp?.data || null;
-          if (userForValidation) setCurrentUser(userForValidation);
-        } catch (_) {
-          // If we still cannot get user, avoid hard rejection here; let backend enforce later
-          return 'Unable to verify identity right now. Please try again in a moment.';
-        }
-      }
-
-      const registeredFirstName = userForValidation.first_name?.trim().toUpperCase() || '';
-      const registeredLastName = userForValidation.last_name?.trim().toUpperCase() || '';
-
-      // Debug: Log the registered names
-      console.log('Registered names:', { registeredFirstName, registeredLastName });
-      console.log('Input names:', { firstName, lastName });
-
-      // If we have registered names, validate them
-      if (registeredFirstName && registeredLastName) {
-        // Normalize names for comparison (uppercase, trimmed)
-        const normalizedInputFirst = firstName.trim().toUpperCase();
-        const normalizedInputLast = lastName.trim().toUpperCase();
-        const normalizedRegisteredFirst = registeredFirstName.trim().toUpperCase();
-        const normalizedRegisteredLast = registeredLastName.trim().toUpperCase();
-
-        console.log('Normalized comparison:', {
-          input: { first: normalizedInputFirst, last: normalizedInputLast },
-          registered: { first: normalizedRegisteredFirst, last: normalizedRegisteredLast }
-        });
-
-        // Exact match required for both first and last names
-        if (normalizedInputFirst !== normalizedRegisteredFirst || normalizedInputLast !== normalizedRegisteredLast) {
-          return "Name does not match registered details";
-        }
-      } else {
-        return 'Unable to retrieve your registered name details for verification.';
-      }
-
-      return '';
-    } catch (error) {
-      console.error('Name validation error:', error);
-      return 'Unable to verify name. Please try again.';
-    }
-  };
-
-  // Immediate validation function for real-time feedback
-  const validateNameImmediate = (first, last) => {
-    if (!first || !last || !currentUser) return '';
-
-    // Get the logged-in user's actual name
-    const userFirstName = currentUser.first_name?.trim().toUpperCase() || '';
-    const userLastName = currentUser.last_name?.trim().toUpperCase() || '';
-
-    const normalizedInputFirst = first.trim().toUpperCase();
-    const normalizedInputLast = last.trim().toUpperCase();
-
-    // Check against logged-in user's actual name
-    if (normalizedInputFirst !== userFirstName || normalizedInputLast !== userLastName) {
-      // Provide simple error messages only
-      if (normalizedInputFirst !== userFirstName && normalizedInputLast !== userLastName) {
-        return "Name does not match registered details";
-      } else if (normalizedInputFirst !== userFirstName) {
-        return "First name does not match";
-      } else if (normalizedInputLast !== userLastName) {
-        return "Last name does not match";
-      }
-    }
-
-    return '';
-  };
-
-  const handleFirstNameChange = (e) => {
-    const value = e.target.value.toUpperCase().replace(/[^A-Z]/g, ''); // Only allow letters
-    setFirstName(value);
-    const error = validateFirstName(value);
-    setFirstNameError(error);
-
-    // Reset verification when name changes
-    setIsIdentityVerified(false);
-    setSelectedCategory('');
-    setSelectedEvent('');
-
-    // Clear registration error when user starts typing
-    if (registrationError && (registrationError.includes('First name') || registrationError.includes('name'))) {
-      setRegistrationError('');
-    }
-
-    // Immediate validation if both names are entered
-    if (value && lastName) {
-      const nameError = validateNameImmediate(value, lastName);
-      setRegistrationError(nameError);
-    }
-  };
-
-  const handleLastNameChange = (e) => {
-    const value = e.target.value.toUpperCase().replace(/[^A-Z]/g, ''); // Only allow letters
-    setLastName(value);
-    const error = validateLastName(value);
-    setLastNameError(error);
-
-    // Reset verification when name changes
-    setIsIdentityVerified(false);
-    setSelectedCategory('');
-    setSelectedEvent('');
-
-    // Clear registration error when user starts typing
-    if (registrationError && (registrationError.includes('Last name') || registrationError.includes('name'))) {
-      setRegistrationError('');
-    }
-
-    // Immediate validation if both names are entered
-    if (value && firstName) {
-      const nameError = validateNameImmediate(firstName, value);
-      setRegistrationError(nameError);
-    }
-  };
-
-  // Handle identity verification
-  const handleIdentityVerification = async () => {
-    if (!firstName || !lastName || firstNameError || lastNameError) {
-      setRegistrationError('Please enter valid first and last names before verification.');
-      return;
-    }
-
-    setIsVerifying(true);
-    setRegistrationError('');
-
-    try {
-      const nameMatchError = await validateNameMatch(firstName, lastName);
-      if (nameMatchError) {
-        setRegistrationError(nameMatchError);
-        setIsIdentityVerified(false);
-      } else {
-        setIsIdentityVerified(true);
-        setRegistrationError('');
-      }
-    } catch (error) {
-      setRegistrationError('Verification failed. Please try again.');
-      setIsIdentityVerified(false);
-    } finally {
-      setIsVerifying(false);
-    }
-  };
-
-  const handleRegister = async () => {
-    // Prevent multiple submissions
-    if (isRegistering) return;
-
-    // Validate identity verification first
-    if (!isIdentityVerified) {
-      setRegistrationError('Please verify your identity before registering.');
-      return;
-    }
-
-    // Validate all required fields
-    if (!selectedCategory || !selectedEvent || !firstName || !lastName || firstNameError || lastNameError) {
-      setRegistrationError('Please complete all required fields correctly.');
-      return;
-    }
-
-    setRegistrationError('');
-    setIsRegistering(true);
-
-    try {
-      // Step 1: Verify name against registered details
-      const nameMatchError = await validateNameMatch(firstName, lastName);
-      if (nameMatchError) {
-        setRegistrationError(nameMatchError);
-        setIsRegistering(false);
-        return;
-      }
-
-      // Step 2: Find the event and verify it exists
-      const selectedEventObj = events.find(e => e.category === selectedCategory && e.name === selectedEvent);
-      if (!selectedEventObj) {
-        setRegistrationError('Selected event not found. Please refresh and try again.');
-        setIsRegistering(false);
-        return;
-      }
-
-      // Step 3: Proceed with registration (events are already filtered to published only)
-      const eventId = Number(selectedEventObj.id);
-
-      // Call the registration API with normalized uppercase names (backend requires uppercase, no spaces)
-      await eventService.registerForEvent(
-        eventId,
-        String(firstName || '').trim().toUpperCase(),
-        String(lastName || '').trim().toUpperCase()
-      );
-
-      // Generate registration confirmation details
-      const categoryLabel = availableCategories.find((c) => c.key === selectedCategory)?.label || selectedCategory;
-      const eventName = selectedEvent;
-      const chessNumber = generateChessNumber();
-      const studentName = `${firstName} ${lastName}`;
-
-      // Generate QR code with registration data
-      const qrPayload = JSON.stringify({
-        studentName,
-        category: categoryLabel,
-        event: eventName,
-        chessNumber,
-        eventId: eventId,
-        registrationDate: new Date().toISOString()
-      });
-
-      const qrDataUrl = await generateQRCodeDataUrl(qrPayload, 320);
-
-      // Store registration details
-      const reg = { studentName, categoryLabel, eventName, chessNumber, qrDataUrl };
-      setLatestRegistration(reg);
-
-      // Show success message and open schedule modal
-      setTimeout(() => {
-        setOpen('schedule');
-      }, 1000);
-
-      // Show success notification
-      const successMessage = `Successfully registered for ${eventName}! Your digital ID card is ready.`;
-      // You could add a toast notification here if you have a toast system
-      console.log(successMessage);
-
-      // Add to local registrations list with proper event details
-      const localReg = {
-        id: `local-${Date.now()}`,
-        event_details: {
-          name: eventName,
-          date: selectedEventObj.date || 'TBD',
-          start_time: selectedEventObj.start_time || 'TBD',
-          end_time: selectedEventObj.end_time || 'TBD',
-          venue_details: {
-            name: selectedEventObj.venue?.name || selectedEventObj.venue_details?.name || 'TBD',
-            location: selectedEventObj.venue?.location || 'TBD'
-          }
-        },
-        _local: true
-      };
-      setRegistrations((prev) => [localReg, ...(Array.isArray(prev) ? prev : [])]);
-
-      // Update the schedule with the new registration
-      const scheduleItem = {
-        id: `schedule-${Date.now()}`,
-        event_details: {
-          name: eventName,
-          date: selectedEventObj.date,
-          start_time: selectedEventObj.start_time,
-          end_time: selectedEventObj.end_time,
-          venue_details: {
-            name: selectedEventObj.venue?.name || selectedEventObj.venue_details?.name || 'TBD',
-            location: selectedEventObj.venue?.location || 'TBD'
-          }
-        },
-        status: 'registered',
-        chess_number: chessNumber
-      };
-      setDemoSchedule((prev) => [scheduleItem, ...(Array.isArray(prev) ? prev : [])]);
-
-      // Reset selections but keep name for convenience
-      setSelectedCategory('');
-      setSelectedEvent('');
-
-      // Clear any previous errors
-      setRegistrationError('');
-      setIsRegistering(false);
-
-    } catch (error) {
-      console.error('Registration error:', error);
-      // Log raw server response for easier troubleshooting during development
-      if (error?.response?.data) {
-        console.log('Registration 400 body:', error.response.data);
-      }
-
-      // Handle different types of errors
-      let errorMessage = 'Registration failed. Please try again.';
-
-      if (error.response) {
-        // Server responded with error status
-        const { status, data } = error.response;
-
-        if (status === 400) {
-          // Bad request - validation errors
-          if (data.first_name) {
-            errorMessage = `First name error: ${Array.isArray(data.first_name) ? data.first_name[0] : data.first_name}`;
-          } else if (data.last_name) {
-            errorMessage = `Last name error: ${Array.isArray(data.last_name) ? data.last_name[0] : data.last_name}`;
-          } else if (data.event) {
-            // Event field specific errors (e.g., missing/invalid/not published)
-            const msg = Array.isArray(data.event) ? data.event[0] : data.event;
-            errorMessage = typeof msg === 'string' ? msg : 'Please select a valid event.';
-          } else if (data.non_field_errors) {
-            errorMessage = Array.isArray(data.non_field_errors) ? data.non_field_errors[0] : data.non_field_errors;
-          } else if (data.detail) {
-            errorMessage = data.detail;
-          } else if (typeof data === 'string') {
-            errorMessage = data;
-          } else if (typeof data === 'object') {
-            // Fallback: join first validation message from any field
-            const firstKey = Object.keys(data)[0];
-            const firstVal = firstKey ? data[firstKey] : null;
-            if (firstVal) {
-              errorMessage = Array.isArray(firstVal) ? String(firstVal[0]) : String(firstVal);
-            }
-          } else {
-            errorMessage = 'Invalid registration data. Please check your information.';
-          }
-        } else if (status === 401) {
-          errorMessage = 'Please log in again to continue.';
-        } else if (status === 403) {
-          errorMessage = 'You do not have permission to register for this event.';
-        } else if (status === 404) {
-          errorMessage = 'Event not found. Please refresh and try again.';
-        } else if (status === 409) {
-          errorMessage = 'You are already registered for this event.';
-        } else if (status >= 500) {
-          errorMessage = 'Server error. Please try again later.';
-        }
-      } else if (error.request) {
-        // Network error
-        errorMessage = 'Network error. Please check your connection and try again.';
-      } else {
-        // Other error
-        errorMessage = error.message || 'An unexpected error occurred.';
-      }
-
-      setRegistrationError(errorMessage);
-      setIsRegistering(false);
+      setPasswordResetLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-amber-50 via-orange-50 to-yellow-50 relative overflow-hidden" style={{
-      backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23f59e0b' fill-opacity='0.03'%3E%3Ccircle cx='30' cy='30' r='1'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
+    <div className="min-h-screen bg-gradient-to-br from-amber-50 via-orange-50 to-yellow-50 relative" style={{
+      backgroundImage: `linear-gradient(to right, rgba(251, 191, 36, 0.08) 1px, transparent 1px), linear-gradient(to bottom, rgba(251, 191, 36, 0.08) 1px, transparent 1px)`,
       backgroundSize: '60px 60px'
     }}>
+      {mustResetPasswordOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg border border-amber-200">
+            <div className="px-6 py-4 border-b bg-amber-50">
+              <h3 className="text-xl font-semibold text-amber-800" style={{ fontFamily: 'Cinzel, serif' }}>
+                Create a New Password
+              </h3>
+              <p className="text-sm text-amber-700 mt-1">
+                You must change your temporary password before continuing.
+              </p>
+            </div>
+            <form onSubmit={submitPasswordReset} className="p-6 space-y-4">
+              {passwordResetError && (
+                <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
+                  {passwordResetError}
+                </div>
+              )}
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">New Password</label>
+                <input
+                  type="password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  className="w-full px-4 py-3 border-2 border-amber-200 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-amber-500 transition-all duration-200"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Confirm Password</label>
+                <input
+                  type="password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  className="w-full px-4 py-3 border-2 border-amber-200 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-amber-500 transition-all duration-200"
+                  required
+                />
+              </div>
+              <button
+                type="submit"
+                disabled={passwordResetLoading}
+                className="w-full px-6 py-3 bg-gradient-to-r from-amber-600 to-orange-600 text-white font-semibold rounded-xl hover:from-amber-700 hover:to-orange-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
+              >
+                {passwordResetLoading ? 'Updating...' : 'Update Password'}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* User Info Header */}
       <UserInfoHeader
         user={currentUser}
@@ -1420,7 +1196,7 @@ const StudentDashboard = () => {
             <div className="w-10 h-10 bg-gradient-to-br from-red-500 to-pink-500 rounded-full flex items-center justify-center shadow-lg animate-pulse" />
             <h3 className="text-xl font-bold text-amber-800">{t('live_results') || 'Live Results'}</h3>
           </div>
-          <LiveResultsCarousel results={staticResultsForCarousel} />
+          <LiveResultsCarousel results={(transformedResults && transformedResults.length) ? transformedResults : staticResultsForCarousel} />
         </div>
 
         {/* Ultra-Detailed Professional Kathakali Mask */}
@@ -2293,10 +2069,16 @@ const StudentDashboard = () => {
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {(() => {
-                  // Get events from the published events array that match the selected category
-                  const categoryEvents = events.filter(event =>
-                    event.category === selectedCategory
-                  );
+                  if (allowedEventIdSet === null) {
+                    return (
+                      <div className="col-span-2 text-center py-12">
+                        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-green-600 mx-auto"></div>
+                      </div>
+                    );
+                  }
+
+                  // Only show events selected by the student's school for this category
+                  const categoryEvents = filteredCategoryEvents;
 
                   if (categoryEvents.length === 0) {
                     return (
@@ -2306,14 +2088,14 @@ const StudentDashboard = () => {
                             <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd"></path>
                           </svg>
                         </div>
-                        <h3 className="text-xl font-bold text-gray-700 mb-3" style={{ fontFamily: 'Cinzel, serif' }}>No Events Published</h3>
+                        <h3 className="text-xl font-bold text-gray-700 mb-3" style={{ fontFamily: 'Cinzel, serif' }}>No events available</h3>
                         <p className="text-gray-600 text-lg leading-relaxed max-w-md mx-auto">
-                          No events are currently published for the <strong>{availableCategories.find(c => c.key === selectedCategory)?.label}</strong> category.
-                          Please check back later or contact the administration.
+                          Your school has not selected any events for the <strong>{availableCategories.find(c => c.key === selectedCategory)?.label}</strong> category.
+                          Please contact your school coordinator.
                         </p>
                         <div className="mt-6 p-4 bg-blue-50 rounded-xl border border-blue-200">
                           <p className="text-blue-700 text-sm font-medium">
-                            💡 Tip: Events are published by administrators when they're ready for registration.
+                            💡 Tip: Schools choose eligible events during participant submission.
                           </p>
                         </div>
                       </div>

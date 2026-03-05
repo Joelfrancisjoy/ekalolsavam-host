@@ -5,6 +5,7 @@ Validates all required environment variables and configurations.
 """
 
 import os
+import socket
 import sys
 from pathlib import Path
 from dotenv import load_dotenv
@@ -23,10 +24,6 @@ def validate_environment():
     # Required environment variables
     required_vars = {
         'SECRET_KEY': 'Django secret key for cryptographic signing',
-        'DATABASE_NAME': 'Database name for MySQL connection',
-        'DATABASE_USER': 'Database username for MySQL connection',
-        'DATABASE_PASSWORD': 'Database password for MySQL connection',
-        'DATABASE_HOST': 'Database host (default: localhost)',
         'SOCIAL_AUTH_GOOGLE_OAUTH2_KEY': 'Google OAuth2 Client ID',
         'SOCIAL_AUTH_GOOGLE_OAUTH2_SECRET': 'Google OAuth2 Client Secret',
     }
@@ -91,31 +88,86 @@ def validate_environment():
     print("-" * 40)
     
     use_sqlite = os.getenv('USE_SQLITE', 'False').lower() == 'true'
+    database_url = os.getenv('DATABASE_URL')
     
     if use_sqlite:
         print("✅ Database: Using SQLite (development mode)")
     else:
-        db_host = os.getenv('DATABASE_HOST', 'localhost')
-        db_port = os.getenv('DATABASE_PORT', '3306')
-        db_name = os.getenv('DATABASE_NAME')
-        db_user = os.getenv('DATABASE_USER')
-        
-        print(f"✅ Database: Using MySQL")
-        print(f"   Host: {db_host}:{db_port}")
-        print(f"   Database: {db_name}")
-        print(f"   User: {db_user}")
-        
-        # Test database connection
-        try:
-            import MySQLdb
-            print("✅ MySQL client: Available")
-        except ImportError:
+        if database_url:
             try:
-                import pymysql
-                print("✅ PyMySQL client: Available")
+                import urllib.parse as _urlparse
+                parsed = _urlparse.urlparse(database_url)
+                scheme = (parsed.scheme or '').lower()
+            except Exception:
+                scheme = ''
+
+            host = getattr(parsed, 'hostname', None) if 'parsed' in locals() else None
+            if host:
+                try:
+                    socket.getaddrinfo(host, None)
+                except OSError:
+                    errors.append(f"❌ DATABASE_URL host DNS resolution failed: {host}")
+                    print(f"❌ Database host DNS: Cannot resolve {host}")
+            else:
+                warnings.append("⚠️  DATABASE_URL is set but hostname could not be extracted")
+                print("⚠️  Database host DNS: Could not extract hostname")
+ 
+            if scheme in ('postgres', 'postgresql'):
+                print("✅ Database: Using PostgreSQL (DATABASE_URL)")
+                try:
+                    import psycopg
+                    print("✅ PostgreSQL client: psycopg available")
+                except ImportError:
+                    try:
+                        import psycopg2
+                        print("✅ PostgreSQL client: psycopg2 available")
+                    except ImportError:
+                        errors.append("❌ PostgreSQL client: Install 'psycopg[binary]' (recommended) or 'psycopg2-binary'")
+                        print("❌ PostgreSQL client: Not available")
+            elif scheme in ('mysql', 'mariadb'):
+                print("✅ Database: Using MySQL (DATABASE_URL)")
+                try:
+                    import MySQLdb
+                    print("✅ MySQL client: Available")
+                except ImportError:
+                    try:
+                        import pymysql
+                        print("✅ PyMySQL client: Available")
+                    except ImportError:
+                        errors.append("❌ MySQL client: Neither MySQLdb nor PyMySQL available")
+                        print("❌ MySQL client: Not available")
+            else:
+                warnings.append("⚠️  DATABASE_URL is set but its scheme could not be validated")
+                print("⚠️  Database: DATABASE_URL is set but scheme is unknown")
+        else:
+            required_vars.update({
+                'DATABASE_NAME': 'Database name for MySQL connection',
+                'DATABASE_USER': 'Database username for MySQL connection',
+                'DATABASE_PASSWORD': 'Database password for MySQL connection',
+                'DATABASE_HOST': 'Database host (default: localhost)',
+            })
+ 
+            db_host = os.getenv('DATABASE_HOST', 'localhost')
+            db_port = os.getenv('DATABASE_PORT', '3306')
+            db_name = os.getenv('DATABASE_NAME')
+            db_user = os.getenv('DATABASE_USER')
+             
+            print(f"✅ Database: Using MySQL")
+            print(f"   Host: {db_host}:{db_port}")
+            print(f"   Database: {db_name}")
+            print(f"   User: {db_user}")
+             
+            # Test database connection
+            try:
+                import MySQLdb
+                print("✅ MySQL client: Available")
             except ImportError:
-                errors.append("❌ MySQL client: Neither MySQLdb nor PyMySQL available")
-                print("❌ MySQL client: Not available")
+                try:
+                    import pymysql
+                    print("✅ PyMySQL client: Available")
+                except ImportError:
+                    errors.append("❌ MySQL client: Neither MySQLdb nor PyMySQL available")
+                    print("❌ MySQL client: Not available")
     
     # Validate Django settings
     print("\n⚙️  Validating Django Configuration:")

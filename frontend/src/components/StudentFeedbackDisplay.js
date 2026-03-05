@@ -151,8 +151,8 @@ const StudentFeedbackDisplay = () => {
           <button
             onClick={() => setActiveTab('results')}
             className={`px-4 py-2 rounded-md font-semibold text-sm transition-all ${activeTab === 'results'
-                ? 'bg-amber-600 text-white shadow-md'
-                : 'text-amber-700 hover:text-amber-800'
+              ? 'bg-amber-600 text-white shadow-md'
+              : 'text-amber-700 hover:text-amber-800'
               }`}
           >
             My Results ({results.length})
@@ -160,8 +160,8 @@ const StudentFeedbackDisplay = () => {
           <button
             onClick={() => setActiveTab('scores')}
             className={`px-4 py-2 rounded-md font-semibold text-sm transition-all ${activeTab === 'scores'
-                ? 'bg-amber-600 text-white shadow-md'
-                : 'text-amber-700 hover:text-amber-800'
+              ? 'bg-amber-600 text-white shadow-md'
+              : 'text-amber-700 hover:text-amber-800'
               }`}
           >
             Judge Scores ({scores.length})
@@ -366,17 +366,17 @@ const StudentFeedbackDisplay = () => {
                                       <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                                     </svg>
                                     <span>
-                                      {result.recheck_request_status === 'Accepted' 
-                                        ? <button 
-                                            onClick={(e) => {
-                                              e.stopPropagation();
-                                              const requestId = result.recheck_request_id || result.id;
-                                              navigate(`/recheck-request/${requestId}`);
-                                            }}
-                                            className="text-blue-600 hover:text-blue-800 underline cursor-pointer bg-transparent border-none p-0 font-medium"
-                                          >
-                                            Request Accepted
-                                          </button>
+                                      {result.recheck_request_status === 'Accepted'
+                                        ? <button
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            const requestId = result.recheck_request_id || result.id;
+                                            navigate(`/recheck-request/${requestId}`);
+                                          }}
+                                          className="text-blue-600 hover:text-blue-800 underline cursor-pointer bg-transparent border-none p-0 font-medium"
+                                        >
+                                          Request Accepted
+                                        </button>
                                         : 'Re-check already requested'}
                                     </span>
                                   </div>

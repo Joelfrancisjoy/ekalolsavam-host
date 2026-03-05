@@ -1,4 +1,5 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { userServiceAdapter as userService, eventServiceAdapter as eventService } from '../services/serviceAdapter';
 import volunteerService from '../services/volunteerService';
@@ -28,6 +29,7 @@ const VolunteerDashboard = () => {
   const [hoveredIcon, setHoveredIcon] = useState(null);
   const [selectedEventId, setSelectedEventId] = useState(null);
   const [eventParticipants, setEventParticipants] = useState([]);
+  const [totalParticipants, setTotalParticipants] = useState(0);
   const [verifiedParticipantIds, setVerifiedParticipantIds] = useState(new Set());
   const [currentUser, setCurrentUser] = useState(null);
 
@@ -308,12 +310,80 @@ const VolunteerDashboard = () => {
         setEventParticipants(participants);
       } catch (error) {
         console.error('Failed to load event participants:', error);
+        const details = error?.response?.data?.error || error?.response?.data?.detail || error?.message;
+        setError(details ? `Failed to load participants: ${details}` : 'Failed to load participants');
         setEventParticipants([]);
       }
     };
     loadEventParticipants();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedEventId]);
+
+  useEffect(() => {
+    const loadTotalParticipants = async () => {
+      if (!Array.isArray(assignments) || assignments.length === 0) {
+        setTotalParticipants(0);
+        return;
+      }
+
+      const uniqueEventIds = Array.from(new Set(assignments.map(a => a?.id).filter(Boolean)));
+      if (uniqueEventIds.length === 0) {
+        setTotalParticipants(0);
+        return;
+      }
+
+      try {
+        const results = await Promise.all(
+          uniqueEventIds.map(async (eventId) => {
+            try {
+              const data = await eventService.listParticipantsForEvent(eventId);
+              return Array.isArray(data) ? data : [];
+            } catch (err) {
+              console.error(`Failed to load participants for event ${eventId}:`, err);
+              return [];
+            }
+          })
+        );
+
+        const chessNumbers = new Set();
+        const registrations = new Set();
+        for (const arr of results) {
+          for (const r of (arr || [])) {
+            const chess = r?.chess_number ?? r?.chessNumber;
+            if (chess) {
+              chessNumbers.add(String(chess));
+            } else if (r?.id != null) {
+              registrations.add(String(r.id));
+            }
+          }
+        }
+
+        setTotalParticipants(chessNumbers.size || registrations.size || 0);
+      } catch (err) {
+        console.error('Failed to load total participants stats:', err);
+        setTotalParticipants(0);
+      }
+    };
+
+    loadTotalParticipants();
+  }, [assignments]);
+
+  const verifiedTodayCount = useMemo(() => {
+    const today = new Date().toDateString();
+    return (verifications || []).filter(v => {
+      const s = String(v?.status || '').toLowerCase();
+      if (s !== 'verified') return false;
+      const ts = v?.verification_time || v?.verificationTime || v?.created_at || v?.createdAt;
+      if (!ts) return false;
+      const d = new Date(ts);
+      if (Number.isNaN(d.getTime())) return false;
+      return d.toDateString() === today;
+    }).length;
+  }, [verifications]);
+
+  const totalVerifiedCount = useMemo(() => {
+    return (verifications || []).filter(v => String(v?.status || '').toLowerCase() === 'verified').length;
+  }, [verifications]);
 
   const loadVolunteerData = async () => {
     try {
@@ -392,12 +462,19 @@ const VolunteerDashboard = () => {
     setIsSearchingParticipant(true);
     try {
       // Get participant details from the event registration
-      const response = await eventService.getParticipantByChessNumber(chessNumber, eventId);
-      setParticipantDetails(response.data);
+      const normalizedChess = String(chessNumber || '').trim();
+      const registration = await eventService.getParticipantByChessNumber(normalizedChess, eventId);
+      const details = registration?.participant_details || null;
+      setParticipantDetails(details);
+
+      if (!details) {
+        setError('No participant found for this chess number and event');
+        setTimeout(() => setError(''), 3000);
+      }
 
       // Auto-fill event details in notes
       const selectedEvent = assignments.find(a => a.id === parseInt(eventId));
-      if (selectedEvent && response.data) {
+      if (selectedEvent && details) {
         const eventDetails = `Event: ${selectedEvent.name}\nDate: ${selectedEvent.date}\nTime: ${selectedEvent.start_time} - ${selectedEvent.end_time}\nVenue: ${selectedEvent.venue}`;
         setVerificationForm(prev => ({
           ...prev,
@@ -407,6 +484,9 @@ const VolunteerDashboard = () => {
     } catch (error) {
       console.error('Error searching participant:', error);
       setParticipantDetails(null);
+      const details = error?.response?.data?.error || error?.response?.data?.detail || error?.message;
+      setError(details ? `Failed to find participant: ${details}` : 'Failed to find participant');
+      setTimeout(() => setError(''), 3000);
     } finally {
       setIsSearchingParticipant(false);
     }
@@ -876,7 +956,7 @@ const VolunteerDashboard = () => {
                     createEmergencySuccess={createEmergencySuccess}
                     // Pass additional handlers for closing triage
                     setSelectedEmergencyId={setSelectedEmergencyId}
-                    setTriageForm={setTriageForm}
+                    setTriageFormDirect={setTriageForm}
                   />
                 )}
 
@@ -967,45 +1047,329 @@ const VolunteerDashboard = () => {
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-sm text-gray-600">Total Participants</span>
-                    <span className="text-lg font-bold text-indigo-600">{eventParticipants.length}</span>
+                    <span className="text-lg font-bold text-indigo-600">{totalParticipants}</span>
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-sm text-gray-600">Verified Today</span>
                     <span className="text-lg font-bold text-green-600">
-                      {verifications.filter(v =>
-                        new Date(v.verification_time).toDateString() === new Date().toDateString()
-                      ).length}
+                      {verifiedTodayCount}
                     </span>
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-sm text-gray-600">Total Verified</span>
-                    <span className="text-lg font-bold text-purple-600">{verifications.length}</span>
+                    <span className="text-lg font-bold text-purple-600">{totalVerifiedCount}</span>
                   </div>
-                  {currentUser?.role === 'volunteer' && (
-                    <div className="mt-4 w-full">
-                      <button
-                        type="button"
-                        onClick={() => setActiveTab('recheck')}
-                        className="w-full flex items-center justify-between px-4 py-2 rounded-lg border border-orange-200 bg-orange-50 hover:bg-orange-100 transition-colors duration-200"
-                      >
-                        <span className="text-sm font-semibold text-orange-800">Result Re-Evaluation</span>
-                        <div className="flex gap-1">
-                          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-bold bg-yellow-100 text-yellow-800">
-                            {recheckRequests.filter(req => req.status === 'Pending' || req.status === 'pending').length} Pending
-                          </span>
-                          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-bold bg-blue-100 text-blue-800">
-                            {recheckRequests.filter(req => req.status === 'Accepted' || req.status === 'accepted').length} Accepted
-                          </span>
-                        </div>
-                      </button>
-                    </div>
-                  )}
                 </div>
               </div>
             </div>
           )}
         </div>
       </div>
+    </div>
+  );
+};
+
+const TypeaheadDropdown = ({
+  id,
+  items,
+  value,
+  onChange,
+  placeholder,
+  className,
+  ariaLabel,
+  ariaLabelledBy,
+  getValue,
+  getDisplayLabel,
+  getSearchLabel,
+}) => {
+  const containerRef = useRef(null);
+  const buttonRef = useRef(null);
+  const listboxRef = useRef(null);
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState('');
+  const [highlightIndex, setHighlightIndex] = useState(0);
+  const [portalStyle, setPortalStyle] = useState(null);
+
+  const closeDropdown = ({ resetQuery = false } = {}) => {
+    setOpen(false);
+    setHighlightIndex(0);
+    setPortalStyle(null);
+    if (resetQuery) {
+      setQuery('');
+    }
+  };
+
+  const updatePortalPosition = () => {
+    const btn = buttonRef.current;
+    if (!btn) return;
+    const rect = btn.getBoundingClientRect();
+    setPortalStyle({
+      position: 'fixed',
+      left: rect.left,
+      top: rect.bottom + 4,
+      width: rect.width,
+      zIndex: 9999,
+    });
+  };
+
+  const computePortalStyle = () => {
+    const btn = buttonRef.current;
+    if (!btn) return null;
+    const rect = btn.getBoundingClientRect();
+    return {
+      position: 'fixed',
+      left: rect.left,
+      top: rect.bottom + 4,
+      width: rect.width,
+      zIndex: 9999,
+    };
+  };
+
+  useEffect(() => {
+    if (!open) return;
+    updatePortalPosition();
+
+    const onDocMouseDown = (e) => {
+      const el = containerRef.current;
+      const listEl = listboxRef.current;
+      const target = e.target;
+      if (el && el.contains(target)) return;
+      if (listEl && listEl.contains(target)) return;
+      closeDropdown();
+    };
+
+    const onWindowChange = () => updatePortalPosition();
+
+    document.addEventListener('mousedown', onDocMouseDown);
+    window.addEventListener('resize', onWindowChange);
+    window.addEventListener('scroll', onWindowChange, true);
+    return () => {
+      document.removeEventListener('mousedown', onDocMouseDown);
+      window.removeEventListener('resize', onWindowChange);
+      window.removeEventListener('scroll', onWindowChange, true);
+    };
+  }, [open]);
+
+  const normalizedQuery = (query || '').trim().toLowerCase();
+  const list = Array.isArray(items) ? items : [];
+  let filteredItems = list;
+
+  if (normalizedQuery) {
+    const scoredMatches = list
+      .map((item) => {
+        const text = ((getSearchLabel ? getSearchLabel(item) : getDisplayLabel(item)) || '').toString().trim().toLowerCase();
+        if (!text) return null;
+
+        const exact = text === normalizedQuery;
+        const startsWith = text.startsWith(normalizedQuery);
+        const containsAt = text.indexOf(normalizedQuery);
+        const contains = containsAt >= 0;
+
+        if (!contains) return null;
+
+        const rank = exact ? 0 : (startsWith ? 1 : 2);
+        return { item, rank, containsAt, text };
+      })
+      .filter(Boolean)
+      .sort((a, b) => {
+        if (a.rank !== b.rank) return a.rank - b.rank;
+        if (a.containsAt !== b.containsAt) return a.containsAt - b.containsAt;
+        return a.text.localeCompare(b.text);
+      });
+
+    filteredItems = scoredMatches.map((m) => m.item);
+  }
+
+  useEffect(() => {
+    if (!open) return;
+    setHighlightIndex(0);
+  }, [open, normalizedQuery]);
+
+  const listboxId = `${id}-listbox`;
+  const safeValue = value == null ? '' : String(value);
+  const selectedItem = list.find((it) => String(getValue(it)) === safeValue) || null;
+  const buttonLabel = selectedItem ? getDisplayLabel(selectedItem) : placeholder;
+
+  const activeItem = open && filteredItems.length ? filteredItems[Math.min(highlightIndex, filteredItems.length - 1)] : null;
+  const activeDescendantId = activeItem ? `${id}-option-${String(getValue(activeItem))}` : undefined;
+
+  useEffect(() => {
+    if (!open) return;
+    if (!activeDescendantId) return;
+    const el = document.getElementById(activeDescendantId);
+    if (el && typeof el.scrollIntoView === 'function') {
+      el.scrollIntoView({ block: 'nearest' });
+    }
+  }, [open, activeDescendantId]);
+
+  const selectItem = (item) => {
+    if (!item) return;
+    const nextValue = String(getValue(item));
+    onChange(nextValue);
+    closeDropdown({ resetQuery: true });
+  };
+
+  const openDropdown = () => {
+    updatePortalPosition();
+    setOpen(true);
+    if (safeValue) {
+      const idx = filteredItems.findIndex((it) => String(getValue(it)) === safeValue);
+      setHighlightIndex(idx >= 0 ? idx : 0);
+    } else {
+      setHighlightIndex(0);
+    }
+  };
+
+  const handleButtonClick = () => {
+    if (open) {
+      if ((query || '').trim()) {
+        updatePortalPosition();
+        setQuery('');
+        setHighlightIndex(0);
+        return;
+      }
+      closeDropdown({ resetQuery: true });
+      return;
+    }
+    openDropdown();
+  };
+
+  const onKeyDown = (e) => {
+    if (!e) return;
+    if (e.defaultPrevented) return;
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+
+    const key = e.key;
+
+    if (key === 'Tab') {
+      closeDropdown();
+      return;
+    }
+
+    if (key === 'Escape') {
+      e.preventDefault();
+      closeDropdown();
+      return;
+    }
+
+    if (key === 'ArrowDown') {
+      e.preventDefault();
+      if (!open) {
+        openDropdown();
+        return;
+      }
+      setHighlightIndex((prev) => Math.min(prev + 1, Math.max(filteredItems.length - 1, 0)));
+      return;
+    }
+
+    if (key === 'ArrowUp') {
+      e.preventDefault();
+      if (!open) {
+        openDropdown();
+        return;
+      }
+      setHighlightIndex((prev) => Math.max(prev - 1, 0));
+      return;
+    }
+
+    if (key === 'Home') {
+      if (!open) return;
+      e.preventDefault();
+      setHighlightIndex(0);
+      return;
+    }
+
+    if (key === 'End') {
+      if (!open) return;
+      e.preventDefault();
+      setHighlightIndex(Math.max(filteredItems.length - 1, 0));
+      return;
+    }
+
+    if (key === 'Enter') {
+      if (!open) return;
+      e.preventDefault();
+      const item = filteredItems[Math.min(highlightIndex, Math.max(filteredItems.length - 1, 0))];
+      selectItem(item);
+      return;
+    }
+
+    if (key === 'Backspace') {
+      e.preventDefault();
+      updatePortalPosition();
+      setOpen(true);
+      setQuery((prev) => prev.slice(0, -1));
+      return;
+    }
+
+    if (typeof key === 'string' && key.length === 1 && /^[a-z0-9 ]$/i.test(key)) {
+      e.preventDefault();
+      updatePortalPosition();
+      setOpen(true);
+      setQuery((prev) => `${prev}${key}`);
+    }
+  };
+
+  return (
+    <div ref={containerRef} className="relative">
+      <button
+        type="button"
+        id={id}
+        ref={buttonRef}
+        role="combobox"
+        aria-label={ariaLabel}
+        aria-labelledby={ariaLabelledBy}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        aria-controls={listboxId}
+        aria-activedescendant={open ? activeDescendantId : undefined}
+        onClick={handleButtonClick}
+        onKeyDown={onKeyDown}
+        className={className}
+      >
+        <span className={selectedItem ? undefined : 'text-gray-500'}>{buttonLabel}</span>
+      </button>
+      <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
+        <svg className="h-5 w-5 text-gray-400" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+          <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 10.94l3.71-3.71a.75.75 0 111.06 1.06l-4.24 4.24a.75.75 0 01-1.06 0L5.21 8.29a.75.75 0 01.02-1.08z" clipRule="evenodd" />
+        </svg>
+      </div>
+      {(() => {
+        if (!open) return null;
+        const effectiveStyle = portalStyle || computePortalStyle();
+        if (!effectiveStyle) return null;
+        return createPortal(
+          <ul
+            ref={listboxRef}
+            id={listboxId}
+            role="listbox"
+            style={effectiveStyle}
+            className="max-h-60 overflow-auto rounded-xl border border-gray-200 bg-white shadow-lg"
+          >
+            {filteredItems.map((item, idx) => {
+              const optionValue = String(getValue(item));
+              const optionId = `${id}-option-${optionValue}`;
+              const isActive = idx === highlightIndex;
+              const isSelected = optionValue === safeValue;
+              return (
+                <li
+                  key={optionId}
+                  id={optionId}
+                  role="option"
+                  aria-selected={isSelected}
+                  onMouseEnter={() => setHighlightIndex(idx)}
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => selectItem(item)}
+                  className={`cursor-pointer px-4 py-3 text-sm font-medium ${isActive ? 'bg-blue-50 text-blue-700' : 'text-gray-900'} ${isSelected ? 'font-semibold' : ''}`}
+                >
+                  {getDisplayLabel(item)}
+                </li>
+              );
+            })}
+          </ul>,
+          document.body
+        );
+      })()}
     </div>
   );
 };
@@ -1098,23 +1462,21 @@ const VerificationTab = ({ assignments, verificationForm, setVerificationForm, o
         <form onSubmit={onVerify} className="px-8 py-6 space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
-              <label htmlFor="event" className="block text-sm font-semibold text-gray-700 mb-2">
+              <label id="event-label" htmlFor="event" className="block text-sm font-semibold text-gray-700 mb-2">
                 Event *
               </label>
-              <select
+              <TypeaheadDropdown
                 id="event"
+                items={assignments}
                 value={verificationForm.eventId}
-                onChange={(e) => onEventChange(e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-xl shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm font-medium transition-all duration-200"
-                required
-              >
-                <option value="">Select an event</option>
-                {assignments.map((assignment, idx) => (
-                  <option key={`${assignment.id}-${idx}`} value={assignment.id}>
-                    {assignment.name} - {assignment.date}
-                  </option>
-                ))}
-              </select>
+                onChange={(next) => onEventChange(next)}
+                placeholder="Choose an event (type to search)"
+                className="w-full px-4 py-3 border border-gray-300 rounded-xl shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm font-medium transition-all duration-200 text-left"
+                ariaLabelledBy="event-label"
+                getValue={(a) => a?.id}
+                getDisplayLabel={(a) => `${a?.name} - ${a?.date}`}
+                getSearchLabel={(a) => a?.name}
+              />
             </div>
 
             <div>
@@ -1142,39 +1504,57 @@ const VerificationTab = ({ assignments, verificationForm, setVerificationForm, o
 
           {/* Participant Details Display */}
           {participantDetails && (
-            <div className="bg-green-50 border border-green-200 rounded-xl p-6">
-              <div className="flex items-center space-x-3 mb-4">
-                <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
-                  <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                  </svg>
+            <div className="bg-white border-2 border-green-300 rounded-2xl p-6 shadow-sm">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-5">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-green-100 rounded-xl flex items-center justify-center border border-green-200">
+                    <svg className="w-6 h-6 text-green-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <div className="text-sm font-extrabold text-green-700 tracking-wide uppercase">Search Result</div>
+                    <h4 className="text-3xl sm:text-4xl font-extrabold text-gray-900">Participant Found</h4>
+                  </div>
                 </div>
-                <h4 className="text-lg font-bold text-green-800">Participant Found</h4>
+
+                {verificationForm?.chessNumber ? (
+                  <div className="flex items-center justify-between sm:justify-end gap-4 bg-green-50 border-2 border-green-200 rounded-xl px-5 py-4">
+                    <div className="text-base font-extrabold text-green-800">Chest / Chess No</div>
+                    <div className="text-2xl sm:text-3xl font-extrabold text-green-900 font-mono tracking-wide">
+                      {String(verificationForm.chessNumber).trim()}
+                    </div>
+                  </div>
+                ) : null}
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <span className="text-sm font-medium text-green-700">Name:</span>
-                  <p className="text-sm text-green-800 font-semibold">
-                    {participantDetails.first_name} {participantDetails.last_name}
-                  </p>
+
+              <div className="mb-5">
+                <div className="text-base font-extrabold text-gray-600">Name</div>
+                <div className="mt-2 text-4xl sm:text-5xl font-extrabold text-gray-900 leading-tight">
+                  {(participantDetails.first_name || '').trim()} {(participantDetails.last_name || '').trim()}
                 </div>
-                <div>
-                  <span className="text-sm font-medium text-green-700">Category:</span>
-                  <p className="text-sm text-green-800 font-semibold">
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-4">
+                  <div className="text-base font-extrabold text-gray-600">Category</div>
+                  <div className="mt-2 text-2xl font-extrabold text-gray-900">
                     {participantDetails.section || 'N/A'}
-                  </p>
+                  </div>
                 </div>
-                <div>
-                  <span className="text-sm font-medium text-green-700">School:</span>
-                  <p className="text-sm text-green-800 font-semibold">
-                    {participantDetails.school?.name || 'N/A'}
-                  </p>
-                </div>
-                <div>
-                  <span className="text-sm font-medium text-green-700">Class:</span>
-                  <p className="text-sm text-green-800 font-semibold">
+
+                <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-4">
+                  <div className="text-base font-extrabold text-gray-600">Class</div>
+                  <div className="mt-2 text-2xl font-extrabold text-gray-900">
                     {participantDetails.student_class || 'N/A'}
-                  </p>
+                  </div>
+                </div>
+
+                <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-4 md:col-span-2 lg:col-span-1">
+                  <div className="text-base font-extrabold text-gray-600">School</div>
+                  <div className="mt-2 text-2xl font-extrabold text-gray-900">
+                    {participantDetails.school?.name || 'N/A'}
+                  </div>
                 </div>
               </div>
             </div>
@@ -1343,6 +1723,39 @@ const HistoryTab = ({ verifications }) => {
 
 // Participants Tab Component
 const ParticipantsTab = ({ assignments, selectedEventId, setSelectedEventId, eventParticipants, verifiedParticipantIds }) => {
+  const [chessLookupQuery, setChessLookupQuery] = useState('');
+  const [chessLookupLoading, setChessLookupLoading] = useState(false);
+  const [chessLookupError, setChessLookupError] = useState('');
+  const [chessLookupResult, setChessLookupResult] = useState(null);
+
+  const handleChessLookup = async (e) => {
+    e.preventDefault();
+    const q = String(chessLookupQuery || '').trim();
+    if (!q) return;
+    setChessLookupLoading(true);
+    setChessLookupError('');
+    setChessLookupResult(null);
+    try {
+      const res = await eventService.lookupParticipantByChessNumber(q);
+      if (!res) {
+        setChessLookupError('No participant found for this chest number');
+        return;
+      }
+      setChessLookupResult(res);
+    } catch (err) {
+      const details = err?.response?.data?.error || err?.response?.data?.detail || err?.message;
+      setChessLookupError(details || 'Failed to search participant');
+    } finally {
+      setChessLookupLoading(false);
+    }
+  };
+
+  const clearChessLookup = () => {
+    setChessLookupQuery('');
+    setChessLookupError('');
+    setChessLookupResult(null);
+  };
+
   if (assignments.length === 0) {
     return (
       <div className="bg-white rounded-2xl shadow-lg p-12 text-center">
@@ -1362,18 +1775,141 @@ const ParticipantsTab = ({ assignments, selectedEventId, setSelectedEventId, eve
       {/* Event Selector */}
       <div className="bg-white rounded-2xl shadow-lg p-6">
         <h3 className="text-lg font-bold text-gray-900 mb-4">Select Event</h3>
-        <select
-          value={selectedEventId || ''}
-          onChange={(e) => setSelectedEventId(Number(e.target.value) || null)}
-          className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-        >
-          <option value="">Choose an event to view participants</option>
-          {assignments.map((assignment) => (
-            <option key={assignment.id} value={assignment.id}>
-              {assignment.name} - {assignment.date}
-            </option>
-          ))}
-        </select>
+        <TypeaheadDropdown
+          id="participants-event"
+          items={assignments}
+          value={selectedEventId == null ? '' : String(selectedEventId)}
+          onChange={(next) => setSelectedEventId(Number(next) || null)}
+          placeholder="Choose an event (type to search)"
+          className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-left"
+          ariaLabel="Choose an event (type to search)"
+          getValue={(a) => a?.id}
+          getDisplayLabel={(a) => `${a?.name} - ${a?.date}`}
+          getSearchLabel={(a) => a?.name}
+        />
+
+        <div className="mt-5">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h4 className="text-sm font-bold text-gray-900">Search participant</h4>
+              <p className="text-sm text-gray-600 mt-1">Search by chest number to view participant details and event participations.</p>
+            </div>
+            {(chessLookupResult || chessLookupError || chessLookupQuery) && (
+              <button
+                type="button"
+                onClick={clearChessLookup}
+                className="shrink-0 inline-flex items-center px-3 py-2 rounded-lg text-sm font-semibold border border-gray-200 bg-white hover:bg-gray-50"
+              >
+                Clear
+              </button>
+            )}
+          </div>
+
+          <form onSubmit={handleChessLookup} className="mt-4">
+            <div className="flex flex-col md:flex-row md:items-center gap-3">
+              <div className="relative flex-1">
+                <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35m1.85-5.15a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                </div>
+                <input
+                  type="text"
+                  value={chessLookupQuery}
+                  onChange={(e) => setChessLookupQuery(e.target.value)}
+                  className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-xl shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm font-medium transition-all duration-200"
+                  placeholder="Enter chest number (e.g., CH001 / 00001234)"
+                  aria-label="Search by chest number"
+                />
+                {chessLookupLoading && (
+                  <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"></div>
+                  </div>
+                )}
+              </div>
+              <button
+                type="submit"
+                disabled={chessLookupLoading || !String(chessLookupQuery || '').trim()}
+                className="inline-flex items-center justify-center px-6 py-3 rounded-xl text-sm font-bold text-white bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                Search
+              </button>
+            </div>
+          </form>
+
+          {chessLookupError && (
+            <div className="mt-4 bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm font-semibold text-red-800">
+              {chessLookupError}
+            </div>
+          )}
+
+          {chessLookupResult && (
+            <div className="mt-4 border border-gray-200 rounded-2xl overflow-hidden">
+              <div className="px-5 py-4 bg-gradient-to-r from-slate-900 to-slate-800">
+                <div className="flex items-center justify-between gap-4">
+                  <div>
+                    <div className="text-white text-sm font-bold">Participant</div>
+                    <div className="text-slate-200 text-xs font-semibold mt-1">
+                      Chest No: <span className="font-mono">{chessLookupResult.chess_number}</span>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-white text-sm font-extrabold">
+                      {chessLookupResult.participant?.first_name} {chessLookupResult.participant?.last_name}
+                    </div>
+                    <div className="text-slate-200 text-xs font-semibold mt-1">
+                      {chessLookupResult.participant?.school?.name || 'School N/A'}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="px-5 py-4 bg-white">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <div className="text-xs font-bold text-gray-600">Category</div>
+                    <div className="text-sm font-semibold text-gray-900 mt-1">{chessLookupResult.participant?.section || 'N/A'}</div>
+                  </div>
+                  <div>
+                    <div className="text-xs font-bold text-gray-600">Class</div>
+                    <div className="text-sm font-semibold text-gray-900 mt-1">{chessLookupResult.participant?.student_class || 'N/A'}</div>
+                  </div>
+                  <div>
+                    <div className="text-xs font-bold text-gray-600">Participations</div>
+                    <div className="text-sm font-semibold text-gray-900 mt-1">{Array.isArray(chessLookupResult.participations) ? chessLookupResult.participations.length : 0}</div>
+                  </div>
+                </div>
+
+                <div className="mt-4">
+                  {Array.isArray(chessLookupResult.participations) && chessLookupResult.participations.length > 0 ? (
+                    <div className="divide-y divide-gray-200 rounded-xl border border-gray-200 overflow-hidden">
+                      {chessLookupResult.participations.map((p) => (
+                        <div key={p.registration_id} className="px-4 py-4 bg-white hover:bg-gray-50 transition-colors">
+                          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
+                            <div>
+                              <div className="text-sm font-bold text-gray-900">{p.event?.name}</div>
+                              <div className="text-xs text-gray-600 mt-1">
+                                {p.event?.date}{p.event?.venue ? ` • ${p.event.venue}` : ''}
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <div className="text-xs font-bold text-gray-600">Chest No</div>
+                              <div className="text-sm font-mono font-semibold text-gray-900 mt-1">{p.chess_number}</div>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-4 text-sm text-gray-700">
+                      No participations found in your assigned events.
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Participants List */}
@@ -1466,7 +2002,7 @@ const ParticipantsTab = ({ assignments, selectedEventId, setSelectedEventId, eve
   );
 };
 
-const EmergenciesTab = ({ emergencies, selectedEmergencyId, triageForm, setTriageForm, onSelectEmergency, onSaveTriage, isSavingTriage, triageSaveSuccess, showCreateEmergency, setShowCreateEmergency, createEmergencyForm, setCreateEmergencyForm, onCreateEmergency, isCreatingEmergency, createEmergencySuccess, setSelectedEmergencyId, setTriageForm: setTriageFormDirect }) => {
+const EmergenciesTab = ({ emergencies, selectedEmergencyId, triageForm, setTriageForm, onSelectEmergency, onSaveTriage, isSavingTriage, triageSaveSuccess, showCreateEmergency, setShowCreateEmergency, createEmergencyForm, setCreateEmergencyForm, onCreateEmergency, isCreatingEmergency, createEmergencySuccess, setSelectedEmergencyId, setTriageFormDirect }) => {
   return (
     <div className="flex flex-col gap-6 lg:h-full">
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-6 lg:flex-1 lg:min-h-0">

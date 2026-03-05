@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
-import authManager from '../utils/authManager';
+import http from '../services/http-common';
 
 const SchoolManagement = () => {
   const [formData, setFormData] = useState({
@@ -20,8 +19,7 @@ const SchoolManagement = () => {
   const fetchSchools = async () => {
     setLoadingSchools(true);
     try {
-      const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:8000';
-      const response = await axios.get(`${apiUrl}/api/auth/schools/`);
+      const response = await http.get('/api/auth/schools/');
       setSchools(response.data);
     } catch (error) {
       console.error('Error fetching schools:', error);
@@ -40,19 +38,7 @@ const SchoolManagement = () => {
     setMessage('');
 
     try {
-      const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:8000';
-      const { access } = authManager.getTokens();
-
-      const response = await axios.post(
-        `${apiUrl}/api/auth/admin/schools/create/`,
-        formData,
-        {
-          headers: {
-            'Authorization': `Bearer ${access}`,
-            'Content-Type': 'application/json'
-          }
-        }
-      );
+      const response = await http.post('/api/auth/admin/schools/create/', formData);
 
       setMessage(`School account created successfully! Username: ${response.data.username}`);
       setFormData({
@@ -83,8 +69,8 @@ const SchoolManagement = () => {
       {/* Message Display */}
       {message && (
         <div className={`p-6 rounded-xl shadow-md ${message.includes('successfully')
-            ? 'bg-green-50 text-green-800 border-l-4 border-green-500'
-            : 'bg-red-50 text-red-800 border-l-4 border-red-500'
+          ? 'bg-green-50 text-green-800 border-l-4 border-green-500'
+          : 'bg-red-50 text-red-800 border-l-4 border-red-500'
           }`}>
           <div className="flex items-start">
             <div className="flex-shrink-0">

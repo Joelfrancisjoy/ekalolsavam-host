@@ -9,13 +9,13 @@ const feedbackService = {
         const res = await http.post('/api/feedback/submit/', feedbackData);
         return res.data;
     },
-    
+
     // Get all feedback (admin only)
     listFeedback: async (params = {}) => {
         const res = await http.get('/api/feedback/admin/list/', { params });
         return res.data;
     },
-    
+
     // Get feedback analytics summary (admin only)
     getFeedbackAnalytics: async () => {
         const res = await http.get('/api/feedback/admin/summary/');

@@ -1,6 +1,7 @@
 from rest_framework import generics, status
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.exceptions import PermissionDenied
 from .models import VolunteerShift, VolunteerAssignment
 from .serializers import VolunteerShiftSerializer, VolunteerAssignmentSerializer
 
@@ -32,7 +33,10 @@ class VolunteerAssignmentView(generics.ListCreateAPIView):
 
     def perform_create(self, serializer):
         user = self.request.user
+        if user.role == 'admin':
+            serializer.save()
+            return
         if user.role == 'volunteer':
             serializer.save(volunteer=user)
-        else:
-            raise PermissionError("Only volunteers can assign themselves to shifts")
+            return
+        raise PermissionDenied("Only admins or volunteers can create shift assignments")

@@ -5,14 +5,14 @@ const mockEventService = {
   listEvents: async (params = {}) => {
     await delay();
     let events = [...mockEvents];
-    
+
     if (params.category) {
       events = events.filter(e => e.category === params.category);
     }
     if (params.date) {
       events = events.filter(e => e.date === params.date);
     }
-    
+
     return events;
   },
 
@@ -100,10 +100,55 @@ const mockEventService = {
 
   getParticipantByChessNumber: async (chessNumber, eventId) => {
     await delay();
-    const registration = mockRegistrations.find(r => 
+    const registration = mockRegistrations.find(r =>
       r.chess_number === chessNumber && r.event === parseInt(eventId)
     );
-    return registration ? registration.participant_details : null;
+    return registration || null;
+  },
+
+  lookupParticipantByChessNumber: async (chessNumber) => {
+    await delay();
+
+    const registration = mockRegistrations.find(r => r.chess_number === chessNumber);
+    if (!registration) return null;
+
+    const participant = registration.participant_details || {};
+
+    const participations = mockRegistrations
+      .filter(r => (r.participant === registration.participant) || (
+        r.participant_details?.first_name === participant.first_name &&
+        r.participant_details?.last_name === participant.last_name
+      ))
+      .map(r => {
+        const ev = mockEvents.find(e => e.id === r.event);
+        return {
+          registration_id: r.id,
+          event: ev ? {
+            id: ev.id,
+            name: ev.name,
+            category: ev.category,
+            date: ev.date,
+            start_time: ev.start_time,
+            end_time: ev.end_time,
+            venue: ev.venue,
+          } : { id: r.event },
+          chess_number: r.chess_number,
+          status: r.status,
+          registration_date: r.registration_date,
+        };
+      });
+
+    return {
+      chess_number: chessNumber,
+      participant: {
+        first_name: participant.first_name,
+        last_name: participant.last_name,
+        section: participant.section,
+        student_class: participant.student_class,
+        school: participant.school,
+      },
+      participations,
+    };
   },
 
   listMyRegistrations: async () => {
@@ -117,7 +162,7 @@ const mockEventService = {
     if (!event) {
       throw new Error('Event not found');
     }
-    
+
     const newRegistration = {
       id: mockRegistrations.length + 1,
       event: parseInt(eventId),
@@ -134,7 +179,7 @@ const mockEventService = {
       },
       event_details: event
     };
-    
+
     mockRegistrations.push(newRegistration);
     return newRegistration;
   },

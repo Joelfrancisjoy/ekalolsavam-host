@@ -1,7 +1,22 @@
 import axios from 'axios';
 import authManager from '../utils/authManager';
 
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
+const rawApiUrl = process.env.REACT_APP_API_URL;
+const normalizeApiUrl = (value) => {
+    const fallback = 'http://localhost:8000';
+    if (!value) return fallback;
+    try {
+        const u = new URL(value);
+        const isLocal = u.hostname === 'localhost' || u.hostname === '127.0.0.1';
+        if (isLocal && u.port === '8002') u.port = '8000';
+        return u.toString().replace(/\/$/, '');
+    } catch (_) {
+        const trimmed = String(value).trim().replace(/\/$/, '');
+        if (trimmed === 'http://localhost:8002' || trimmed === 'http://127.0.0.1:8002') return fallback;
+        return trimmed || fallback;
+    }
+};
+const API_URL = normalizeApiUrl(rawApiUrl);
 
 // Import auth debugger with fallback
 let authDebugger = null;

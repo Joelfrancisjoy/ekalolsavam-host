@@ -408,8 +408,9 @@ const EventManagement = () => {
             if (!Array.isArray(formData.judges) || formData.judges.length === 0) throw new Error('Select at least one judge');
 
             // Build payload compliant with backend
+            const { is_published: desiredPublished, ...rest } = formData;
             const payload = {
-                ...formData,
+                ...rest,
                 venue: formData.venue ? Number(formData.venue) : null,
                 judges: formData.judges || [],
                 volunteers: formData.volunteers || [],
@@ -428,22 +429,29 @@ const EventManagement = () => {
                 if (startMinutes < earliest || endMinutes > latest) throw new Error('Events must be between 09:00 and 20:00');
             }
 
+            let saved;
             if (isEditing) {
-                await eventService.updateEvent(editingId, payload);
+                saved = await eventService.updateEvent(editingId, payload);
                 setSuccess('Event updated successfully');
             } else {
-                await eventService.createEvent(payload);
+                saved = await eventService.createEvent(payload);
                 setSuccess('Event created successfully');
             }
 
-            await reloadAllEvents();
-            setActiveTab('list');
-            resetForm();
+            // Apply publish/unpublish via backend status API
+            const desired = !!desiredPublished;
+            const current = !!saved?.is_published;
+            if (saved?.id && desired !== current) {
+                await eventService.publishEvent(saved.id, desired);
+            }
 
-            setTimeout(() => setSuccess(''), 3000);
+            await reloadAllEvents();
+            setTimeout(() => setSuccess(''), 2000);
+            resetForm();
+            setActiveTab('list');
         } catch (err) {
             console.error('Failed to save event', err);
-            const apiMsg = err.response?.data;
+            const apiMsg = err?.response?.data?.error || err?.response?.data?.detail || err?.response?.data;
             let msg = 'Failed to save event';
             if (typeof apiMsg === 'string') {
                 msg = apiMsg;
@@ -453,10 +461,11 @@ const EventManagement = () => {
                         .map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(', ') : v}`)
                         .join(' | ');
                 } catch (_) { /* ignore */ }
-            } else if (err.message) {
+            } else if (err?.message) {
                 msg = err.message;
             }
             setError(msg);
+            setTimeout(() => setError(''), 3000);
         } finally {
             setSaving(false);
         }
@@ -478,9 +487,6 @@ const EventManagement = () => {
         }
     };
 
-    // Replaced by openDeleteConfirm
-    // const handleDelete = async (id) => {
-    //     if (!window.confirm('Delete this event?')) return;
     //     try {
     //         await eventService.deleteEvent(id);
     //         setSuccess('Event deleted');
@@ -531,12 +537,13 @@ const EventManagement = () => {
                         ...updated,
                         judges: (updated && Object.prototype.hasOwnProperty.call(updated, 'judges')) ? updated.judges : e.judges,
                         volunteers: (updated && Object.prototype.hasOwnProperty.call(updated, 'volunteers')) ? updated.volunteers : e.volunteers,
-                      }
+                    }
                     : e
             ));
         } catch (err) {
             console.error('Failed to toggle publish', err);
-            setError('Failed to update publish status');
+            const details = err?.response?.data?.error || err?.response?.data?.detail || err?.message;
+            setError(details ? `Failed to update publish status: ${details}` : 'Failed to update publish status');
             setTimeout(() => setError(''), 3000);
         }
     };
@@ -818,7 +825,7 @@ const EventList = ({ events, venues, judges, volunteers = [], onEdit, onDelete, 
                             {columnsVisible.judges && (
                                 <td className={`px-8 ${density === 'compact' ? 'py-3' : 'py-6'} whitespace-nowrap text-base text-slate-700`}>
                                     <div className="flex flex-wrap gap-2">
-                                        {(((ev.judges && ev.judges.length ? ev.judges : ((ev.judges_details || []).map(u => u.id))) || []).slice(0,3)).map((jid) => (
+                                        {(((ev.judges && ev.judges.length ? ev.judges : ((ev.judges_details || []).map(u => u.id))) || []).slice(0, 3)).map((jid) => (
                                             <span key={jid} className="px-2.5 py-0.5 text-xs bg-indigo-50 text-indigo-700 rounded-full font-semibold border border-indigo-200" title="Judge">
                                                 {judgeName(jid)}
                                             </span>
@@ -832,7 +839,7 @@ const EventList = ({ events, venues, judges, volunteers = [], onEdit, onDelete, 
                             {columnsVisible.volunteers && (
                                 <td className={`px-8 ${density === 'compact' ? 'py-3' : 'py-6'} whitespace-nowrap text-base text-slate-700`}>
                                     <div className="flex flex-wrap gap-2">
-                                        {(((ev.volunteers && ev.volunteers.length ? ev.volunteers : ((ev.volunteers_details || []).map(u => u.id))) || []).slice(0,3)).map((vid) => (
+                                        {(((ev.volunteers && ev.volunteers.length ? ev.volunteers : ((ev.volunteers_details || []).map(u => u.id))) || []).slice(0, 3)).map((vid) => (
                                             <span key={vid} className="px-2.5 py-0.5 text-xs bg-emerald-50 text-emerald-700 rounded-full font-semibold border border-emerald-200" title="Volunteer">
                                                 {volunteerName(vid)}
                                             </span>
@@ -1022,11 +1029,10 @@ const EventForm = ({ venues, judges, volunteers, availableEvents, data, onChange
                                 key={category.value}
                                 type="button"
                                 onClick={() => onChange({ target: { name: 'category', value: category.value } })}
-                                className={`p-6 rounded-xl border-2 transition-all duration-200 text-left hover:shadow-lg ${
-                                    data.category === category.value
-                                        ? 'border-indigo-400 bg-indigo-100 shadow-lg scale-105'
-                                        : 'border-slate-200 bg-white hover:border-slate-300 hover:shadow-md'
-                                }`}
+                                className={`p-6 rounded-xl border-2 transition-all duration-200 text-left hover:shadow-lg ${data.category === category.value
+                                    ? 'border-indigo-400 bg-indigo-100 shadow-lg scale-105'
+                                    : 'border-slate-200 bg-white hover:border-slate-300 hover:shadow-md'
+                                    }`}
                             >
                                 <div className="flex items-center mb-3">
                                     <span className="text-3xl mr-4">{category.icon}</span>
@@ -1048,12 +1054,28 @@ const EventForm = ({ venues, judges, volunteers, availableEvents, data, onChange
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                             <div className="md:col-span-2">
                                 <label className="block text-xl font-semibold text-slate-700 mb-3 font-display">Event Name</label>
-                                <select name="name" value={data.name} onChange={onChange} className="mt-1 block w-full border-slate-300 rounded-lg shadow-sm text-base py-4 px-4 focus:ring-2 focus:ring-green-500 focus:border-green-500" required>
-                                    <option value="">Select an event name</option>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                                     {(availableEvents[data.category] || []).map((eventName) => (
-                                        <option key={eventName} value={eventName}>{eventName}</option>
+                                        <button
+                                            key={eventName}
+                                            type="button"
+                                            onClick={() => onChange({ target: { name: 'name', value: eventName } })}
+                                            className={`p-5 rounded-xl border-2 transition-all duration-200 text-left hover:shadow-lg ${data.name === eventName
+                                                ? 'border-green-400 bg-green-100 shadow-lg scale-[1.02]'
+                                                : 'border-slate-200 bg-white hover:border-slate-300 hover:shadow-md'
+                                                }`}
+                                        >
+                                            <div className="flex items-center justify-between gap-3">
+                                                <span className="text-lg font-bold text-slate-900">{eventName}</span>
+                                                {data.name === eventName && (
+                                                    <span className="text-green-700 font-bold">✓</span>
+                                                )}
+                                            </div>
+                                            <div className="mt-2 text-sm text-slate-600 font-medium">Click to select</div>
+                                        </button>
                                     ))}
-                                </select>
+                                </div>
+                                <input type="hidden" name="name" value={data.name || ''} />
                             </div>
                             <div className="md:col-span-2">
                                 <label className="block text-xl font-semibold text-slate-700 mb-3 font-display">Description</label>

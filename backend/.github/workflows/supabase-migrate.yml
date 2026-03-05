@@ -1,0 +1,139 @@
+name: Supabase Migrate
+
+on:
+  workflow_dispatch:
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install system deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential libpq-dev default-libmysqlclient-dev libssl-dev
+
+      - name: Verify repo paths
+        run: |
+          pwd
+          ls -la
+
+      - name: Install Python deps
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+
+      - name: Verify psycopg installation
+        run: |
+          echo "PIP LIST:"
+          python -m pip list
+          echo "SHOW PACKAGE INFO:"
+          python -m pip show psycopg || true
+          echo "PYTHON IMPORT TESTS:"
+          python -c "import sys; print('Python', sys.version); import psycopg; print('Imported psycopg', getattr(psycopg, '__version__', 'unknown'))"
+
+      - name: Force IPv4 for DATABASE_URL
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DATABASE_HOSTNAME: ${{ secrets.DATABASE_HOSTNAME }}
+        run: |
+          python - <<'PY'
+          import os
+          import ipaddress
+          import socket
+          import urllib.parse
+
+          url = os.environ.get("DATABASE_URL")
+          if not url:
+              raise SystemExit("DATABASE_URL is not set")
+
+          parsed = urllib.parse.urlparse(url)
+          host = parsed.hostname
+          if not host:
+              raise SystemExit("DATABASE_URL has no hostname")
+
+          hostname_override = os.environ.get("DATABASE_HOSTNAME")
+
+          # If the URL already contains an IPv6 literal (e.g. 2406:...), we cannot resolve an IPv4
+          # address from it. In that case, require a hostname override (e.g. db.<ref>.supabase.co).
+          try:
+              ip = ipaddress.ip_address(host)
+              if ip.version == 6:
+                  if not hostname_override:
+                      raise SystemExit(
+                          "DATABASE_URL host appears to be an IPv6 literal. "
+                          "Set a GitHub secret DATABASE_HOSTNAME to your DB hostname (IPv4-resolvable), "
+                          "e.g. db.<project-ref>.supabase.co or the Supabase pooler host."
+                      )
+                  host_to_resolve = hostname_override
+              else:
+                  host_to_resolve = host
+          except ValueError:
+              host_to_resolve = host
+
+          ipv4 = None
+          # Print DNS diagnostics for easier debugging in CI logs
+          v4_candidates = []
+          v6_candidates = []
+          try:
+              for family, _, _, _, sockaddr in socket.getaddrinfo(host_to_resolve, None, socket.AF_UNSPEC):
+                  if family == socket.AF_INET:
+                      v4_candidates.append(sockaddr[0])
+                  elif family == socket.AF_INET6:
+                      v6_candidates.append(sockaddr[0])
+          except socket.gaierror as e:
+              raise SystemExit(f"DNS lookup failed for host '{host_to_resolve}': {e}")
+
+          if v4_candidates:
+              ipv4 = v4_candidates[0]
+
+          if not ipv4:
+              raise SystemExit(
+                  f"Could not resolve an IPv4 address for host: {host_to_resolve}. "
+                  f"IPv4 candidates: {v4_candidates}. IPv6 candidates: {v6_candidates}. "
+                  "GitHub-hosted runners often lack IPv6 egress. Use a Supabase pooler hostname "
+                  "(transaction pooler) that has an A record, or run this workflow on a self-hosted runner with IPv6."
+              )
+
+          # If a hostname override is provided, also rewrite the URL host to that hostname.
+          # This helps TLS / SNI validation while hostaddr forces the IPv4 connection.
+          if hostname_override:
+              userinfo = ""
+              if parsed.username:
+                  userinfo += urllib.parse.quote(parsed.username, safe="")
+              if parsed.password:
+                  userinfo += ":" + urllib.parse.quote(parsed.password, safe="")
+              if userinfo:
+                  userinfo += "@"
+
+              port = parsed.port
+              netloc = f"{userinfo}{hostname_override}" + (f":{port}" if port else "")
+              parsed = parsed._replace(netloc=netloc)
+
+          qs = urllib.parse.parse_qs(parsed.query, keep_blank_values=True)
+          qs["hostaddr"] = [ipv4]
+          new_query = urllib.parse.urlencode(qs, doseq=True)
+          new_url = parsed._replace(query=new_query).geturl()
+
+          github_env = os.environ.get("GITHUB_ENV")
+          if not github_env:
+              raise SystemExit("GITHUB_ENV is not set")
+          with open(github_env, "a", encoding="utf-8") as f:
+              f.write(f"DATABASE_URL={new_url}\n")
+          PY
+
+      - name: Prepare for migration
+        env:
+          SECRET_KEY: ${{ secrets.SECRET_KEY }}
+          DEBUG: 'False'
+        run: |
+          python manage.py migrate --noinput
+          # collectstatic is optional; allow it to fail harmlessly if staticfiles not configured
+          python manage.py collectstatic --noinput || true

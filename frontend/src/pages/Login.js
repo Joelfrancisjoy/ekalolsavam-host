@@ -11,6 +11,13 @@ const Login = () => {
   const navigate = useNavigate();
   const { t } = useTranslation();
   const [isLogin, setIsLogin] = useState(true);
+  const festivalNotes = [
+    'Where every stage becomes a story.',
+    'Celebrate rhythm, color, and community.',
+    'Your performances. Your pride. One festival.',
+    'From rehearsal to spotlight — manage it here.',
+  ];
+  const [activeNoteIndex, setActiveNoteIndex] = useState(0);
   const [formData, setFormData] = useState({
     username: '',
     email: '',
@@ -41,12 +48,12 @@ const Login = () => {
     // Check if user is coming from logout or has invalid tokens
     const urlParams = new URLSearchParams(window.location.search);
     const logoutParam = urlParams.get('logout');
-    
+
     // If there's a logout parameter or user is authenticated, clear any existing tokens to force refresh
     if (logoutParam || authManager.isAuthenticated()) {
       // Clear tokens to reset authentication state
       authManager.clearTokens();
-      
+
       // Remove logout param from URL if present to avoid repeated clearing
       if (logoutParam) {
         urlParams.delete('logout');
@@ -66,6 +73,13 @@ const Login = () => {
         .catch(() => setSchools([]));
     }
   }, [isLogin]);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setActiveNoteIndex((i) => (i + 1) % festivalNotes.length);
+    }, 4500);
+    return () => clearInterval(interval);
+  }, [festivalNotes.length]);
 
   const handleInputChange = (e) => {
     setFormData({
@@ -517,440 +531,493 @@ const Login = () => {
 
       {/* Main Content */}
       <div className="relative flex items-center justify-center min-h-[calc(100vh-120px)] px-4 sm:px-6 lg:px-8 py-12">
-        <div className="max-w-lg w-full space-y-8">
-          {/* Login Card */}
-          <div className="bg-white/95 backdrop-blur-sm rounded-3xl shadow-2xl p-8 border-2 border-amber-200/50 relative overflow-hidden">
-            {/* Decorative Corner Elements */}
-            <div className="absolute top-0 right-0 w-20 h-20 opacity-10">
-              <svg viewBox="0 0 100 100" className="w-full h-full text-amber-600">
-                <path d="M0,0 Q50,25 100,0 L100,50 Q75,25 100,100 L50,100 Q25,75 0,100 Z" fill="currentColor" />
-              </svg>
-            </div>
+        <div className="max-w-5xl w-full">
+          <div className="grid grid-cols-1 lg:grid-cols-5 gap-8 items-stretch">
+            <div className="lg:col-span-2">
+              <div className="h-full bg-white/70 backdrop-blur-sm rounded-3xl border-2 border-amber-200/60 shadow-xl p-8 relative overflow-hidden">
+                <div className="absolute -top-10 -left-10 w-48 h-48 rounded-full bg-gradient-to-br from-amber-200/50 to-orange-200/40 blur-2xl" />
+                <div className="absolute -bottom-16 -right-12 w-64 h-64 rounded-full bg-gradient-to-br from-orange-200/40 to-amber-200/30 blur-3xl" />
 
-            {/* Card Header */}
-            <div className="text-center mb-8 relative">
-              <div className="mx-auto w-20 h-20 bg-gradient-to-br from-amber-500 to-orange-500 rounded-full flex items-center justify-center mb-6 shadow-lg relative">
-                <svg className="w-10 h-10 text-white" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M12,2A3,3 0 0,1 15,5V11A3,3 0 0,1 12,14A3,3 0 0,1 9,11V5A3,3 0 0,1 12,2M19,11C19,14.53 16.39,17.44 13,17.93V21H11V17.93C7.61,17.44 5,14.53 5,11H7A5,5 0 0,0 12,16A5,5 0 0,0 17,11H19Z" />
-                </svg>
-                {/* Decorative Ring */}
-                <div className="absolute inset-0 rounded-full border-4 border-amber-300/30 animate-pulse"></div>
+                <div className="relative">
+                  <div className="inline-flex items-center gap-3 px-4 py-2 rounded-full bg-amber-50/90 border border-amber-200 text-amber-800 shadow-sm">
+                    <span className="w-2 h-2 rounded-full bg-orange-500 animate-pulse" />
+                    <span className="text-sm font-semibold tracking-wide">Arts Festival Program</span>
+                  </div>
+
+                  <h2 className="mt-6 text-4xl font-extrabold text-amber-900 leading-tight">
+                    E-Kalolsavam
+                    <span className="block text-orange-700 font-bold">Portal Access</span>
+                  </h2>
+
+                  <div className="mt-6 rounded-2xl border border-amber-200 bg-white/80 p-5 shadow-sm">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-amber-700">Festival Note</p>
+                    <p key={activeNoteIndex} className="mt-2 text-base font-medium text-amber-900 leading-relaxed">
+                      {festivalNotes[activeNoteIndex]}
+                    </p>
+                    <div className="mt-4 grid grid-cols-3 gap-2">
+                      {festivalNotes.map((_, idx) => (
+                        <div
+                          key={idx}
+                          className={
+                            'h-1.5 rounded-full transition-all duration-300 ' +
+                            (idx === activeNoteIndex ? 'bg-gradient-to-r from-amber-600 to-orange-600' : 'bg-amber-200/80')
+                          }
+                        />
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="mt-6 grid grid-cols-2 gap-4">
+                    <div className="rounded-2xl border border-amber-200/70 bg-amber-50/70 p-4">
+                      <p className="text-xs font-semibold text-amber-700">Secure access</p>
+                      <p className="mt-1 text-sm text-amber-900">Role-based dashboards</p>
+                    </div>
+                    <div className="rounded-2xl border border-amber-200/70 bg-amber-50/70 p-4">
+                      <p className="text-xs font-semibold text-amber-700">Fast sign-in</p>
+                      <p className="mt-1 text-sm text-amber-900">Email / Google options</p>
+                    </div>
+                  </div>
+
+                  <div className="mt-6 text-sm text-amber-800/90 leading-relaxed">
+                    Use your credentials to continue. If you’re registering, keep your ID photo ready for verification.
+                  </div>
+                </div>
               </div>
-              <h2 className="text-4xl font-bold text-amber-800 mb-3 tracking-wide">
-                {isLogin ? t('login') : t('signup')}
-              </h2>
-              <p className="text-orange-600 font-medium">
-                {isLogin ? 'Welcome back to the cultural celebration!' : 'Join our vibrant cultural community'}
-              </p>
             </div>
 
-            {/* Error Message */}
-            {error && (
-              <div className="bg-red-50 border-l-4 border-red-500 p-4 mb-6 rounded-r-xl">
-                <div className="flex">
-                  <div className="flex-shrink-0">
-                    <svg className="h-5 w-5 text-red-500" viewBox="0 0 20 20" fill="currentColor">
-                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+            <div className="lg:col-span-3">
+              <div className="bg-white/95 backdrop-blur-sm rounded-3xl shadow-2xl p-8 border-2 border-amber-200/50 relative overflow-hidden">
+                {/* Decorative Corner Elements */}
+                <div className="absolute top-0 right-0 w-20 h-20 opacity-10">
+                  <svg viewBox="0 0 100 100" className="w-full h-full text-amber-600">
+                    <path d="M0,0 Q50,25 100,0 L100,50 Q75,25 100,100 L50,100 Q25,75 0,100 Z" fill="currentColor" />
+                  </svg>
+                </div>
+
+                {/* Card Header */}
+                <div className="text-center mb-8 relative">
+                  <div className="mx-auto w-20 h-20 bg-gradient-to-br from-amber-500 to-orange-500 rounded-full flex items-center justify-center mb-6 shadow-lg relative">
+                    <svg className="w-10 h-10 text-white" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M12 3C14.76 3 17 5.24 17 8C17 9.93 15.98 11.62 14.45 12.5C15.78 13.46 16.7 15.03 16.93 16.82L17 17.5H7L7.07 16.82C7.3 15.03 8.22 13.46 9.55 12.5C8.02 11.62 7 9.93 7 8C7 5.24 9.24 3 12 3ZM5 19H19V21H5V19Z" />
                     </svg>
+                    {/* Decorative Ring */}
+                    <div className="absolute inset-0 rounded-full border-4 border-amber-300/30 animate-pulse"></div>
                   </div>
-                  <div className="ml-3">
-                    <p className="text-sm text-red-700 font-medium">{error}</p>
-                  </div>
+                  <h2 className="text-4xl font-bold text-amber-800 mb-3 tracking-wide">
+                    {isLogin ? t('login') : t('signup')}
+                  </h2>
+                  <p className="text-orange-600 font-medium">
+                    {isLogin ? 'Welcome back to the cultural celebration!' : 'Join our vibrant cultural community'}
+                  </p>
                 </div>
-              </div>
-            )}
 
-            {/* Form */}
-            <form onSubmit={handleSubmit} className="space-y-6">
-              {!isLogin && (
-                <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-                  <div>
-                    <label className="block text-sm font-semibold text-amber-800 mb-2">
-                      First Name
-                    </label>
-                    <input
-                      type="text"
-                      name="first_name"
-                      value={formData.first_name}
-                      onChange={handleInputChange}
-                      className="w-full px-4 py-3 border-2 border-amber-200 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-amber-500 transition-all duration-200 bg-amber-50/50 focus:bg-white text-amber-900 placeholder-amber-400"
-                      required={!isLogin}
-                      placeholder="Enter first name"
-                    />
-                    {fieldErrors?.first_name && (
-                      <p className="mt-1 text-sm text-red-600">{String(fieldErrors.first_name)}</p>
-                    )}
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-semibold text-amber-800 mb-2">
-                      Last Name
-                    </label>
-                    <input
-                      type="text"
-                      name="last_name"
-                      value={formData.last_name}
-                      onChange={handleInputChange}
-                      className="w-full px-4 py-3 border-2 border-amber-200 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-amber-500 transition-all duration-200 bg-amber-50/50 focus:bg-white text-amber-900 placeholder-amber-400"
-                      required={!isLogin}
-                      placeholder="Enter last name"
-                    />
-                    {fieldErrors?.last_name && (
-                      <p className="mt-1 text-sm text-red-600">{String(fieldErrors.last_name)}</p>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {!isLogin && (
-                <>
-                  <div>
-                    <label className="block text-sm font-semibold text-amber-800 mb-2">
-                      Email Address
-                    </label>
-                    <input
-                      type="email"
-                      name="email"
-                      value={formData.email}
-                      onChange={(e) => { handleInputChange(e); debouncedValidateEmail(e.target.value); }}
-                      onBlur={() => validateEmailNow(formData.email)}
-                      className="w-full px-4 py-3 border-2 border-amber-200 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-amber-500 transition-all duration-200 bg-amber-50/50 focus:bg-white text-amber-900 placeholder-amber-400"
-                      required={!isLogin}
-                      placeholder="Enter your email"
-                    />
-                    {emailWarning && (
-                      <div className="mt-2 inline-flex items-center px-3 py-2 text-sm bg-amber-50 text-amber-800 border border-amber-200 rounded-lg shadow-sm">
-                        <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                          <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                {/* Error Message */}
+                {error && (
+                  <div className="bg-red-50 border-l-4 border-red-500 p-4 mb-6 rounded-r-xl">
+                    <div className="flex">
+                      <div className="flex-shrink-0">
+                        <svg className="h-5 w-5 text-red-500" viewBox="0 0 20 20" fill="currentColor">
+                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
                         </svg>
-                        {emailWarning}
                       </div>
-                    )}
-                    {!emailWarning && (
-                      <EmailValidationChecker
-                        email={formData.email}
-                        onValidationChange={setEmailValidForGoogle}
-                      />
-                    )}
-                    {fieldErrors?.email && (
-                      <p className="mt-1 text-sm text-red-600">{String(fieldErrors.email)}</p>
-                    )}
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-semibold text-amber-800 mb-2">
-                      Phone Number
-                    </label>
-                    <input
-                      type="text"
-                      name="phone"
-                      value={formData.phone}
-                      onChange={handleInputChange}
-                      inputMode="numeric"
-                      pattern="[0-9]*"
-                      onBlur={() => validatePhoneNow(formData.phone)}
-                      maxLength={10}
-                      className="w-full px-4 py-3 border-2 border-amber-200 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-amber-500 transition-all duration-200 bg-amber-50/50 focus:bg-white text-amber-900 placeholder-amber-400"
-                      placeholder="Enter phone number"
-                      required
-                    />
-                    {phoneWarning && (
-                      <div className="mt-2 inline-flex items-center px-3 py-2 text-sm bg-amber-50 text-amber-800 border border-amber-200 rounded-lg shadow-sm">
-                        <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                          <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                        </svg>
-                        {phoneWarning}
+                      <div className="ml-3">
+                        <p className="text-sm text-red-700 font-medium">{error}</p>
                       </div>
-                    )}
-                    {fieldErrors?.phone && (
-                      <p className="mt-1 text-sm text-red-600">{String(fieldErrors.phone)}</p>
-                    )}
+                    </div>
                   </div>
+                )}
 
-                  <div>
-                    <label className="block text-sm font-semibold text-amber-800 mb-2">
-                      Role
-                    </label>
-                    <select
-                      name="role"
-                      value={formData.role}
-                      onChange={(e) => {
-                        handleInputChange(e);
-                        // Reset student-only fields when switching role
-                        if (e.target.value !== 'student') {
-                          setCollegeIdFile(null);
-                          setSelectedSchoolId('');
-                          setSchoolCategoryExtra('');
-                        }
-                        if (e.target.value !== 'volunteer') {
-                          setStaffIdFile(null);
-                        }
-                        if (e.target.value !== 'judge') {
-                          setJudgeIdFile(null);
-                        }
-                      }}
-                      className="w-full px-4 py-3 border-2 border-amber-200 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-amber-500 transition-all duration-200 bg-amber-50/50 focus:bg-white text-amber-900"
-                    >
-                      <option value="student">Student</option>
-                      <option value="judge">Judge</option>
-                      <option value="volunteer">Volunteer</option>
-                    </select>
-                    {fieldErrors?.role && (
-                      <p className="mt-1 text-sm text-red-600">{String(fieldErrors.role)}</p>
-                    )}
-                  </div>
-
-                  {formData.role === 'student' && (
-                    <>
-                      {/* School selection (required) */}
+                {/* Form */}
+                <form onSubmit={handleSubmit} className="space-y-6">
+                  {!isLogin && (
+                    <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
                       <div>
-                        <label className="block text-sm font-semibold text-amber-800 mb-2">School</label>
-                        <select
-                          value={selectedSchoolId}
-                          onChange={(e) => setSelectedSchoolId(e.target.value)}
-                          className="w-full px-4 py-3 border-2 border-amber-200 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-amber-500 transition-all duration-200 bg-amber-50/50 focus:bg-white text-amber-900"
-                          required
-                        >
-                          <option value="">Select your school</option>
-                          {/* Group by category */}
-                          {['LP', 'UP', 'HS', 'HSS'].map((cat) => (
-                            <optgroup key={cat} label={cat}>
-                              {schools
-                                .filter((s) => s.is_active && s.category === cat)
-                                .map((s) => (
-                                  <option key={s.id} value={s.id}>{s.name}</option>
-                                ))}
-                            </optgroup>
-                          ))}
-                        </select>
+                        <label className="block text-sm font-semibold text-amber-800 mb-2">
+                          First Name
+                        </label>
+                        <input
+                          type="text"
+                          name="first_name"
+                          value={formData.first_name}
+                          onChange={handleInputChange}
+                          className="w-full px-4 py-3 border-2 border-amber-200 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-amber-500 transition-all duration-200 bg-amber-50/50 focus:bg-white text-amber-900 placeholder-amber-400"
+                          required={!isLogin}
+                          placeholder="Enter first name"
+                        />
+                        {fieldErrors?.first_name && (
+                          <p className="mt-1 text-sm text-red-600">{String(fieldErrors.first_name)}</p>
+                        )}
                       </div>
 
-                      {/* Additional dropdown for non-LP */}
-                      {schools.find((s) => String(s.id) === String(selectedSchoolId))?.category !== 'LP' && (
-                        <div>
-                          <label className="block text-sm font-semibold text-amber-800 mb-2">Category Details</label>
-                          <select
-                            value={schoolCategoryExtra}
-                            onChange={(e) => setSchoolCategoryExtra(e.target.value)}
-                            className="w-full px-4 py-3 border-2 border-amber-200 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-amber-500 transition-all duration-200 bg-amber-50/50 focus:bg-white text-amber-900"
-                            required
-                          >
-                            <option value="">Select category</option>
-                            <option value="UP">UP</option>
-                            <option value="HS">HS</option>
-                            <option value="HSS">HSS</option>
-                          </select>
-                          {fieldErrors?.school_category_extra && (
-                            <p className="mt-1 text-sm text-red-600">{String(fieldErrors.school_category_extra)}</p>
+                      <div>
+                        <label className="block text-sm font-semibold text-amber-800 mb-2">
+                          Last Name
+                        </label>
+                        <input
+                          type="text"
+                          name="last_name"
+                          value={formData.last_name}
+                          onChange={handleInputChange}
+                          className="w-full px-4 py-3 border-2 border-amber-200 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-amber-500 transition-all duration-200 bg-amber-50/50 focus:bg-white text-amber-900 placeholder-amber-400"
+                          required={!isLogin}
+                          placeholder="Enter last name"
+                        />
+                        {fieldErrors?.last_name && (
+                          <p className="mt-1 text-sm text-red-600">{String(fieldErrors.last_name)}</p>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {!isLogin && (
+                    <>
+                      <div>
+                        <label className="block text-sm font-semibold text-amber-800 mb-2">
+                          Email Address
+                        </label>
+                        <input
+                          type="email"
+                          name="email"
+                          value={formData.email}
+                          onChange={(e) => { handleInputChange(e); debouncedValidateEmail(e.target.value); }}
+                          onBlur={() => validateEmailNow(formData.email)}
+                          className="w-full px-4 py-3 border-2 border-amber-200 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-amber-500 transition-all duration-200 bg-amber-50/50 focus:bg-white text-amber-900 placeholder-amber-400"
+                          required={!isLogin}
+                          placeholder="Enter your email"
+                        />
+                        {emailWarning && (
+                          <div className="mt-2 inline-flex items-center px-3 py-2 text-sm bg-amber-50 text-amber-800 border border-amber-200 rounded-lg shadow-sm">
+                            <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                            </svg>
+                            {emailWarning}
+                          </div>
+                        )}
+                        {!emailWarning && (
+                          <EmailValidationChecker
+                            email={formData.email}
+                            onValidationChange={setEmailValidForGoogle}
+                          />
+                        )}
+                        {fieldErrors?.email && (
+                          <p className="mt-1 text-sm text-red-600">{String(fieldErrors.email)}</p>
+                        )}
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-semibold text-amber-800 mb-2">
+                          Phone Number
+                        </label>
+                        <input
+                          type="text"
+                          name="phone"
+                          value={formData.phone}
+                          onChange={handleInputChange}
+                          inputMode="numeric"
+                          pattern="[0-9]*"
+                          onBlur={() => validatePhoneNow(formData.phone)}
+                          maxLength={10}
+                          className="w-full px-4 py-3 border-2 border-amber-200 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-amber-500 transition-all duration-200 bg-amber-50/50 focus:bg-white text-amber-900 placeholder-amber-400"
+                          placeholder="Enter phone number"
+                          required
+                        />
+                        {phoneWarning && (
+                          <div className="mt-2 inline-flex items-center px-3 py-2 text-sm bg-amber-50 text-amber-800 border border-amber-200 rounded-lg shadow-sm">
+                            <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                            </svg>
+                            {phoneWarning}
+                          </div>
+                        )}
+                        {fieldErrors?.phone && (
+                          <p className="mt-1 text-sm text-red-600">{String(fieldErrors.phone)}</p>
+                        )}
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-semibold text-amber-800 mb-2">
+                          Role
+                        </label>
+                        <select
+                          name="role"
+                          value={formData.role}
+                          onChange={(e) => {
+                            handleInputChange(e);
+                            // Reset student-only fields when switching role
+                            if (e.target.value !== 'student') {
+                              setCollegeIdFile(null);
+                              setSelectedSchoolId('');
+                              setSchoolCategoryExtra('');
+                            }
+                            if (e.target.value !== 'volunteer') {
+                              setStaffIdFile(null);
+                            }
+                            if (e.target.value !== 'judge') {
+                              setJudgeIdFile(null);
+                            }
+                          }}
+                          className="w-full px-4 py-3 border-2 border-amber-200 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-amber-500 transition-all duration-200 bg-amber-50/50 focus:bg-white text-amber-900"
+                        >
+                          <option value="student">Student</option>
+                          <option value="judge">Judge</option>
+                          <option value="volunteer">Volunteer</option>
+                        </select>
+                        {fieldErrors?.role && (
+                          <p className="mt-1 text-sm text-red-600">{String(fieldErrors.role)}</p>
+                        )}
+                      </div>
+
+                      {formData.role === 'student' && (
+                        <>
+                          {/* School selection (required) */}
+                          <div>
+                            <label className="block text-sm font-semibold text-amber-800 mb-2">School</label>
+                            <select
+                              value={selectedSchoolId}
+                              onChange={(e) => setSelectedSchoolId(e.target.value)}
+                              className="w-full px-4 py-3 border-2 border-amber-200 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-amber-500 transition-all duration-200 bg-amber-50/50 focus:bg-white text-amber-900"
+                              required
+                            >
+                              <option value="">Select your school</option>
+                              {/* Group by category */}
+                              {['LP', 'UP', 'HS', 'HSS'].map((cat) => (
+                                <optgroup key={cat} label={cat}>
+                                  {schools
+                                    .filter((s) => s.is_active && s.category === cat)
+                                    .map((s) => (
+                                      <option key={s.id} value={s.id}>{s.name}</option>
+                                    ))}
+                                </optgroup>
+                              ))}
+                            </select>
+                          </div>
+
+                          {/* Additional dropdown for non-LP */}
+                          {schools.find((s) => String(s.id) === String(selectedSchoolId))?.category !== 'LP' && (
+                            <div>
+                              <label className="block text-sm font-semibold text-amber-800 mb-2">Category Details</label>
+                              <select
+                                value={schoolCategoryExtra}
+                                onChange={(e) => setSchoolCategoryExtra(e.target.value)}
+                                className="w-full px-4 py-3 border-2 border-amber-200 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-amber-500 transition-all duration-200 bg-amber-50/50 focus:bg-white text-amber-900"
+                                required
+                              >
+                                <option value="">Select category</option>
+                                <option value="UP">UP</option>
+                                <option value="HS">HS</option>
+                                <option value="HSS">HSS</option>
+                              </select>
+                              {fieldErrors?.school_category_extra && (
+                                <p className="mt-1 text-sm text-red-600">{String(fieldErrors.school_category_extra)}</p>
+                              )}
+                            </div>
                           )}
-                        </div>
+
+                          {/* College ID (JPEG only) */}
+                          <div>
+                            <label className="block text-sm font-semibold text-amber-800 mb-2">College ID (JPEG)</label>
+                            <input
+                              type="file"
+                              accept=".jpg,.jpeg,image/jpeg"
+                              onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                setCollegeIdFile(file || null);
+                              }}
+                              className="w-full"
+                              required
+                            />
+                            <p className="text-xs text-amber-600 mt-1">Upload a clear photo of your college ID. Only .jpg or .jpeg allowed.</p>
+                            {fieldErrors?.college_id_photo && (
+                              <p className="mt-1 text-sm text-red-600">{String(fieldErrors.college_id_photo)}</p>
+                            )}
+                          </div>
+                        </>
                       )}
 
-                      {/* College ID (JPEG only) */}
-                      <div>
-                        <label className="block text-sm font-semibold text-amber-800 mb-2">College ID (JPEG)</label>
-                        <input
-                          type="file"
-                          accept=".jpg,.jpeg,image/jpeg"
-                          onChange={(e) => {
-                            const file = e.target.files?.[0];
-                            setCollegeIdFile(file || null);
-                          }}
-                          className="w-full"
-                          required
-                        />
-                        <p className="text-xs text-amber-600 mt-1">Upload a clear photo of your college ID. Only .jpg or .jpeg allowed.</p>
-                        {fieldErrors?.college_id_photo && (
-                          <p className="mt-1 text-sm text-red-600">{String(fieldErrors.college_id_photo)}</p>
-                        )}
-                      </div>
+                      {formData.role === 'volunteer' && (
+                        <>
+                          {/* Staff ID (JPEG only) */}
+                          <div>
+                            <label className="block text-sm font-semibold text-amber-800 mb-2">Staff ID (JPEG)</label>
+                            <input
+                              type="file"
+                              accept=".jpg,.jpeg,image/jpeg"
+                              onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                setStaffIdFile(file || null);
+                              }}
+                              className="w-full"
+                              required
+                            />
+                            <p className="text-xs text-amber-600 mt-1">Upload a clear photo of your staff ID. Only .jpg or .jpeg allowed.</p>
+                            {fieldErrors?.staff_id_photo && (
+                              <p className="mt-1 text-sm text-red-600">{String(fieldErrors.staff_id_photo)}</p>
+                            )}
+                          </div>
+                        </>
+                      )}
+
+                      {formData.role === 'judge' && (
+                        <>
+                          {/* Judge Photo ID (JPEG only) */}
+                          <div>
+                            <label className="block text-sm font-semibold text-amber-800 mb-2">Photo ID (JPEG)</label>
+                            <input
+                              type="file"
+                              accept=".jpg,.jpeg,image/jpeg,image/png"
+                              onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                setJudgeIdFile(file || null);
+                              }}
+                              className="w-full"
+                              required
+                            />
+                            <p className="text-xs text-amber-600 mt-1">Upload a clear photo of your ID. Only .jpg or .jpeg allowed.</p>
+                            {fieldErrors?.judge_id_photo && (
+                              <p className="mt-1 text-sm text-red-600">{String(fieldErrors.judge_id_photo)}</p>
+                            )}
+                          </div>
+                        </>
+                      )}
                     </>
                   )}
 
-                  {formData.role === 'volunteer' && (
-                    <>
-                      {/* Staff ID (JPEG only) */}
-                      <div>
-                        <label className="block text-sm font-semibold text-amber-800 mb-2">Staff ID (JPEG)</label>
-                        <input
-                          type="file"
-                          accept=".jpg,.jpeg,image/jpeg"
-                          onChange={(e) => {
-                            const file = e.target.files?.[0];
-                            setStaffIdFile(file || null);
-                          }}
-                          className="w-full"
-                          required
-                        />
-                        <p className="text-xs text-amber-600 mt-1">Upload a clear photo of your staff ID. Only .jpg or .jpeg allowed.</p>
-                        {fieldErrors?.staff_id_photo && (
-                          <p className="mt-1 text-sm text-red-600">{String(fieldErrors.staff_id_photo)}</p>
-                        )}
-                      </div>
-                    </>
-                  )}
 
-                  {formData.role === 'judge' && (
-                    <>
-                      {/* Judge Photo ID (JPEG only) */}
-                      <div>
-                        <label className="block text-sm font-semibold text-amber-800 mb-2">Photo ID (JPEG)</label>
-                        <input
-                          type="file"
-                          accept=".jpg,.jpeg,image/jpeg,image/png"
-                          onChange={(e) => {
-                            const file = e.target.files?.[0];
-                            setJudgeIdFile(file || null);
-                          }}
-                          className="w-full"
-                          required
-                        />
-                        <p className="text-xs text-amber-600 mt-1">Upload a clear photo of your ID. Only .jpg or .jpeg allowed.</p>
-                        {fieldErrors?.judge_id_photo && (
-                          <p className="mt-1 text-sm text-red-600">{String(fieldErrors.judge_id_photo)}</p>
-                        )}
-                      </div>
-                    </>
-                  )}
-                </>
-              )}
-
-
-              <div>
-                <label className="block text-sm font-semibold text-amber-800 mb-2">
-                  Username
-                </label>
-                <input
-                  type="text"
-                  name="username"
-                  value={formData.username}
-                  onChange={handleInputChange}
-                  className="w-full px-4 py-3 border-2 border-amber-200 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-amber-500 transition-all duration-200 bg-amber-50/50 focus:bg-white text-amber-900 placeholder-amber-400"
-                  required={isLogin || formData.role !== 'judge'}
-                  placeholder="Enter your username"
-                />
-                {isLogin && loginEmailWarning && (
-                  <p className="mt-1 text-sm text-red-600">{loginEmailWarning}</p>
-                )}
-                {!isLogin && usernameCheckMsg && (
-                  <p className="mt-1 text-sm text-red-600">{usernameCheckMsg}</p>
-                )}
-                {fieldErrors?.username && (
-                  <p className="mt-1 text-sm text-red-600">{String(fieldErrors.username)}</p>
-                )}
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold text-amber-800 mb-2">
-                  Password
-                </label>
-                <input
-                  type="password"
-                  name="password"
-                  value={formData.password}
-                  onChange={handleInputChange}
-                  className="w-full px-4 py-3 border-2 border-amber-200 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-amber-500 transition-all duration-200 bg-amber-50/50 focus:bg-white text-amber-900 placeholder-amber-400"
-                  required={isLogin || formData.role !== 'judge'}
-                  placeholder="Enter your password"
-                />
-                {fieldErrors?.password && (
-                  <p className="mt-1 text-sm text-red-600">{String(fieldErrors.password)}</p>
-                )}
-              </div>
-
-              {!isLogin && (
-                <div>
-                  <label className="block text-sm font-semibold text-amber-800 mb-2">
-                    Confirm Password
-                  </label>
-                  <input
-                    type="password"
-                    name="password_confirm"
-                    value={formData.password_confirm}
-                    onChange={handleInputChange}
-                    className="w-full px-4 py-3 border-2 border-amber-200 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-amber-500 transition-all duration-200 bg-amber-50/50 focus:bg-white text-amber-900 placeholder-amber-400"
-                    required={!isLogin}
-                    placeholder="Confirm your password"
-                  />
-                  {fieldErrors?.password_confirm && (
-                    <p className="mt-1 text-sm text-red-600">{String(fieldErrors.password_confirm)}</p>
-                  )}
-                </div>
-              )}
-
-              <button
-                type="submit"
-                className="w-full bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700 text-white font-bold py-4 px-6 rounded-xl transition-all duration-200 transform hover:scale-[1.02] focus:outline-none focus:ring-4 focus:ring-amber-300 shadow-lg hover:shadow-xl"
-              >
-                {isLogin ? t('login') : t('signup')}
-              </button>
-            </form>
-
-            {/* Google Login, only if provider is configured */}
-            {process.env.REACT_APP_GOOGLE_CLIENT_ID ? (
-              <div className="mt-8">
-                <div className="relative">
-                  <div className="absolute inset-0 flex items-center">
-                    <div className="w-full border-t-2 border-amber-200"></div>
-                  </div>
-                  <div className="relative flex justify-center text-sm">
-                    <span className="px-4 bg-white text-orange-600 font-semibold">
-                      Or continue with
-                    </span>
-                  </div>
-                </div>
-
-                <div className="mt-6 flex justify-center">
-                  <div className="w-full max-w-xs">
-                    <GoogleLogin
-                      onSuccess={handleGoogleSuccess}
-                      onError={handleGoogleFailure}
-                      useOneTap={false}
-                      theme="outline"
-                      size="large"
-                      width={300}
+                  <div>
+                    <label className="block text-sm font-semibold text-amber-800 mb-2">
+                      Username
+                    </label>
+                    <input
+                      type="text"
+                      name="username"
+                      value={formData.username}
+                      onChange={handleInputChange}
+                      className="w-full px-4 py-3 border-2 border-amber-200 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-amber-500 transition-all duration-200 bg-amber-50/50 focus:bg-white text-amber-900 placeholder-amber-400"
+                      required={isLogin || formData.role !== 'judge'}
+                      placeholder="Enter your username"
                     />
+                    {isLogin && loginEmailWarning && (
+                      <p className="mt-1 text-sm text-red-600">{loginEmailWarning}</p>
+                    )}
+                    {!isLogin && usernameCheckMsg && (
+                      <p className="mt-1 text-sm text-red-600">{usernameCheckMsg}</p>
+                    )}
+                    {fieldErrors?.username && (
+                      <p className="mt-1 text-sm text-red-600">{String(fieldErrors.username)}</p>
+                    )}
                   </div>
-                </div>
 
-                {/* Google Login Info */}
-                <div className="mt-4 text-center">
-                  <p className="text-xs text-amber-600 bg-amber-50 px-3 py-2 rounded-lg border border-amber-200">
-                    <svg className="w-4 h-4 inline mr-1 text-amber-500" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-                    </svg>
-                    Sign in with your Google account to get started quickly.
-                  </p>
+                  <div>
+                    <label className="block text-sm font-semibold text-amber-800 mb-2">
+                      Password
+                    </label>
+                    <input
+                      type="password"
+                      name="password"
+                      value={formData.password}
+                      onChange={handleInputChange}
+                      className="w-full px-4 py-3 border-2 border-amber-200 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-amber-500 transition-all duration-200 bg-amber-50/50 focus:bg-white text-amber-900 placeholder-amber-400"
+                      required={isLogin || formData.role !== 'judge'}
+                      placeholder="Enter your password"
+                    />
+                    {fieldErrors?.password && (
+                      <p className="mt-1 text-sm text-red-600">{String(fieldErrors.password)}</p>
+                    )}
+                  </div>
+
+                  {!isLogin && (
+                    <div>
+                      <label className="block text-sm font-semibold text-amber-800 mb-2">
+                        Confirm Password
+                      </label>
+                      <input
+                        type="password"
+                        name="password_confirm"
+                        value={formData.password_confirm}
+                        onChange={handleInputChange}
+                        className="w-full px-4 py-3 border-2 border-amber-200 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-amber-500 transition-all duration-200 bg-amber-50/50 focus:bg-white text-amber-900 placeholder-amber-400"
+                        required={!isLogin}
+                        placeholder="Confirm your password"
+                      />
+                      {fieldErrors?.password_confirm && (
+                        <p className="mt-1 text-sm text-red-600">{String(fieldErrors.password_confirm)}</p>
+                      )}
+                    </div>
+                  )}
+
+                  <button
+                    type="submit"
+                    className="w-full bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700 text-white font-bold py-4 px-6 rounded-xl transition-all duration-200 transform hover:scale-[1.02] focus:outline-none focus:ring-4 focus:ring-amber-300 shadow-lg hover:shadow-xl"
+                  >
+                    {isLogin ? t('login') : t('signup')}
+                  </button>
+                </form>
+
+                {/* Google Login, only if provider is configured */}
+                {process.env.REACT_APP_GOOGLE_CLIENT_ID ? (
+                  <div className="mt-8">
+                    <div className="relative">
+                      <div className="absolute inset-0 flex items-center">
+                        <div className="w-full border-t-2 border-amber-200"></div>
+                      </div>
+                      <div className="relative flex justify-center text-sm">
+                        <span className="px-4 bg-white text-orange-600 font-semibold">
+                          Or continue with
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="mt-6 flex justify-center">
+                      <div className="w-full max-w-xs">
+                        <GoogleLogin
+                          onSuccess={handleGoogleSuccess}
+                          onError={handleGoogleFailure}
+                          useOneTap={false}
+                          theme="outline"
+                          size="large"
+                          width={300}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Google Login Info */}
+                    <div className="mt-4 text-center">
+                      <p className="text-xs text-amber-600 bg-amber-50 px-3 py-2 rounded-lg border border-amber-200">
+                        <svg className="w-4 h-4 inline mr-1 text-amber-500" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                        </svg>
+                        Sign in with your Google account to get started quickly.
+                      </p>
+                    </div>
+                  </div>
+                ) : null}
+
+                {/* Registration Redirect - ID-Based Only */}
+                <div className="mt-8 text-center space-y-3">
+                  {isLogin ? (
+                    <div>
+                      <button
+                        onClick={() => navigate('/register-with-id')}
+                        className="text-amber-700 hover:text-orange-700 font-semibold transition-colors duration-200 underline decoration-2 underline-offset-4 decoration-amber-300 hover:decoration-orange-400"
+                      >
+                        Don't have an account? Register with ID
+                      </button>
+                      <p className="text-xs text-amber-600 mt-2 bg-amber-50 px-3 py-2 rounded-lg border border-amber-200 inline-block">
+                        💡 New registrations require an admin-issued ID
+                      </p>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => setIsLogin(!isLogin)}
+                      className="text-amber-700 hover:text-orange-700 font-semibold transition-colors duration-200 underline decoration-2 underline-offset-4 decoration-amber-300 hover:decoration-orange-400"
+                    >
+                      Already have an account? Login
+                    </button>
+                  )}
                 </div>
               </div>
-            ) : null}
-
-            {/* Registration Redirect - ID-Based Only */}
-            <div className="mt-8 text-center space-y-3">
-              {isLogin ? (
-                <div>
-                  <button
-                    onClick={() => navigate('/register-with-id')}
-                    className="text-amber-700 hover:text-orange-700 font-semibold transition-colors duration-200 underline decoration-2 underline-offset-4 decoration-amber-300 hover:decoration-orange-400"
-                  >
-                    Don't have an account? Register with ID
-                  </button>
-                  <p className="text-xs text-amber-600 mt-2 bg-amber-50 px-3 py-2 rounded-lg border border-amber-200 inline-block">
-                    💡 New registrations require an admin-issued ID
-                  </p>
-                </div>
-              ) : (
-                <button
-                  onClick={() => setIsLogin(!isLogin)}
-                  className="text-amber-700 hover:text-orange-700 font-semibold transition-colors duration-200 underline decoration-2 underline-offset-4 decoration-amber-300 hover:decoration-orange-400"
-                >
-                  Already have an account? Login
-                </button>
-              )}
             </div>
           </div>
-
-
         </div>
       </div>
     </div >

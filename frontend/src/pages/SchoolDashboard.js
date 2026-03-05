@@ -405,77 +405,102 @@ const SchoolDashboard = () => {
                     {/* Table Body */}
                     <div className="divide-y divide-gray-100">
                       {participants.map((p, index) => (
-                        <div
-                          key={index}
-                          className="grid grid-cols-12 gap-4 px-8 py-6 hover:bg-gradient-to-r hover:from-indigo-50 hover:to-purple-50 transition-all duration-200 group"
-                        >
-                          {/* Participant ID */}
-                          <div className="col-span-2 flex items-center">
-                            <div className="flex items-center space-x-3">
-                              <div className="w-14 h-14 bg-gradient-to-br from-indigo-100 to-purple-100 rounded-lg flex items-center justify-center group-hover:from-indigo-200 group-hover:to-purple-200 transition-colors">
-                                <span className="text-lg font-bold text-indigo-700">
-                                  {p.participant_id.substring(0, 2)}
-                                </span>
-                              </div>
-                              <span className="text-lg font-bold text-gray-900">{p.participant_id}</span>
-                            </div>
-                          </div>
-
-                          {/* Name */}
-                          <div className="col-span-2 flex items-center">
-                            <div>
-                              <p className="text-lg font-semibold text-gray-900">{p.first_name} {p.last_name}</p>
-                              <p className="text-base text-gray-500">Student</p>
-                            </div>
-                          </div>
-
-                          {/* Class */}
-                          <div className="col-span-1 flex items-center">
-                            <span className="inline-flex items-center px-5 py-2.5 rounded-lg bg-gray-100 text-gray-800 text-lg font-semibold">
-                              {p.student_class}
-                            </span>
-                          </div>
-
-                          {/* Events */}
-                          <div className="col-span-5 flex items-center">
-                            <div className="flex flex-wrap gap-2">
-                              {p.events_display && p.events_display.length > 0 ? (
-                                p.events_display.map((event, idx) => (
-                                  <span
-                                    key={idx}
-                                    className="inline-flex items-center px-4 py-2 rounded-lg text-base font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100 transition-colors"
-                                  >
-                                    <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                                    </svg>
-                                    {event.name}
+                        <div key={index} className="px-8 py-6 hover:bg-gradient-to-r hover:from-indigo-50 hover:to-purple-50 transition-all duration-200">
+                          <div className="grid grid-cols-12 gap-4 group">
+                            {/* Participant ID */}
+                            <div className="col-span-2 flex items-center">
+                              <div className="flex items-center space-x-3">
+                                <div className="w-14 h-14 bg-gradient-to-br from-indigo-100 to-purple-100 rounded-lg flex items-center justify-center group-hover:from-indigo-200 group-hover:to-purple-200 transition-colors">
+                                  <span className="text-lg font-bold text-indigo-700">
+                                    {p.participant_id.substring(0, 2)}
                                   </span>
-                                ))
+                                </div>
+                                <span className="text-lg font-bold text-gray-900">{p.participant_id}</span>
+                              </div>
+                            </div>
+
+                            {/* Name */}
+                            <div className="col-span-2 flex items-center">
+                              <div>
+                                <p className="text-lg font-semibold text-gray-900">{p.first_name} {p.last_name}</p>
+                                <p className="text-base text-gray-500">Student</p>
+                                {(p.status === 'approved' || p.verified_by_volunteer) && p.user_account && (
+                                  <div className="mt-2 space-y-1">
+                                    {p.user_account.username && (
+                                      <p className="text-sm text-gray-700">
+                                        <span className="font-semibold">Username:</span> <span className="font-mono font-semibold">{p.user_account.username}</span>
+                                      </p>
+                                    )}
+                                    {p.user_account.temporary_password && (
+                                      <p className="text-sm text-gray-700">
+                                        <span className="font-semibold">Temporary Password:</span> <span className="font-mono font-semibold">{p.user_account.temporary_password}</span>
+                                      </p>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Class & Section */}
+                            <div className="col-span-1 flex items-center">
+                              <div>
+                                <span className="inline-flex items-center px-5 py-2.5 rounded-lg bg-gray-100 text-gray-800 text-lg font-semibold">
+                                  {p.student_class}
+                                </span>
+                                {p.section && (
+                                  <span className={`mt-1 inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${p.section === 'LP' ? 'bg-orange-100 text-orange-700' :
+                                    p.section === 'UP' ? 'bg-blue-100 text-blue-700' :
+                                      p.section === 'HS' ? 'bg-green-100 text-green-700' :
+                                        'bg-purple-100 text-purple-700'
+                                    }`}>
+                                    {p.section}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Events */}
+                            <div className="col-span-5 flex items-center">
+                              <div className="flex flex-wrap gap-2">
+                                {p.events_display && p.events_display.length > 0 ? (
+                                  p.events_display.map((event, idx) => (
+                                    <span
+                                      key={idx}
+                                      className="inline-flex items-center px-4 py-2 rounded-lg text-base font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100 transition-colors"
+                                    >
+                                      <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                                      </svg>
+                                      {event.name}
+                                    </span>
+                                  ))
+                                ) : (
+                                  <span className="text-base text-gray-400 italic">No events selected</span>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Status */}
+                            <div className="col-span-2 flex items-center justify-center">
+                              {p.status === 'approved' || p.verified_by_volunteer ? (
+                                <span className="inline-flex items-center px-6 py-3 rounded-lg bg-green-50 text-green-700 border-2 border-green-200 text-lg font-bold">
+                                  <svg className="w-6 h-6 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                                  </svg>
+                                  Approved
+                                </span>
                               ) : (
-                                <span className="text-base text-gray-400 italic">No events selected</span>
+                                <span className="inline-flex items-center px-6 py-3 rounded-lg bg-yellow-50 text-yellow-700 border-2 border-yellow-200 text-lg font-bold">
+                                  <svg className="w-6 h-6 mr-2 animate-spin" fill="none" viewBox="0 0 24 24">
+                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                  </svg>
+                                  Pending Approval
+                                </span>
                               )}
                             </div>
                           </div>
 
-                          {/* Status */}
-                          <div className="col-span-2 flex items-center justify-center">
-                            {p.verified_by_volunteer ? (
-                              <span className="inline-flex items-center px-6 py-3 rounded-lg bg-green-50 text-green-700 border-2 border-green-200 text-lg font-bold">
-                                <svg className="w-6 h-6 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                                </svg>
-                                Verified
-                              </span>
-                            ) : (
-                              <span className="inline-flex items-center px-6 py-3 rounded-lg bg-yellow-50 text-yellow-700 border-2 border-yellow-200 text-lg font-bold">
-                                <svg className="w-6 h-6 mr-2 animate-spin" fill="none" viewBox="0 0 24 24">
-                                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                </svg>
-                                Pending
-                              </span>
-                            )}
-                          </div>
                         </div>
                       ))}
                     </div>

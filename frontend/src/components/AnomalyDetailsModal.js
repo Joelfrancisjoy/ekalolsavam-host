@@ -98,11 +98,10 @@ const AnomalyDetailsModal = ({ eventId, onClose }) => {
             {flaggedScores.map((score) => (
               <div
                 key={score.id}
-                className={`border-2 rounded-xl p-6 transition-all ${
-                  score.admin_reviewed
+                className={`border-2 rounded-xl p-6 transition-all ${score.admin_reviewed
                     ? 'bg-gray-50 border-gray-200'
                     : 'bg-red-50 border-red-200 hover:shadow-lg'
-                }`}
+                  }`}
               >
                 <div className="flex items-start justify-between">
                   <div className="flex-1">

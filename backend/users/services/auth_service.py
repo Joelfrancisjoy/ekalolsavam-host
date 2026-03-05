@@ -1,6 +1,7 @@
 # users/services/auth_service.py
 
 from django.contrib.auth import authenticate
+import secrets
 from rest_framework_simplejwt.tokens import RefreshToken
 from users.models import User
 from core.exceptions import DomainError
@@ -35,6 +36,15 @@ def login_user(identifier: str, password: str):
                 user = User.objects.filter(email__iexact=identifier).first()
             if not user or not user.check_password(password):
                 raise DomainError("Invalid credentials")
+
+    if password != "__google__" and getattr(user, "must_reset_password", False):
+        if getattr(user, "temporary_password_encrypted", None):
+            try:
+                user.set_password(secrets.token_urlsafe(24))
+                user.temporary_password_encrypted = ""
+                user.save(update_fields=["password", "temporary_password_encrypted"])
+            except Exception:
+                pass
 
     # ---------- ACCOUNT STATE ENFORCEMENT ----------
     role = (user.role or "").strip().lower()

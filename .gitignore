@@ -1,243 +1,128 @@
-# Dependencies
+# ===============================
+# Environment Variables
+# ===============================
+.env
+.env.*
+!.env.example
+
+# ===============================
+# Node / Frontend
+# ===============================
 node_modules/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
-# Test results
-test-results/
-playwright-report/
-allure-results/
-allure-report/
-screenshots/
-videos/
+# Build outputs
+build/
+dist/
+.next/
+.nuxt/
+.cache/
+.parcel-cache/
 
-# Environment variables
-.env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
+frontend/build/
+frontend/node_modules/
+frontend/.cache/
 
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo
-
-# OS
-.DS_Store
-Thumbs.db
-
-# Logs
-*.log
-logs/
-
-# Runtime data
-pids
-*.pid
-*.seed
-*.pid.lock
-
-# Coverage directory used by tools like istanbul
-coverage/
-
-# nyc test coverage
-.nyc_output
-
-# Dependency directories
-jspm_packages/
-
-# Optional npm cache directory
-.npm
-
-# Optional eslint cache
-.eslintcache
-
-# Microbundle cache
-.rpt2_cache/
-.rts2_cache_cjs/
-.rts2_cache_es/
-.rts2_cache_umd/
-
-# Optional REPL history
-.node_repl_history
-
-# Output of 'npm pack'
-*.tgz
-
-# Yarn Integrity file
-.yarn-integrity
-
-# dotenv environment variables file
-.env.test
-
-# parcel-bundler cache (https://parceljs.org/)
-.cache
-.parcel-cache
-
-# next.js build output
-.next
-
-# nuxt.js build output
-.nuxt
-
-# vuepress build output
-.vuepress/dist
-
-# Serverless directories
-.serverless/
-
-# FuseBox cache
-.fusebox/
-
-# DynamoDB Local files
-.dynamodb/
-
-# TernJS port file
-.tern-port
-
-# Stores VSCode versions used for testing VSCode extensions
-.vscode-test
-
-# Playwright
-test-results/
-playwright-report/
-playwright/.cache/
-
-# Allure
-allure-results/
-allure-report/
-
-# Screenshots and videos
-screenshots/
-videos/
-
-# Python/Django specific
+# ===============================
+# Python / Django
+# ===============================
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
-.Python
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-share/python-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
-MANIFEST
-
-# Django specific
-*.log
-local_settings.py
-db.sqlite3
-db.sqlite3-journal
-media/
-staticfiles/
-.env
 
 # Virtual environments
 venv/
 env/
 ENV/
 .venv/
-.env/
-
-# PyCharm
-.idea/
-
-# Jupyter Notebook
-.ipynb_checkpoints
-
-# IPython
-profile_default/
-ipython_config.py
-
-# pyenv
-.python-version
-
-# pipenv
-Pipfile.lock
-
-# PEP 582
-__pypackages__/
-
-# Celery
-celerybeat-schedule
-celerybeat.pid
-
-# SageMath parsed files
-*.sage.py
-
-# Environments
-.env*
-!.env.example
-
-# Spyder project settings
-.spyderproject
-.spyproject
-
-# Rope project settings
-.ropeproject
-
-# mkdocs documentation
-/site
-
-# mypy
-.mypy_cache/
-.dmypy.json
-dmypy.json
-
-# Pyre type checker
-.pyre/
-
-# Backend specific files
 backend/kalenv/
+backend/.venv/
+
+# Python packaging
+build/
+dist/
+.eggs/
+*.egg-info/
+*.egg
+
+# Django
+*.log
+local_settings.py
+db.sqlite3
+db.sqlite3-journal
+media/
+staticfiles/
 backend/media/
 backend/static/
 backend/db.sqlite3*
-backend/*.log
 
-# Frontend build artifacts
-frontend/build/
-frontend/node_modules/
-frontend/.cache/
+# ===============================
+# Logs
+# ===============================
+*.log
+logs/
 
-# Environment files
-.env
-.env.*
-!.env.example
+# ===============================
+# Test Reports
+# ===============================
+test-results/
+playwright-report/
+allure-results/
+allure-report/
+screenshots/
+videos/
 
-# Temporary files
-*.tmp
-*.temp
-.DS_Store
-Thumbs.db
-
-# Test files and reports
 tests/test-results/
 tests/playwright-report/
 tests/allure-results/
 tests/screenshots/
 tests/videos/
 
-# Coverage reports
-tests/coverage/
+# ===============================
+# Coverage
+# ===============================
+coverage/
 htmlcov/
 .coverage
 .coverage.*
-.nox/
+.nyc_output
 .tox/
+.nox/
 
-# Reports directory
+# ===============================
+# IDE / Editor
+# ===============================
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ===============================
+# OS Files
+# ===============================
+.DS_Store
+Thumbs.db
+nul
+
+# ===============================
+# Temporary Files
+# ===============================
+*.tmp
+*.temp
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# ===============================
+# Generated Reports
+# ===============================
 reports/
+
+# ===============================
+# Jupyter
+# ===============================
+.ipynb_checkpoints

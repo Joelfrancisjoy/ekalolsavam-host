@@ -3,7 +3,7 @@ from django.db.models import Q
 from rest_framework import generics, status
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny, IsAuthenticated
-from rest_framework.decorators import api_view, permission_classes
+from rest_framework.decorators import api_view, permission_classes, authentication_classes
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenObtainPairView
 from rest_framework.exceptions import PermissionDenied
@@ -55,8 +55,10 @@ class RegisterView(generics.CreateAPIView):
 
 # users/views.py
 
+@csrf_exempt
 @api_view(['POST'])
 @permission_classes([AllowAny])
+@authentication_classes([])
 def login_view(request):
     try:
         from users.services.auth_service import login_user
@@ -66,7 +68,13 @@ def login_view(request):
         )
         return Response(data)
     except DomainError as e:
-        return Response({"error": str(e)}, status=403)
+        msg = str(e)
+        status_code = 403
+        if msg in ["Username or email required"]:
+            status_code = 400
+        elif msg in ["Invalid credentials"]:
+            status_code = 401
+        return Response({"error": msg}, status=status_code)
 
 
 class CurrentUserView(generics.RetrieveAPIView):

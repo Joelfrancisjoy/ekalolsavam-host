@@ -14,11 +14,61 @@ from .ml_models.anomaly_detector import get_anomaly_detector
 from .services import RecheckRequestService, VolunteerAssignmentService
 from django.db.models import Sum
 import logging
+from datetime import datetime, timedelta
 from decimal import Decimal
 import razorpay
 from django.conf import settings
+from django.utils import timezone
 
 logger = logging.getLogger(__name__)
+
+
+def _is_scoring_open(event):
+    if event is None:
+        return False
+
+    status_value = (getattr(event, 'status', None) or '').strip()
+    if status_value == 'in_progress':
+        return True
+    if status_value in {'draft', 'scoring_closed', 'results_published', 'archived'}:
+        return False
+
+    # If the event is not explicitly closed but scheduling fields are missing,
+    # avoid blocking judges due to incomplete configuration.
+    if not getattr(event, 'date', None) or not getattr(event, 'start_time', None) or not getattr(event, 'end_time', None):
+        return True
+
+    try:
+        tz = timezone.get_current_timezone()
+        start_dt = timezone.make_aware(
+            datetime.combine(event.date, event.start_time),
+            timezone=tz
+        )
+        end_dt = timezone.make_aware(
+            datetime.combine(event.date, event.end_time),
+            timezone=tz
+        )
+        # handle events that end after midnight
+        if end_dt <= start_dt:
+            end_dt = end_dt + timedelta(days=1)
+
+        now = timezone.localtime(timezone.now())
+        early_buffer = timedelta(minutes=30)
+        late_buffer = timedelta(minutes=120)
+        return (start_dt - early_buffer) <= now <= (end_dt + late_buffer)
+    except Exception as exc:
+        logger.warning(
+            'Unable to evaluate scoring window; allowing scoring for non-closed event',
+            extra={
+                'event_id': getattr(event, 'id', None),
+                'event_status': getattr(event, 'status', None),
+                'event_date': str(getattr(event, 'date', None)),
+                'start_time': str(getattr(event, 'start_time', None)),
+                'end_time': str(getattr(event, 'end_time', None)),
+                'error': str(exc),
+            }
+        )
+        return True
 
 
 class ScoreListCreateView(generics.ListCreateAPIView):
@@ -39,7 +89,7 @@ class ScoreListCreateView(generics.ListCreateAPIView):
         if user.role == 'judge':
             # Enforce scoring rule: Scoring only allowed when event is in progress
             event = serializer.validated_data['event']
-            if event.status != "in_progress":
+            if not _is_scoring_open(event):
                 from django.core.exceptions import ValidationError
                 raise ValidationError("Scoring not open")
 
@@ -128,8 +178,19 @@ def _submit_dynamic_scores(request, user):
     try:
         event = get_object_or_404(Event, pk=event_id)
 
-        # Enforce scoring rule: Scoring only allowed when event is in progress
-        if event.status != "in_progress":
+        if not _is_scoring_open(event):
+            logger.warning(
+                'Score submission blocked: scoring not open',
+                extra={
+                    'event_id': getattr(event, 'id', None),
+                    'event_status': getattr(event, 'status', None),
+                    'event_date': str(getattr(event, 'date', None)),
+                    'start_time': str(getattr(event, 'start_time', None)),
+                    'end_time': str(getattr(event, 'end_time', None)),
+                    'judge_id': getattr(user, 'id', None),
+                    'participant_id': participant_id,
+                }
+            )
             return Response({"error": "Scoring not open"}, status=status.HTTP_400_BAD_REQUEST)
 
         # Get expected criteria for this event
@@ -222,8 +283,19 @@ def _submit_legacy_scores(request, user):
     try:
         event = get_object_or_404(Event, pk=event_id)
 
-        # Enforce scoring rule: Scoring only allowed when event is in progress
-        if event.status != "in_progress":
+        if not _is_scoring_open(event):
+            logger.warning(
+                'Score submission blocked: scoring not open',
+                extra={
+                    'event_id': getattr(event, 'id', None),
+                    'event_status': getattr(event, 'status', None),
+                    'event_date': str(getattr(event, 'date', None)),
+                    'start_time': str(getattr(event, 'start_time', None)),
+                    'end_time': str(getattr(event, 'end_time', None)),
+                    'judge_id': getattr(user, 'id', None),
+                    'participant_id': participant_id,
+                }
+            )
             return Response({"error": "Scoring not open"}, status=status.HTTP_400_BAD_REQUEST)
 
         # Prepare score data for anomaly detection

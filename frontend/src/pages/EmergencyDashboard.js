@@ -661,8 +661,8 @@ const EmergencyDashboard = () => {
                                     type="button"
                                     onClick={() => setCreateEmergencyForm({ ...createEmergencyForm, severity: level.id })}
                                     className={`rounded-2xl border-2 px-4 py-4 text-base font-black transition-all duration-200 transform hover:scale-105 ${createEmergencyForm.severity === level.id
-                                        ? 'border-white shadow-lg bg-white text-slate-900'
-                                        : 'border-slate-600 bg-slate-800/50 text-slate-300 hover:border-slate-500 hover:bg-slate-700/50'
+                                      ? 'border-white shadow-lg bg-white text-slate-900'
+                                      : 'border-slate-600 bg-slate-800/50 text-slate-300 hover:border-slate-500 hover:bg-slate-700/50'
                                       }`}
                                   >
                                     <div className={`w-4 h-4 ${level.color} rounded-full mx-auto mb-2`}></div>
@@ -718,16 +718,16 @@ const EmergencyDashboard = () => {
                             type="button"
                             onClick={() => handleSelectEmergency(emergency)}
                             className={`w-full text-left rounded-2xl border p-5 flex items-start justify-between gap-4 transition-all duration-150 ${selectedEmergencyId === emergency.id
-                                ? 'border-red-500 bg-red-50 shadow-lg'
-                                : 'border-gray-300 bg-white hover:border-red-400 hover:bg-red-50'
+                              ? 'border-red-500 bg-red-50 shadow-lg'
+                              : 'border-gray-300 bg-white hover:border-red-400 hover:bg-red-50'
                               }`}
                           >
                             <div className="min-w-0">
                               <div className="flex items-center gap-3 flex-wrap">
                                 <span className={`inline-flex w-4 h-4 rounded-full ${emergency.severity === 'red' ? 'bg-red-600' :
-                                    emergency.severity === 'orange' ? 'bg-orange-500' :
-                                      emergency.severity === 'yellow' ? 'bg-yellow-400' :
-                                        emergency.severity === 'blue' ? 'bg-blue-500' : 'bg-green-500'
+                                  emergency.severity === 'orange' ? 'bg-orange-500' :
+                                    emergency.severity === 'yellow' ? 'bg-yellow-400' :
+                                      emergency.severity === 'blue' ? 'bg-blue-500' : 'bg-green-500'
                                   }`} />
                                 <span className="text-lg font-extrabold text-gray-900">
                                   {emergency.emergency_type?.toUpperCase() || 'EMERGENCY'}
@@ -741,14 +741,14 @@ const EmergencyDashboard = () => {
                                 {emergency.severity && (
                                   <span
                                     className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-extrabold tracking-wide ${emergency.severity === 'red'
-                                        ? 'bg-red-600 text-white'
-                                        : emergency.severity === 'orange'
-                                          ? 'bg-orange-500 text-white'
-                                          : emergency.severity === 'yellow'
-                                            ? 'bg-yellow-400 text-gray-900'
-                                            : emergency.severity === 'blue'
-                                              ? 'bg-blue-600 text-white'
-                                              : 'bg-green-600 text-white'
+                                      ? 'bg-red-600 text-white'
+                                      : emergency.severity === 'orange'
+                                        ? 'bg-orange-500 text-white'
+                                        : emergency.severity === 'yellow'
+                                          ? 'bg-yellow-400 text-gray-900'
+                                          : emergency.severity === 'blue'
+                                            ? 'bg-blue-600 text-white'
+                                            : 'bg-green-600 text-white'
                                       }`}
                                   >
                                     {emergency.severity.toUpperCase()}
@@ -856,8 +856,8 @@ const EmergencyDashboard = () => {
                                 type="button"
                                 onClick={() => setTriageForm({ ...triageForm, severity: level.id })}
                                 className={`text-left rounded-2xl border-2 p-5 transition-all duration-200 transform hover:scale-105 ${triageForm.severity === level.id
-                                    ? 'border-white shadow-xl bg-white text-slate-900'
-                                    : 'border-slate-600 bg-slate-800/50 text-slate-300 hover:border-slate-500 hover:bg-slate-700/50'
+                                  ? 'border-white shadow-xl bg-white text-slate-900'
+                                  : 'border-slate-600 bg-slate-800/50 text-slate-300 hover:border-slate-500 hover:bg-slate-700/50'
                                   }`}
                               >
                                 <div className={`w-5 h-5 ${level.color} rounded-full mx-auto mb-3`}></div>

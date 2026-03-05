@@ -13,7 +13,7 @@ class UserSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ['id', 'username', 'email', 'first_name', 'last_name', 'role', 'phone', 'approval_status', 'student_class', 'section', 'school', 'school_category_extra']
+        fields = ['id', 'username', 'email', 'first_name', 'last_name', 'role', 'phone', 'approval_status', 'must_reset_password', 'student_class', 'section', 'school', 'school_category_extra']
         read_only_fields = ['id', 'section']
 
     def get_section(self, obj):

@@ -9,6 +9,7 @@ from .views import (
     ParticipantVerificationView, verify_participant_by_chess_number,
     get_volunteer_assignments, volunteer_check_in,
     assign_volunteers,
+    lookup_participant_by_chess_number,
 )
 
 urlpatterns = [
@@ -35,6 +36,8 @@ urlpatterns = [
     path('volunteer-assignments/', get_volunteer_assignments,
          name='volunteer-assignments'),
     path('volunteer-check-in/', volunteer_check_in, name='volunteer-check-in'),
+    path('participant-lookup/', lookup_participant_by_chess_number,
+         name='participant-lookup'),
     path('<int:pk>/assign-volunteers/',
          assign_volunteers, name='assign-volunteers'),
 ]

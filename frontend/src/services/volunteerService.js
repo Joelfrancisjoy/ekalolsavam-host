@@ -14,7 +14,7 @@ const volunteerService = {
   // Verify participant by chess number
   verifyParticipant: (chessNumber, eventId, notes = '') => {
     return http.post('/api/events/verify-participant/', {
-      chess_number: chessNumber,
+      chess_number: String(chessNumber || '').trim(),
       event_id: eventId,
       notes: notes
     });

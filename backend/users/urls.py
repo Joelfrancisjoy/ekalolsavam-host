@@ -16,7 +16,11 @@ from .workflow_views import (
     VolunteerSchoolParticipantsView,
     VolunteerVerifyStudentView, AdminAssignVolunteerToSchoolView,
     SchoolStandingsView, AdminIssuedIDListView, AdminIssuedIDDetailView,
-    SchoolViewOwnParticipantsView, check_id_validity
+    SchoolViewOwnParticipantsView, check_id_validity,
+    AdminSchoolParticipantsListView, admin_approve_school_participant,
+    admin_bulk_approve_school_participants,
+    student_allowed_events,
+    admin_link_school_user_to_school_profile
 )
 
 urlpatterns = [
@@ -56,6 +60,7 @@ urlpatterns = [
     # New Workflow Endpoints
     # Admin: School management
     path('admin/schools/create/', AdminCreateSchoolView.as_view(), name='admin-create-school'),
+    path('admin/schools/link-user/', admin_link_school_user_to_school_profile, name='admin-link-school-user-to-school-profile'),
     path('admin/ids/generate/', AdminGenerateIDView.as_view(), name='admin-generate-id'),
     path('admin/ids/', AdminIssuedIDListView.as_view(), name='admin-issued-ids-list'),
     path('admin/ids/<int:pk>/', AdminIssuedIDDetailView.as_view(), name='admin-issued-id-detail'),
@@ -76,10 +81,17 @@ urlpatterns = [
     # Volunteer: View and verify participants
     path('volunteer/school-participants/', VolunteerSchoolParticipantsView.as_view(), name='volunteer-school-participants'),
     path('volunteer/verify-student/', VolunteerVerifyStudentView.as_view(), name='volunteer-verify-student'),
+
+    path('students/allowed-events/', student_allowed_events, name='student-allowed-events'),
     
     # Admin: Assign volunteers to schools
     path('admin/assign-volunteer/', AdminAssignVolunteerToSchoolView.as_view(), name='admin-assign-volunteer'),
-    
+
+    # Admin: Manage school participants (for user management panel)
+    path('admin/school-participants/', AdminSchoolParticipantsListView.as_view(), name='admin-school-participants-list'),
+    path('admin/school-participants/<int:participant_id>/approve/', admin_approve_school_participant, name='admin-approve-school-participant'),
+    path('admin/school-participants/bulk-approve/', admin_bulk_approve_school_participants, name='admin-bulk-approve-school-participants'),
+
     # Public: School standings
     path('standings/', SchoolStandingsView.as_view(), name='school-standings'),
 ]

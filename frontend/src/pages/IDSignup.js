@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import http from '../services/http-common';
 
 const IDSignup = () => {
   const navigate = useNavigate();
@@ -68,18 +68,18 @@ const IDSignup = () => {
     setLoading(true);
 
     try {
-      const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:8000';
-      const response = await axios.post(
-        `${apiUrl}/api/auth/register/with-id/`,
-        formData
-      );
+      await http.post('/api/auth/register/with-id/', formData);
 
       setSuccess(true);
       setTimeout(() => {
         navigate('/login');
       }, 3000);
     } catch (err) {
-      setError(err.response?.data?.error || 'Registration failed. Please try again.');
+      if (!err.response) {
+        setError('Cannot reach the server. Please check that the backend is running and the API URL is configured correctly.');
+      } else {
+        setError(err.response?.data?.error || 'Registration failed. Please try again.');
+      }
     } finally {
       setLoading(false);
     }

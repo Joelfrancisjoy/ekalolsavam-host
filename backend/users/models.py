@@ -71,6 +71,14 @@ class User(AbstractUser):
     # Academic class/standard for students (1-12). Used to derive LP/UP/HS/HSS section.
     student_class = models.PositiveSmallIntegerField(null=True, blank=True)
 
+    availability = models.CharField(
+        max_length=20,
+        choices=[('available', 'Available'), ('busy', 'Busy'), ('offline', 'Offline')],
+        default='offline',
+        help_text='Volunteer availability status for emergency assignments'
+    )
+    availability_updated_at = models.DateTimeField(null=True, blank=True)
+
     # Volunteer-specific
     staff_id_photo = models.ImageField(upload_to='staff_id_photos/', blank=True, null=True)
     # Judge-specific
@@ -86,6 +94,7 @@ class User(AbstractUser):
     # Temporarily store the password provided during registration (encrypted).
     # This is cleared once the user accepts it or sets a new password after approval.
     pending_password_encrypted = models.TextField(blank=True, null=True)
+    temporary_password_encrypted = models.TextField(blank=True, null=True)
     # Require user to set a new password on next login (used for temp-password accounts)
     must_reset_password = models.BooleanField(default=False)
 

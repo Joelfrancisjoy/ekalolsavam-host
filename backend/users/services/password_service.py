@@ -14,6 +14,7 @@ def accept_pending_password(user):
 
     user.set_password(password)
     user.pending_password_encrypted = ""
+    user.temporary_password_encrypted = ""
     user.must_reset_password = False
     user.save()
 
@@ -27,6 +28,7 @@ def set_new_password(user, new_password):
 
     user.set_password(new_password)
     user.pending_password_encrypted = ""
+    user.temporary_password_encrypted = ""
     user.must_reset_password = False
     user.save()
 

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import http from '../services/http-common';
 
 const IDBasedRegistration = () => {
     const navigate = useNavigate();
@@ -20,8 +20,6 @@ const IDBasedRegistration = () => {
     const [error, setError] = useState('');
     const [success, setSuccess] = useState(false);
 
-    const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
-
     // Step 1: Verify ID Code
     const handleVerifyId = async (e) => {
         e.preventDefault();
@@ -29,7 +27,7 @@ const IDBasedRegistration = () => {
         setError('');
 
         try {
-            const response = await axios.post(`${API_URL}/api/auth/ids/check/`, {
+            const response = await http.post('/api/auth/ids/check/', {
                 id_code: idCode.trim().toUpperCase()
             });
 
@@ -51,7 +49,11 @@ const IDBasedRegistration = () => {
                 setError(response.data.error || 'Invalid ID code');
             }
         } catch (err) {
-            setError(err.response?.data?.error || 'Failed to verify ID. Please try again.');
+            if (!err.response) {
+                setError('Cannot reach the server. Please check that the backend is running and the API URL is configured correctly.');
+            } else {
+                setError(err.response?.data?.error || 'Failed to verify ID. Please try again.');
+            }
         } finally {
             setLoading(false);
         }
@@ -77,7 +79,7 @@ const IDBasedRegistration = () => {
         }
 
         try {
-            const response = await axios.post(`${API_URL}/api/auth/register/with-id/`, {
+            const response = await http.post('/api/auth/register/with-id/', {
                 id_code: idCode.trim().toUpperCase(),
                 username: formData.username,
                 password: formData.password,
@@ -96,7 +98,9 @@ const IDBasedRegistration = () => {
             }, 3000);
         } catch (err) {
             const errorData = err.response?.data;
-            if (typeof errorData === 'object' && errorData.error) {
+            if (!err.response) {
+                setError('Cannot reach the server. Please check that the backend is running and the API URL is configured correctly.');
+            } else if (typeof errorData === 'object' && errorData.error) {
                 setError(errorData.error);
             } else if (typeof errorData === 'string') {
                 setError(errorData);

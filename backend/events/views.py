@@ -335,8 +335,20 @@ class ParticipantsByEventForJudgeView(generics.ListAPIView):
         # Allow judges and volunteers assigned to the event
         is_assigned_judge = getattr(
             user, 'role', None) == 'judge' and event.judges.filter(pk=user.pk).exists()
-        is_assigned_volunteer = getattr(
-            user, 'role', None) == 'volunteer' and event.volunteers.filter(pk=user.pk).exists()
+        is_shift_assigned_volunteer = False
+        if getattr(user, 'role', None) == 'volunteer':
+            try:
+                from volunteers.models import VolunteerAssignment
+                is_shift_assigned_volunteer = VolunteerAssignment.objects.filter(
+                    volunteer=user,
+                    shift__event=event,
+                ).exists()
+            except Exception:
+                is_shift_assigned_volunteer = False
+
+        is_assigned_volunteer = getattr(user, 'role', None) == 'volunteer' and (
+            event.volunteers.filter(pk=user.pk).exists() or is_shift_assigned_volunteer
+        )
 
         if is_assigned_judge:
             # For judges: Only show participants who have been verified by volunteers
@@ -351,9 +363,13 @@ class ParticipantsByEventForJudgeView(generics.ListAPIView):
             ).select_related('participant', 'participant__school')
 
             # Filter by chess number if provided
-            chess_number = self.request.query_params.get('chess_number')
+            chess_number = (self.request.query_params.get('chess_number') or '').strip()
+            if chess_number and chess_number.lower().startswith('ch'):
+                chess_number = chess_number.upper()
+            if chess_number and chess_number.isdigit() and len(chess_number) < 8:
+                chess_number = chess_number.zfill(8)
             if chess_number:
-                queryset = queryset.filter(chess_number=chess_number)
+                queryset = queryset.filter(chess_number__iexact=chess_number)
 
             return queryset
         elif is_assigned_volunteer:
@@ -362,9 +378,13 @@ class ParticipantsByEventForJudgeView(generics.ListAPIView):
                 event=event).select_related('participant', 'participant__school')
 
             # Filter by chess number if provided
-            chess_number = self.request.query_params.get('chess_number')
+            chess_number = (self.request.query_params.get('chess_number') or '').strip()
+            if chess_number and chess_number.lower().startswith('ch'):
+                chess_number = chess_number.upper()
+            if chess_number and chess_number.isdigit() and len(chess_number) < 8:
+                chess_number = chess_number.zfill(8)
             if chess_number:
-                queryset = queryset.filter(chess_number=chess_number)
+                queryset = queryset.filter(chess_number__iexact=chess_number)
 
             return queryset
         return EventRegistration.objects.none()
@@ -390,7 +410,7 @@ class ParticipantVerificationView(generics.ListCreateAPIView):
     def perform_create(self, serializer):
         # Enforce verification rule: Verification only allowed when event is in registration_closed or in_progress status
         event = serializer.validated_data['event']
-        if event.status not in ["registration_closed", "in_progress"]:
+        if event.status not in ["published", "registration_closed", "in_progress"]:
             from django.core.exceptions import ValidationError
             raise ValidationError("Verification not allowed at this stage")
 
@@ -407,7 +427,11 @@ def verify_participant_by_chess_number(request):
         return Response({'error': 'Only volunteers can verify participants'},
                         status=status.HTTP_403_FORBIDDEN)
 
-    chess_number = request.data.get('chess_number')
+    chess_number = (request.data.get('chess_number') or '').strip()
+    if chess_number and chess_number.lower().startswith('ch'):
+        chess_number = chess_number.upper()
+    if chess_number and chess_number.isdigit() and len(chess_number) < 8:
+        chess_number = chess_number.zfill(8)
     event_id = request.data.get('event_id')
     notes = request.data.get('notes', '')
 
@@ -416,14 +440,32 @@ def verify_participant_by_chess_number(request):
                         status=status.HTTP_400_BAD_REQUEST)
 
     try:
+        event = get_object_or_404(Event, pk=event_id)
+
+        # Ensure the volunteer is actually assigned to this event (directly or via shift)
+        is_direct_assigned = event.volunteers.filter(pk=request.user.pk).exists()
+        is_shift_assigned = False
+        try:
+            from volunteers.models import VolunteerAssignment
+            is_shift_assigned = VolunteerAssignment.objects.filter(
+                volunteer=request.user,
+                shift__event=event,
+            ).exists()
+        except Exception:
+            is_shift_assigned = False
+
+        if not (is_direct_assigned or is_shift_assigned):
+            return Response({'error': 'You are not assigned to this event'},
+                            status=status.HTTP_403_FORBIDDEN)
+
         # Find the registration with this chess number for the specified event
         registration = EventRegistration.objects.select_related('participant', 'participant__school', 'event').get(
-            chess_number=chess_number,
+            chess_number__iexact=chess_number,
             event_id=event_id
         )
 
         # Enforce verification rule: Verification only allowed when event is in registration_closed or in_progress status
-        if registration.event.status not in ["registration_closed", "in_progress"]:
+        if registration.event.status not in ["published", "registration_closed", "in_progress"]:
             return Response({
                 'error': 'Verification not allowed at this stage'
             }, status=status.HTTP_400_BAD_REQUEST)
@@ -466,6 +508,89 @@ def verify_participant_by_chess_number(request):
                         status=status.HTTP_404_NOT_FOUND)
     except Exception as e:
         return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def lookup_participant_by_chess_number(request):
+    if getattr(request.user, 'role', None) != 'volunteer':
+        return Response({'error': 'Only volunteers can access this endpoint'}, status=status.HTTP_403_FORBIDDEN)
+
+    chess_number = (request.query_params.get('chess_number') or '').strip()
+    if chess_number and chess_number.lower().startswith('ch'):
+        chess_number = chess_number.upper()
+    if chess_number and chess_number.isdigit() and len(chess_number) < 8:
+        chess_number = chess_number.zfill(8)
+
+    if not chess_number:
+        return Response({'error': 'chess_number is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+    registration = EventRegistration.objects.select_related(
+        'participant',
+        'participant__school',
+        'event',
+        'event__venue',
+    ).filter(chess_number__iexact=chess_number).first()
+
+    if registration is None:
+        return Response({'error': 'No participant found with this chess number'}, status=status.HTTP_404_NOT_FOUND)
+
+    participant = registration.participant
+
+    # Only include participations for events the volunteer is assigned to (directly or via shift)
+    assigned_event_ids = set(Event.objects.filter(volunteers=request.user).values_list('id', flat=True))
+    try:
+        from volunteers.models import VolunteerAssignment
+        shift_event_ids = VolunteerAssignment.objects.filter(
+            volunteer=request.user,
+        ).values_list('shift__event_id', flat=True)
+        assigned_event_ids.update(list(shift_event_ids))
+    except Exception:
+        pass
+
+    participations_qs = EventRegistration.objects.select_related('event', 'event__venue').filter(
+        participant=participant,
+        event_id__in=list(assigned_event_ids) if assigned_event_ids else [],
+    ).order_by('event__date', 'event__start_time')
+
+    participations = [
+        {
+            'registration_id': r.id,
+            'event': {
+                'id': r.event.id,
+                'name': r.event.name,
+                'category': r.event.category,
+                'date': str(r.event.date),
+                'start_time': str(r.event.start_time),
+                'end_time': str(r.event.end_time),
+                'venue': getattr(r.event.venue, 'name', None) if getattr(r.event, 'venue', None) else None,
+            },
+            'chess_number': r.chess_number,
+            'status': r.status,
+            'registration_date': r.registration_date,
+        }
+        for r in participations_qs
+    ]
+
+    participant_payload = {
+        'id': participant.id,
+        'first_name': participant.first_name,
+        'last_name': participant.last_name,
+        'username': participant.username,
+        'section': participant.section,
+        'student_class': participant.student_class,
+        'school': {
+            'id': participant.school.id if participant.school else None,
+            'name': participant.school.name if participant.school else None,
+            'category': participant.school.category if participant.school else None,
+        } if participant.school else None,
+    }
+
+    return Response({
+        'chess_number': chess_number,
+        'participant': participant_payload,
+        'participations': participations,
+    })
 
 
 def send_participant_details_to_judges(verification):

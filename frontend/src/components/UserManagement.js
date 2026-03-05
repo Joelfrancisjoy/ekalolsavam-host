@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { userService } from '../services/userService';
 import axios from 'axios';
 import authManager from '../utils/authManager';
+import http from '../services/http-common';
 
 // Small utility for classNames
 const cx = (...cls) => cls.filter(Boolean).join(' ');
@@ -18,6 +19,16 @@ const UserManagement = () => {
     const [selectedRegister, setSelectedRegister] = useState(''); // 'student', 'volunteer', 'judge'
     const [page, setPage] = useState(1);
     const [selectedStudentCategory, setSelectedStudentCategory] = useState(''); // 'LP' | 'UP' | 'HS' | 'HSS'
+
+    // School participants (pending approval) state
+    const [schoolParticipants, setSchoolParticipants] = useState([]);
+    const [showPendingParticipants, setShowPendingParticipants] = useState(false);
+    const [selectedParticipants, setSelectedParticipants] = useState([]);
+    const [approvalModal, setApprovalModal] = useState(null); // { participant, credentials }
+
+    const [schools, setSchools] = useState([]);
+    const [linkSchoolModal, setLinkSchoolModal] = useState(null); // { schoolUsername, participantId }
+    const [linkSchoolId, setLinkSchoolId] = useState('');
 
     const filtered = useMemo(() => {
         const q = query.trim().toLowerCase();
@@ -88,6 +99,186 @@ const UserManagement = () => {
         loadUsers();
     }, [loadUsers, loadAllUsers]);
 
+    // Load school participants pending approval
+    const loadSchoolParticipants = useCallback(async ({ silent = false } = {}) => {
+        if (!silent) setLoading(true);
+        try {
+            const tokens = authManager.getTokens();
+            if (!tokens.access) {
+                throw new Error('Not authenticated');
+            }
+            const response = await http.get('/api/auth/admin/school-participants/', {
+                params: { status: 'pending' },
+            });
+            const data = response.data;
+            setSchoolParticipants(Array.isArray(data) ? data : (data?.results || []));
+        } catch (error) {
+            console.error('Failed to load school participants:', error);
+            if (!silent) setError('Failed to load pending participants.');
+        } finally {
+            if (!silent) setLoading(false);
+        }
+    }, []);
+
+    // Approve a single school participant
+    const approveParticipant = async (participantId) => {
+        setLoading(true);
+        setError('');
+        try {
+            const response = await http.post(
+                `/api/auth/admin/school-participants/${participantId}/approve/`,
+                {}
+            );
+
+            // Show credentials modal
+            setApprovalModal({
+                participant: response.data.participant,
+                credentials: response.data.user_credentials
+            });
+
+            // Reload participants
+            await loadSchoolParticipants({ silent: true });
+            await loadAllUsers({ silent: true });
+            await loadUsers({ silent: true });
+        } catch (error) {
+            const status = error?.response?.status;
+            const apiError = error?.response?.data?.error;
+            const details = error?.response?.data?.details;
+            const schoolUser = error?.response?.data?.school_user;
+            const message = apiError
+                ? (details ? `${apiError} (${details})` : apiError)
+                : (error?.message || 'Failed to approve participant.');
+            setError(status ? `[${status}] ${message}` : message);
+
+            if (
+                status === 400 &&
+                typeof apiError === 'string' &&
+                apiError.toLowerCase().includes('not linked') &&
+                schoolUser?.username
+            ) {
+                setLinkSchoolModal({ schoolUsername: schoolUser.username, participantId });
+                setLinkSchoolId('');
+            }
+
+            if (process.env.NODE_ENV !== 'production') {
+                console.warn('Approval failed:', {
+                    status,
+                    data: error?.response?.data,
+                    message: error?.message
+                });
+            }
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const loadSchools = useCallback(async ({ silent = false } = {}) => {
+        try {
+            if (!silent) setLoading(true);
+            const res = await http.get('/api/auth/schools/');
+            setSchools(Array.isArray(res.data) ? res.data : (res.data?.results || []));
+        } catch (e) {
+            if (!silent) setError('Failed to load schools.');
+        } finally {
+            if (!silent) setLoading(false);
+        }
+    }, []);
+
+    useEffect(() => {
+        if (linkSchoolModal && schools.length === 0) {
+            loadSchools({ silent: true });
+        }
+    }, [linkSchoolModal, schools.length, loadSchools]);
+
+    const linkSchoolAndRetry = async () => {
+        if (!linkSchoolModal?.schoolUsername || !linkSchoolModal?.participantId) return;
+        if (!linkSchoolId) {
+            setError('Please select a school profile to link.');
+            return;
+        }
+        setLoading(true);
+        setError('');
+        try {
+            await http.post('/api/auth/admin/schools/link-user/', {
+                username: linkSchoolModal.schoolUsername,
+                school_id: linkSchoolId,
+            });
+            const participantId = linkSchoolModal.participantId;
+            setLinkSchoolModal(null);
+            setLinkSchoolId('');
+            await approveParticipant(participantId);
+        } catch (error) {
+            const status = error?.response?.status;
+            const apiError = error?.response?.data?.error;
+            const message = apiError || error?.message || 'Failed to link school user.';
+            setError(status ? `[${status}] ${message}` : message);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    // Bulk approve school participants
+    const bulkApproveParticipants = async (participantIds) => {
+        if (!participantIds || participantIds.length === 0) {
+            setError('No participants selected for approval.');
+            return;
+        }
+
+        if (!window.confirm(`Approve ${participantIds.length} participant(s)?`)) return;
+
+        setLoading(true);
+        setError('');
+        try {
+            const response = await http.post(
+                '/api/auth/admin/school-participants/bulk-approve/',
+                { participant_ids: participantIds }
+            );
+
+            const results = response.data.results;
+            alert(`Approval Complete!\n\nApproved: ${results.approved.length}\nFailed: ${results.failed.length}\nAlready Approved: ${results.already_approved.length}`);
+
+            // Show credentials for approved participants
+            if (results.approved.length > 0) {
+                const credentialsText = results.approved.map(p =>
+                    `${p.name}\nUsername: ${p.username}\nPassword: ${p.password}\nSection: ${p.section}\n`
+                ).join('\n');
+
+                // Create downloadable file
+                const blob = new Blob([credentialsText], { type: 'text/plain' });
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = `participant_credentials_${Date.now()}.txt`;
+                link.click();
+                URL.revokeObjectURL(url);
+            }
+
+            // Clear selection and reload
+            setSelectedParticipants([]);
+            await loadSchoolParticipants({ silent: true });
+            await loadAllUsers({ silent: true });
+            await loadUsers({ silent: true });
+        } catch (error) {
+            const status = error?.response?.status;
+            const apiError = error?.response?.data?.error;
+            const details = error?.response?.data?.details;
+            const message = apiError
+                ? (details ? `${apiError} (${details})` : apiError)
+                : (error?.message || 'Failed to bulk approve participants.');
+            setError(status ? `[${status}] ${message}` : message);
+
+            if (process.env.NODE_ENV !== 'production') {
+                console.warn('Bulk approval failed:', {
+                    status,
+                    data: error?.response?.data,
+                    message: error?.message
+                });
+            }
+        } finally {
+            setLoading(false);
+        }
+    };
+
     useEffect(() => {
         const intervalMs = 5000;
 
@@ -95,12 +286,18 @@ const UserManagement = () => {
             if (document.hidden) return;
             await loadAllUsers({ silent: true });
             await loadUsers({ silent: true });
+            if (showPendingParticipants) {
+                await loadSchoolParticipants({ silent: true });
+            }
         };
 
         const onVisibilityChange = () => {
             if (!document.hidden) {
                 loadAllUsers({ silent: true });
                 loadUsers({ silent: true });
+                if (showPendingParticipants) {
+                    loadSchoolParticipants({ silent: true });
+                }
             }
         };
 
@@ -111,7 +308,7 @@ const UserManagement = () => {
             clearInterval(timer);
             document.removeEventListener('visibilitychange', onVisibilityChange);
         };
-    }, [selectedRegister, loadUsers, loadAllUsers]);
+    }, [selectedRegister, loadUsers, loadAllUsers, showPendingParticipants, loadSchoolParticipants]);
 
     const updateUser = async (id, patch) => {
         try {
@@ -213,6 +410,51 @@ const UserManagement = () => {
                     </div>
                 )}
 
+                {linkSchoolModal && (
+                    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                        <div className="bg-white rounded-3xl shadow-2xl max-w-2xl w-full overflow-hidden">
+                            <div className="p-6 border-b border-gray-200 bg-gradient-to-r from-gray-50 to-yellow-50">
+                                <div className="text-xl font-bold text-gray-900">Link School Account</div>
+                                <div className="text-sm text-gray-600 mt-1">
+                                    School user <span className="font-semibold">{linkSchoolModal.schoolUsername}</span> is not linked to a School profile.
+                                </div>
+                            </div>
+                            <div className="p-6 space-y-4">
+                                <div>
+                                    <label className="block text-sm font-semibold text-gray-700 mb-2">Select School Profile</label>
+                                    <select
+                                        value={linkSchoolId}
+                                        onChange={(e) => setLinkSchoolId(e.target.value)}
+                                        className="w-full border-2 border-gray-300 rounded-xl px-4 py-3 focus:ring-4 focus:ring-yellow-500 focus:border-yellow-500"
+                                    >
+                                        <option value="">-- Select --</option>
+                                        {schools.map(s => (
+                                            <option key={s.id} value={s.id}>
+                                                {s.name} ({s.category})
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+                            </div>
+                            <div className="p-6 border-t border-gray-200 flex items-center justify-end gap-3 bg-gray-50">
+                                <button
+                                    onClick={() => { setLinkSchoolModal(null); setLinkSchoolId(''); }}
+                                    className="px-5 py-2 rounded-xl border-2 border-gray-300 font-semibold text-gray-700 hover:bg-white"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={linkSchoolAndRetry}
+                                    disabled={loading}
+                                    className="px-6 py-2 rounded-xl bg-gradient-to-r from-yellow-500 to-orange-500 text-white font-bold hover:from-yellow-600 hover:to-orange-600 disabled:opacity-50"
+                                >
+                                    Link & Retry Approval
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
                 <div className="grid grid-cols-1 xl:grid-cols-5 gap-8">
                     {/* Enhanced User Statistics Cards */}
                     <div className="xl:col-span-2">
@@ -239,26 +481,68 @@ const UserManagement = () => {
                             )}
 
                             <div className="space-y-6">
+                                {/* Pending Participants Button */}
+                                <button
+                                    onClick={() => {
+                                        setShowPendingParticipants(!showPendingParticipants);
+                                        if (!showPendingParticipants) {
+                                            loadSchoolParticipants();
+                                            setSelectedRegister('');
+                                            setSelectedStudentCategory('');
+                                        }
+                                    }}
+                                    className={`w-full p-6 rounded-2xl border-2 transition-all duration-300 text-left group ${showPendingParticipants
+                                        ? 'bg-gradient-to-r from-yellow-50 to-orange-50 border-yellow-300 text-yellow-900 shadow-lg transform scale-105'
+                                        : 'bg-gradient-to-r from-yellow-50 to-amber-50 border-yellow-200 text-yellow-800 hover:border-yellow-300 hover:shadow-md hover:scale-102'
+                                        }`}
+                                >
+                                    <div className="flex items-center justify-between">
+                                        <div>
+                                            <div className="font-bold text-xl mb-2 flex items-center">
+                                                <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                                                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
+                                                </svg>
+                                                Pending Approvals
+                                            </div>
+                                            <div className="text-sm font-medium text-yellow-700">
+                                                School participants awaiting approval
+                                            </div>
+                                        </div>
+                                        <div className={`text-3xl font-bold transition-colors duration-300 ${showPendingParticipants ? 'text-yellow-700' : 'text-yellow-600 group-hover:text-yellow-700'}`}>
+                                            {schoolParticipants.length}
+                                        </div>
+                                    </div>
+                                </button>
+
                                 <RegisterButton
                                     label="Students"
                                     role="student"
                                     count={userCounts.student}
                                     isSelected={selectedRegister === 'student'}
-                                    onClick={() => handleRegisterClick('student')}
+                                    onClick={() => {
+                                        handleRegisterClick('student');
+                                        setShowPendingParticipants(false);
+                                    }}
                                 />
                                 <RegisterButton
                                     label="Volunteers"
                                     role="volunteer"
                                     count={userCounts.volunteer}
                                     isSelected={selectedRegister === 'volunteer'}
-                                    onClick={() => handleRegisterClick('volunteer')}
+                                    onClick={() => {
+                                        handleRegisterClick('volunteer');
+                                        setShowPendingParticipants(false);
+                                    }}
                                 />
                                 <RegisterButton
                                     label="Judges"
                                     role="judge"
                                     count={userCounts.judge}
                                     isSelected={selectedRegister === 'judge'}
-                                    onClick={() => handleRegisterClick('judge')}
+                                    onClick={() => {
+                                        handleRegisterClick('judge');
+                                        setShowPendingParticipants(false);
+                                    }}
                                 />
                             </div>
 
@@ -312,44 +596,154 @@ const UserManagement = () => {
                                 )}
                             </div>
 
-                            {/* Users Table */}
+                            {/* Users Table or Pending Participants */}
                             <div className="overflow-x-auto">
-                                {loading ? (
-                                    <div className="flex justify-center items-center py-12">
-                                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-                                    </div>
-                                ) : !selectedRegister ? (
-                                    <div className="text-center py-12">
-                                        <h3 className="text-lg font-medium text-gray-900 mb-2">No category selected</h3>
-                                        <p className="text-gray-500">Please select Student, Judge, or Volunteer to view users.</p>
-                                    </div>
-                                ) : (selectedRegister === 'student' && !selectedStudentCategory) ? (
-                                    <div className="text-center py-12">
-                                        <h3 className="text-lg font-medium text-gray-900 mb-2">Select a student subcategory</h3>
-                                        <p className="text-gray-500">Choose LP, UP, HS, or HSS to view student users.</p>
-                                    </div>
-                                ) : paged.length === 0 ? (
-                                    <div className="text-center py-12">
-                                        <div className="text-gray-400 mb-4">
-                                            <svg className="mx-auto h-12 w-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z" />
-                                            </svg>
+                                {showPendingParticipants ? (
+                                    // Pending Participants View
+                                    loading ? (
+                                        <div className="flex justify-center items-center py-12">
+                                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-yellow-600"></div>
                                         </div>
-                                        <h3 className="text-lg font-medium text-gray-900 mb-2">No users found</h3>
-                                        <p className="text-gray-500">{selectedRegister ? `No ${selectedRegister}s found` : 'No users match your search criteria'}</p>
-                                    </div>
+                                    ) : schoolParticipants.length === 0 ? (
+                                        <div className="text-center py-12">
+                                            <div className="text-yellow-400 mb-4">
+                                                <svg className="mx-auto h-12 w-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                </svg>
+                                            </div>
+                                            <h3 className="text-lg font-medium text-gray-900 mb-2">No Pending Participants</h3>
+                                            <p className="text-gray-500">All school participants have been approved!</p>
+                                        </div>
+                                    ) : (
+                                        <div>
+                                            {/* Bulk Actions Bar */}
+                                            {selectedParticipants.length > 0 && (
+                                                <div className="bg-yellow-50 border-b border-yellow-200 px-8 py-4 flex items-center justify-between">
+                                                    <div className="text-sm font-medium text-yellow-900">
+                                                        {selectedParticipants.length} participant(s) selected
+                                                    </div>
+                                                    <button
+                                                        onClick={() => bulkApproveParticipants(selectedParticipants)}
+                                                        className="px-6 py-2 bg-gradient-to-r from-green-500 to-green-600 text-white font-semibold rounded-lg hover:from-green-600 hover:to-green-700 transition-all duration-200 shadow-md hover:shadow-lg"
+                                                    >
+                                                        Approve Selected
+                                                    </button>
+                                                </div>
+                                            )}
+
+                                            {/* Participants Table */}
+                                            <div className="divide-y divide-gray-200">
+                                                {schoolParticipants.map(participant => (
+                                                    <div key={participant.id} className="p-6 hover:bg-gray-50 transition-colors duration-150">
+                                                        <div className="flex items-start gap-4">
+                                                            {/* Checkbox */}
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={selectedParticipants.includes(participant.id)}
+                                                                onChange={(e) => {
+                                                                    if (e.target.checked) {
+                                                                        setSelectedParticipants(prev => [...prev, participant.id]);
+                                                                    } else {
+                                                                        setSelectedParticipants(prev => prev.filter(id => id !== participant.id));
+                                                                    }
+                                                                }}
+                                                                className="mt-1 w-5 h-5 text-yellow-600 border-gray-300 rounded focus:ring-yellow-500"
+                                                            />
+
+                                                            {/* Participant Info */}
+                                                            <div className="flex-1">
+                                                                <div className="flex items-start justify-between">
+                                                                    <div>
+                                                                        <h4 className="text-lg font-semibold text-gray-900">
+                                                                            {participant.first_name} {participant.last_name}
+                                                                        </h4>
+                                                                        <div className="mt-1 space-y-1">
+                                                                            <p className="text-sm text-gray-600">
+                                                                                <span className="font-medium">ID:</span> {participant.participant_id}
+                                                                            </p>
+                                                                            <p className="text-sm text-gray-600">
+                                                                                <span className="font-medium">School:</span> {participant.school_name}
+                                                                            </p>
+                                                                            <p className="text-sm text-gray-600">
+                                                                                <span className="font-medium">Class:</span> {participant.student_class}
+                                                                                <span className={`ml-2 px-2 py-0.5 rounded-full text-xs font-semibold ${participant.section === 'LP' ? 'bg-orange-100 text-orange-700' :
+                                                                                    participant.section === 'UP' ? 'bg-blue-100 text-blue-700' :
+                                                                                        participant.section === 'HS' ? 'bg-green-100 text-green-700' :
+                                                                                            'bg-purple-100 text-purple-700'
+                                                                                    }`}>
+                                                                                    {participant.section}
+                                                                                </span>
+                                                                            </p>
+                                                                            {participant.events_display && participant.events_display.length > 0 && (
+                                                                                <div className="mt-2">
+                                                                                    <span className="text-xs font-medium text-gray-500 uppercase">Events:</span>
+                                                                                    <div className="mt-1 flex flex-wrap gap-1">
+                                                                                        {participant.events_display.map(event => (
+                                                                                            <span key={event.id} className="px-2 py-1 bg-blue-50 text-blue-700 rounded text-xs font-medium">
+                                                                                                {event.name}
+                                                                                            </span>
+                                                                                        ))}
+                                                                                    </div>
+                                                                                </div>
+                                                                            )}
+                                                                        </div>
+                                                                    </div>
+
+                                                                    {/* Approve Button */}
+                                                                    <button
+                                                                        onClick={() => approveParticipant(participant.id)}
+                                                                        disabled={loading}
+                                                                        className="px-4 py-2 bg-gradient-to-r from-green-500 to-green-600 text-white font-semibold rounded-lg hover:from-green-600 hover:to-green-700 transition-all duration-200 shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                                                                    >
+                                                                        Approve
+                                                                    </button>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )
                                 ) : (
-                                    <div className="divide-y divide-gray-200">
-                                        {paged.map(u => (
-                                            <UserCard
-                                                key={u.id}
-                                                user={u}
-                                                onPhoneChange={onPhoneChange}
-                                                onDelete={deleteUser}
-                                                onUpdate={updateUser}
-                                            />
-                                        ))}
-                                    </div>
+                                    // Regular Users View
+                                    loading ? (
+                                        <div className="flex justify-center items-center py-12">
+                                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                                        </div>
+                                    ) : !selectedRegister ? (
+                                        <div className="text-center py-12">
+                                            <h3 className="text-lg font-medium text-gray-900 mb-2">No category selected</h3>
+                                            <p className="text-gray-500">Please select Student, Judge, or Volunteer to view users.</p>
+                                        </div>
+                                    ) : (selectedRegister === 'student' && !selectedStudentCategory) ? (
+                                        <div className="text-center py-12">
+                                            <h3 className="text-lg font-medium text-gray-900 mb-2">Select a student subcategory</h3>
+                                            <p className="text-gray-500">Choose LP, UP, HS, or HSS to view student users.</p>
+                                        </div>
+                                    ) : paged.length === 0 ? (
+                                        <div className="text-center py-12">
+                                            <div className="text-gray-400 mb-4">
+                                                <svg className="mx-auto h-12 w-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z" />
+                                                </svg>
+                                            </div>
+                                            <h3 className="text-lg font-medium text-gray-900 mb-2">No users found</h3>
+                                            <p className="text-gray-500">{selectedRegister ? `No ${selectedRegister}s found` : 'No users match your search criteria'}</p>
+                                        </div>
+                                    ) : (
+                                        <div className="divide-y divide-gray-200">
+                                            {paged.map(u => (
+                                                <UserCard
+                                                    key={u.id}
+                                                    user={u}
+                                                    onPhoneChange={onPhoneChange}
+                                                    onDelete={deleteUser}
+                                                    onUpdate={updateUser}
+                                                />
+                                            ))}
+                                        </div>
+                                    )
                                 )}
                             </div>
 
@@ -382,6 +776,97 @@ const UserManagement = () => {
                         </div>
                     </div>
                 </div>
+
+                {/* Credentials Modal */}
+                {approvalModal && (
+                    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                        <div className="bg-white rounded-3xl shadow-2xl max-w-2xl w-full overflow-hidden">
+                            {/* Modal Header */}
+                            <div className="bg-gradient-to-r from-green-500 to-green-600 px-8 py-6">
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center">
+                                        <svg className="w-10 h-10 text-white mr-3" fill="currentColor" viewBox="0 0 20 20">
+                                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                                        </svg>
+                                        <h2 className="text-3xl font-bold text-white">Participant Approved!</h2>
+                                    </div>
+                                    <button
+                                        onClick={() => setApprovalModal(null)}
+                                        className="text-white hover:text-gray-200 transition-colors"
+                                    >
+                                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                        </svg>
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Modal Body */}
+                            <div className="px-8 py-8">
+                                <div className="mb-6">
+                                    <h3 className="text-xl font-semibold text-gray-900 mb-4">
+                                        {approvalModal.participant.first_name} {approvalModal.participant.last_name}
+                                    </h3>
+                                    <div className="space-y-3 text-gray-700">
+                                        <p><span className="font-medium">Participant ID:</span> {approvalModal.participant.participant_id}</p>
+                                        <p><span className="font-medium">School:</span> {approvalModal.participant.school_name}</p>
+                                        <p><span className="font-medium">Class:</span> {approvalModal.participant.student_class}</p>
+                                        <p><span className="font-medium">Section:</span> <span className={`px-2 py-1 rounded-full text-xs font-semibold ${approvalModal.credentials.section === 'LP' ? 'bg-orange-100 text-orange-700' :
+                                            approvalModal.credentials.section === 'UP' ? 'bg-blue-100 text-blue-700' :
+                                                approvalModal.credentials.section === 'HS' ? 'bg-green-100 text-green-700' :
+                                                    'bg-purple-100 text-purple-700'
+                                            }`}>{approvalModal.credentials.section}</span></p>
+                                    </div>
+                                </div>
+
+                                {/* Credentials Box */}
+                                <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl p-6 border-2 border-blue-200">
+                                    <h4 className="text-lg font-bold text-blue-900 mb-4 flex items-center">
+                                        <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                                            <path fillRule="evenodd" d="M18 8a6 6 0 01-7.743 5.743L10 14l-1 1-1 1H6v2H2v-4l4.257-4.257A6 6 0 1118 8zm-6-4a1 1 0 100 2 2 2 0 012 2 1 1 0 102 0 4 4 0 00-4-4z" clipRule="evenodd" />
+                                        </svg>
+                                        Login Credentials
+                                    </h4>
+                                    <div className="space-y-3">
+                                        <div className="bg-white rounded-lg p-4">
+                                            <p className="text-sm font-medium text-gray-600 mb-1">Username</p>
+                                            <p className="text-lg font-mono font-bold text-gray-900">{approvalModal.credentials.username}</p>
+                                        </div>
+                                        <div className="bg-white rounded-lg p-4">
+                                            <p className="text-sm font-medium text-gray-600 mb-1">Password</p>
+                                            <p className="text-lg font-mono font-bold text-red-600">{approvalModal.credentials.password}</p>
+                                        </div>
+                                    </div>
+                                    <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                                        <p className="text-sm text-yellow-800">
+                                            <span className="font-bold">⚠️ Important:</span> Please save these credentials securely. The password is shown only once and cannot be recovered.
+                                        </p>
+                                    </div>
+                                </div>
+
+                                {/* Action Buttons */}
+                                <div className="mt-8 flex gap-4">
+                                    <button
+                                        onClick={() => {
+                                            const text = `Participant Credentials\n\nName: ${approvalModal.participant.first_name} ${approvalModal.participant.last_name}\nUsername: ${approvalModal.credentials.username}\nPassword: ${approvalModal.credentials.password}\nSection: ${approvalModal.credentials.section}`;
+                                            navigator.clipboard.writeText(text);
+                                            alert('Credentials copied to clipboard!');
+                                        }}
+                                        className="flex-1 px-6 py-3 bg-gradient-to-r from-blue-500 to-blue-600 text-white font-semibold rounded-lg hover:from-blue-600 hover:to-blue-700 transition-all duration-200 shadow-md hover:shadow-lg"
+                                    >
+                                        Copy to Clipboard
+                                    </button>
+                                    <button
+                                        onClick={() => setApprovalModal(null)}
+                                        className="flex-1 px-6 py-3 bg-gray-200 text-gray-800 font-semibold rounded-lg hover:bg-gray-300 transition-all duration-200"
+                                    >
+                                        Close
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
             </div>
         </div>
     );

@@ -255,6 +255,35 @@ class EventRegistrationSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(
                 "You are already registered for this event.")
 
+        try:
+            if getattr(user, 'role', None) == 'student':
+                registration_id = (getattr(user, 'registration_id', None) or '').strip()
+                participant_pk = None
+                if registration_id.startswith('SPP-'):
+                    try:
+                        participant_pk = int(registration_id.split('-', 1)[1])
+                    except Exception:
+                        participant_pk = None
+
+                if participant_pk is None:
+                    raise serializers.ValidationError(
+                        'Your school-approved event selection was not found. Please contact your school coordinator.')
+
+                from users.workflow_models import SchoolParticipant
+                participant = SchoolParticipant.objects.prefetch_related('events').filter(pk=participant_pk).first()
+                if participant is None:
+                    raise serializers.ValidationError(
+                        'Your school-approved event selection was not found. Please contact your school coordinator.')
+
+                allowed_event_ids = set(participant.events.values_list('id', flat=True))
+                if selected_event.id not in allowed_event_ids:
+                    raise serializers.ValidationError(
+                        'You are not allowed to register for this event. It was not selected by your school.')
+        except serializers.ValidationError:
+            raise
+        except Exception:
+            raise serializers.ValidationError('Unable to validate school-approved event selection. Please try again later.')
+
         return data
 
     def create(self, validated_data):
