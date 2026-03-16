@@ -105,6 +105,11 @@ class SchoolParticipant(models.Model):
     Participant data submitted by schools.
     This data is sent to the assigned volunteer for verification.
     """
+    GENDER_CHOICES = [
+        ('BOYS', 'Boys'),
+        ('GIRLS', 'Girls'),
+    ]
+
     school = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
@@ -115,6 +120,7 @@ class SchoolParticipant(models.Model):
     first_name = models.CharField(max_length=100)
     last_name = models.CharField(max_length=100)
     student_class = models.PositiveSmallIntegerField(help_text="Class 1-12")
+    gender = models.CharField(max_length=10, choices=GENDER_CHOICES, null=True, blank=True)
     events = models.ManyToManyField('events.Event', related_name='school_participant_events')
     submitted_at = models.DateTimeField(auto_now_add=True)
     verified_by_volunteer = models.BooleanField(default=False)
@@ -136,6 +142,107 @@ class SchoolParticipant(models.Model):
     
     def __str__(self):
         return f"{self.participant_id} - {self.first_name} {self.last_name}"
+
+
+class SchoolGroupEntry(models.Model):
+    """
+    Group-based participant data submitted by schools for group events.
+    """
+    GROUP_CLASS_CHOICES = [
+        ('LP', 'Lower Primary'),
+        ('UP', 'Upper Primary'),
+        ('HS', 'High School'),
+        ('HSS', 'Higher Secondary School'),
+    ]
+    GENDER_CHOICES = [
+        ('BOYS', 'Boys'),
+        ('GIRLS', 'Girls'),
+        ('MIXED', 'Mixed'),
+    ]
+    STATUS_CHOICES = [
+        ('pending', 'Pending'),
+        ('approved', 'Approved'),
+        ('rejected', 'Rejected'),
+    ]
+    SOURCE_CHOICES = [
+        ('manual', 'Manual'),
+        ('bulk', 'Bulk Import'),
+    ]
+
+    school = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='school_group_entries',
+        limit_choices_to={'role': 'school'}
+    )
+    group_id = models.CharField(max_length=100, help_text="School-assigned unique group ID")
+    group_class = models.CharField(max_length=10, choices=GROUP_CLASS_CHOICES)
+    gender_category = models.CharField(max_length=10, choices=GENDER_CHOICES)
+    participant_count = models.PositiveSmallIntegerField()
+    leader_full_name = models.CharField(max_length=220)
+    leader_user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        related_name='led_school_groups',
+        null=True,
+        blank=True,
+        limit_choices_to={'role': 'student'}
+    )
+    events = models.ManyToManyField('events.Event', related_name='school_group_entries', blank=True)
+
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    review_notes = models.TextField(blank=True)
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+    reviewed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        related_name='reviewed_school_group_entries',
+        null=True,
+        blank=True,
+        limit_choices_to={'role': 'admin'}
+    )
+    source = models.CharField(max_length=20, choices=SOURCE_CHOICES, default='manual')
+    submitted_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'School Group Entry'
+        verbose_name_plural = 'School Group Entries'
+        ordering = ['-submitted_at']
+        unique_together = [['school', 'group_id']]
+        constraints = [
+            models.CheckConstraint(
+                check=models.Q(participant_count__gte=1) & models.Q(participant_count__lte=20),
+                name='school_group_participant_count_range',
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.group_id} - {self.school.username}"
+
+
+class SchoolGroupMember(models.Model):
+    """
+    Individual members within a school group entry.
+    """
+    group_entry = models.ForeignKey(
+        SchoolGroupEntry,
+        on_delete=models.CASCADE,
+        related_name='members'
+    )
+    member_order = models.PositiveSmallIntegerField()
+    first_name = models.CharField(max_length=100)
+    last_name = models.CharField(max_length=100)
+    is_leader = models.BooleanField(default=False)
+
+    class Meta:
+        verbose_name = 'School Group Member'
+        verbose_name_plural = 'School Group Members'
+        ordering = ['member_order']
+        unique_together = [['group_entry', 'member_order']]
+
+    def __str__(self):
+        return f"{self.group_entry.group_id} - {self.first_name} {self.last_name}"
 
 
 class SchoolVolunteerAssignment(models.Model):

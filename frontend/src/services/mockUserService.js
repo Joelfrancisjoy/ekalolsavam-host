@@ -1,5 +1,20 @@
 import { mockUsers, delay } from './mockData';
 
+const toPlainUserData = (raw) => {
+  if (!raw) return {};
+  if (typeof FormData !== 'undefined' && raw instanceof FormData) {
+    const data = {};
+    raw.forEach((value, key) => {
+      data[key] = value;
+    });
+    return data;
+  }
+  if (typeof raw === 'object') {
+    return { ...raw };
+  }
+  return {};
+};
+
 const mockUserService = {
   login: async (email, password) => {
     await delay();
@@ -14,17 +29,20 @@ const mockUserService = {
         email: user.email,
         first_name: user.first_name,
         last_name: user.last_name,
-        role: user.role
+        role: user.role,
+        gender: user.gender || ''
       }
     };
   },
 
   register: async (userData) => {
     await delay();
+    const parsedData = toPlainUserData(userData);
     const newUser = {
       id: mockUsers.length + 1,
-      ...userData,
-      role: 'student'
+      ...parsedData,
+      role: parsedData.role || 'student',
+      gender: parsedData.gender || ''
     };
     mockUsers.push(newUser);
     return {
@@ -55,6 +73,17 @@ const mockUserService = {
     const index = mockUsers.findIndex(u => u.id === parseInt(id));
     if (index !== -1) {
       mockUsers[index] = { ...mockUsers[index], ...userData };
+      return mockUsers[index];
+    }
+    throw new Error('User not found');
+  },
+
+  update: async (id, userData) => {
+    await delay();
+    const index = mockUsers.findIndex((u) => u.id === parseInt(id));
+    if (index !== -1) {
+      const patch = toPlainUserData(userData);
+      mockUsers[index] = { ...mockUsers[index], ...patch };
       return mockUsers[index];
     }
     throw new Error('User not found');

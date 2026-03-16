@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import http from '../services/http-common';
+import { GENDER_OPTIONS, normalizeGenderValue } from '../constants/gender';
 
 const IDSignup = () => {
   const navigate = useNavigate();
@@ -11,7 +12,8 @@ const IDSignup = () => {
     password_confirm: '',
     email: '',
     first_name: '',
-    last_name: ''
+    last_name: '',
+    gender: ''
   });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -54,6 +56,10 @@ const IDSignup = () => {
       setError('First name and last name are required');
       return false;
     }
+    if (!normalizeGenderValue(formData.gender)) {
+      setError('Please select your gender');
+      return false;
+    }
     return true;
   };
 
@@ -68,7 +74,10 @@ const IDSignup = () => {
     setLoading(true);
 
     try {
-      await http.post('/api/auth/register/with-id/', formData);
+      await http.post('/api/auth/register/with-id/', {
+        ...formData,
+        gender: normalizeGenderValue(formData.gender)
+      });
 
       setSuccess(true);
       setTimeout(() => {
@@ -169,6 +178,26 @@ const IDSignup = () => {
                   placeholder="Doe"
                 />
               </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Gender *
+              </label>
+              <select
+                name="gender"
+                value={formData.gender}
+                onChange={handleChange}
+                required
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">Select gender</option>
+                {GENDER_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
             </div>
 
             <div>

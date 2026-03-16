@@ -28,6 +28,7 @@ INSTALLED_APPS = [
     'social_django',
     'core',  # Core system utilities
     'users',
+    'catalog',
     'events',
     'scores',
     'certificates',

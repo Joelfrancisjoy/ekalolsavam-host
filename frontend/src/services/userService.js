@@ -1,6 +1,13 @@
 import http from './http-common';
 import authManager from '../utils/authManager';
 
+const normalizeCollection = (payload) => {
+    if (Array.isArray(payload)) return payload;
+    if (Array.isArray(payload?.results)) return payload.results;
+    if (Array.isArray(payload?.items)) return payload.items;
+    return [];
+};
+
 export const userService = {
     login: async (username, password) => {
         const res = await http.post('/api/auth/login/', { username, password });
@@ -22,7 +29,7 @@ export const userService = {
 
     list: async (params = {}) => {
         const res = await http.get('/api/auth/users/', { params });
-        return res.data;
+        return normalizeCollection(res.data);
     },
     update: async (id, data) => {
         const res = await http.patch(`/api/auth/users/${id}/`, data);

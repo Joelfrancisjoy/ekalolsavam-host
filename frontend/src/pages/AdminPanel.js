@@ -4,12 +4,14 @@ import { useNavigate, useParams } from 'react-router-dom';
 import AllowedEmailsManager from '../components/AllowedEmailsManager';
 import UserManagement from '../components/UserManagement';
 import EventManagement from '../components/EventManagement';
+import CatalogEventManagement from '../components/CatalogEventManagement';
 import ResultPublishing from '../components/ResultPublishing';
 import CertificateGeneration from '../components/CertificateGeneration';
 import VolunteerCoordination from '../components/VolunteerCoordination';
 import SystemSettings from '../components/SystemSettings';
 import SchoolManagement from '../components/SchoolManagement';
 import IDManagement from '../components/IDManagementEnhanced';
+import SchoolGroupParticipantsAdmin from '../components/SchoolGroupParticipantsAdmin';
 
 const AdminPanel = () => {
   const { t } = useTranslation();
@@ -29,6 +31,8 @@ const AdminPanel = () => {
         return <UserManagement />;
       case 'events':
         return <EventManagement />;
+      case 'catalog':
+        return <CatalogEventManagement />;
       case 'results':
         return <ResultPublishing />;
       case 'certificates':
@@ -41,6 +45,8 @@ const AdminPanel = () => {
         return <SchoolManagement />;
       case 'ids':
         return <IDManagement />;
+      case 'school-group-participants':
+        return <SchoolGroupParticipantsAdmin />;
       case 'dashboard':
       default:
         return (
@@ -92,6 +98,15 @@ const AdminPanel = () => {
                   description="Create and schedule events"
                   icon="📅"
                   onClick={() => goTo('events')}
+                />
+              </div>
+
+              <div className="animate-fade-in-up animation-delay-350 md:col-span-1 lg:col-span-1">
+                <AdminCard
+                  title="Event Catalog"
+                  description="Manage base events, variants, and rules"
+                  icon="🗂️"
+                  onClick={() => goTo('catalog')}
                 />
               </div>
 
@@ -148,6 +163,14 @@ const AdminPanel = () => {
               </div>
               <div className="animate-fade-in-up animation-delay-1000">
                 <AdminCard
+                  title="School Group Participants"
+                  description="Review and transition school group entries"
+                  icon="👥"
+                  onClick={() => goTo('school-group-participants')}
+                />
+              </div>
+              <div className="animate-fade-in-up animation-delay-1000">
+                <AdminCard
                   title="Emergency Dashboard"
                   description="Monitor and manage emergency alerts"
                   icon="🚨"
@@ -191,12 +214,14 @@ const AdminPanel = () => {
                   {activeSection === 'allowed-emails' && 'Google Signup Email Management'}
                   {activeSection === 'users' && 'User Management'}
                   {activeSection === 'events' && 'Event Management'}
+                  {activeSection === 'catalog' && 'Event Catalog'}
                   {activeSection === 'results' && 'Result Publishing'}
                   {activeSection === 'certificates' && 'Certificate Generation'}
                   {activeSection === 'volunteers' && 'Volunteer Coordination'}
                   {activeSection === 'settings' && 'System Settings'}
                   {activeSection === 'schools' && 'School Management'}
                   {activeSection === 'ids' && 'ID Management'}
+                  {activeSection === 'school-group-participants' && 'School Group Participants'}
                 </h1>
               </div>
             </div>

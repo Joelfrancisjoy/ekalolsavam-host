@@ -12,6 +12,26 @@ from django.core.mail import send_mail
 from django.shortcuts import get_object_or_404
 
 
+def _event_queryset():
+    """
+    Shared eager-loaded queryset for event read endpoints.
+    Reduces N+1 queries when serializing nested event/judge/volunteer details.
+    """
+    return Event.objects.select_related(
+        "venue",
+        "created_by",
+        "event_definition",
+        "event_definition__category",
+        "event_definition__participation_type",
+        "event_variant",
+    ).prefetch_related(
+        "judges",
+        "volunteers",
+        "event_definition__rules__level",
+        "event_definition__rules__variant",
+    )
+
+
 class VenueListCreateView(generics.ListCreateAPIView):
     queryset = Venue.objects.all()
     serializer_class = VenueSerializer
@@ -47,7 +67,7 @@ class JudgeDetailView(generics.RetrieveUpdateDestroyAPIView):
 
 
 class EventListCreateView(generics.ListCreateAPIView):
-    queryset = Event.objects.all()
+    queryset = _event_queryset()
     serializer_class = EventSerializer
 
     # Authenticated users can list events; only admins can create
@@ -57,7 +77,7 @@ class EventListCreateView(generics.ListCreateAPIView):
         return [IsAdminRole()]
 
     def get_queryset(self):
-        queryset = Event.objects.all()
+        queryset = _event_queryset()
         category = self.request.query_params.get('category', None)
         date = self.request.query_params.get('date', None)
         published_only = self.request.query_params.get('published_only', None)
@@ -75,7 +95,7 @@ class EventListCreateView(generics.ListCreateAPIView):
 
 @method_decorator(csrf_exempt, name='dispatch')
 class EventDetailView(generics.RetrieveUpdateDestroyAPIView):
-    queryset = Event.objects.all()
+    queryset = _event_queryset()
     serializer_class = EventSerializer
 
     # Authenticated users can read; only admins can update/delete
@@ -308,7 +328,7 @@ class MyAssignedEventsView(generics.ListAPIView):
         user = self.request.user
         if getattr(user, 'role', None) == 'judge':
             # Only published events should be visible in the dashboard
-            return Event.objects.filter(
+            return _event_queryset().filter(
                 judges=user,
                 status__in=["published", "registration_closed", "in_progress",
                             "scoring_closed", "results_published", "archived"]
@@ -329,7 +349,7 @@ class ParticipantsByEventForJudgeView(generics.ListAPIView):
 
     def get_queryset(self):
         event_id = self.kwargs.get('pk')
-        event = get_object_or_404(Event, pk=event_id)
+        event = get_object_or_404(_event_queryset(), pk=event_id)
 
         user = self.request.user
         # Allow judges and volunteers assigned to the event
@@ -360,7 +380,20 @@ class ParticipantsByEventForJudgeView(generics.ListAPIView):
             queryset = EventRegistration.objects.filter(
                 event=event,
                 participant_id__in=verified_participant_ids
-            ).select_related('participant', 'participant__school')
+            ).select_related(
+                'participant',
+                'participant__school',
+                'event',
+                'event__venue',
+                'event__created_by',
+                'event__event_definition',
+                'event__event_definition__category',
+                'event__event_definition__participation_type',
+                'event__event_variant',
+            ).prefetch_related(
+                'event__judges',
+                'event__volunteers',
+            )
 
             # Filter by chess number if provided
             chess_number = (self.request.query_params.get('chess_number') or '').strip()
@@ -375,7 +408,21 @@ class ParticipantsByEventForJudgeView(generics.ListAPIView):
         elif is_assigned_volunteer:
             # For volunteers: Show all registered participants
             queryset = EventRegistration.objects.filter(
-                event=event).select_related('participant', 'participant__school')
+                event=event
+            ).select_related(
+                'participant',
+                'participant__school',
+                'event',
+                'event__venue',
+                'event__created_by',
+                'event__event_definition',
+                'event__event_definition__category',
+                'event__event_definition__participation_type',
+                'event__event_variant',
+            ).prefetch_related(
+                'event__judges',
+                'event__volunteers',
+            )
 
             # Filter by chess number if provided
             chess_number = (self.request.query_params.get('chess_number') or '').strip()

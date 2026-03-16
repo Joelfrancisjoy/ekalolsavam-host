@@ -110,12 +110,17 @@ const eventService = {
         return res.data;
     },
 
-    registerForEvent: async (eventId, firstName, lastName) => {
-        const res = await http.post('/api/events/registrations/', {
+    registerForEvent: async (eventId, firstName, lastName, groupId = '') => {
+        const payload = {
             event: eventId,
             first_name: firstName,
             last_name: lastName
-        });
+        };
+        const normalizedGroupId = String(groupId || '').trim().toUpperCase();
+        if (normalizedGroupId) {
+            payload.group_id = normalizedGroupId;
+        }
+        const res = await http.post('/api/events/registrations/', payload);
         return res.data;
     },
 

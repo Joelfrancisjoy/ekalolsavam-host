@@ -1,5 +1,11 @@
 from rest_framework import serializers
+from django.db.models import Q
 from .models import Event, Venue, EventRegistration, Judge, ParticipantVerification
+from .services.catalog_sync import (
+    build_canonical_event_name_from_models,
+    get_effective_level_codes,
+    map_event_definition_category_to_event_category,
+)
 
 # It's generally better practice to import other serializers at the top level
 # if you can resolve circular dependency issues, for example, by moving
@@ -31,6 +37,9 @@ class EventSerializer(serializers.ModelSerializer):
     judges_details = serializers.SerializerMethodField()
     volunteers_details = serializers.SerializerMethodField()
     created_by_details = serializers.SerializerMethodField()
+    event_definition_details = serializers.SerializerMethodField()
+    event_variant_details = serializers.SerializerMethodField()
+    effective_level_codes = serializers.SerializerMethodField()
 
     class Meta:
         model = Event
@@ -50,16 +59,69 @@ class EventSerializer(serializers.ModelSerializer):
         from users.serializers import UserSerializer
         return UserSerializer(obj.created_by).data
 
+    def get_event_definition_details(self, obj):
+        if not getattr(obj, 'event_definition_id', None):
+            return None
+        try:
+            from catalog.serializers import EventDefinitionSerializer
+            return EventDefinitionSerializer(obj.event_definition).data
+        except Exception:
+            return None
+
+    def get_event_variant_details(self, obj):
+        if not getattr(obj, 'event_variant_id', None):
+            return None
+        try:
+            from catalog.serializers import EventVariantSerializer
+            return EventVariantSerializer(obj.event_variant).data
+        except Exception:
+            return None
+
+    def get_effective_level_codes(self, obj):
+        return get_effective_level_codes(
+            getattr(obj, 'event_definition', None),
+            getattr(obj, 'event_variant', None),
+        )
+
     def create(self, validated_data):
+        event_definition = validated_data.get('event_definition')
+        event_variant = validated_data.get('event_variant')
+        if event_definition is not None:
+            if event_variant is not None and event_variant.event_id != event_definition.id:
+                raise serializers.ValidationError('event_variant must belong to the selected event_definition')
+
+            validated_data['name'] = build_canonical_event_name_from_models(event_definition, event_variant)
+            validated_data.setdefault('description', event_definition.event_name)
+            validated_data['category'] = self._map_catalog_category_to_event_category(event_definition)
+
         validated_data['created_by'] = self.context['request'].user
         return super().create(validated_data)
 
     def validate(self, data):
+        event_definition = data.get('event_definition') if 'event_definition' in data else getattr(getattr(self, 'instance', None), 'event_definition', None)
+        event_variant = data.get('event_variant') if 'event_variant' in data else getattr(getattr(self, 'instance', None), 'event_variant', None)
+
         venue = data.get('venue')
         date = data.get('date')
         start_time = data.get('start_time')
         end_time = data.get('end_time')
         instance = getattr(self, 'instance', None)  # For update
+
+        if event_definition is None and event_variant is not None:
+            raise serializers.ValidationError('event_variant requires event_definition')
+
+        if event_definition is not None:
+            if event_variant is not None and event_variant.event_id != event_definition.id:
+                raise serializers.ValidationError('event_variant must belong to the selected event_definition')
+
+            max_participants = data.get('max_participants') if 'max_participants' in data else getattr(instance, 'max_participants', None)
+            type_name = getattr(getattr(event_definition, 'participation_type', None), 'type_name', None)
+            if type_name == 'INDIVIDUAL':
+                if max_participants not in (None, 1):
+                    raise serializers.ValidationError('Individual events must have max_participants = 1')
+            elif type_name == 'GROUP':
+                if max_participants is not None and int(max_participants) < 2:
+                    raise serializers.ValidationError('Group events must have max_participants >= 2')
 
         # Check event limit per venue
         if venue:
@@ -113,6 +175,25 @@ class EventSerializer(serializers.ModelSerializer):
 
         return data
 
+    def update(self, instance, validated_data):
+        event_definition = validated_data.get('event_definition', getattr(instance, 'event_definition', None))
+        event_variant = validated_data.get('event_variant', getattr(instance, 'event_variant', None))
+
+        if event_definition is not None:
+            if event_variant is not None and event_variant.event_id != event_definition.id:
+                raise serializers.ValidationError('event_variant must belong to the selected event_definition')
+            validated_data['name'] = build_canonical_event_name_from_models(event_definition, event_variant)
+            validated_data.setdefault('description', event_definition.event_name)
+            validated_data['category'] = self._map_catalog_category_to_event_category(event_definition)
+
+        return super().update(instance, validated_data)
+
+    def _map_catalog_category_to_event_category(self, event_definition):
+        try:
+            return map_event_definition_category_to_event_category(event_definition, strict=True)
+        except ValueError as exc:
+            raise serializers.ValidationError(str(exc))
+
     def validate_volunteers(self, volunteers):
         # Ensure all assigned users are volunteers
         invalid = [u for u in volunteers if getattr(
@@ -131,6 +212,7 @@ class EventRegistrationSerializer(serializers.ModelSerializer):
     # Extra write-only fields for validation during creation
     first_name = serializers.CharField(write_only=True)
     last_name = serializers.CharField(write_only=True)
+    group_id = serializers.CharField(write_only=True, required=False, allow_blank=True)
 
     class Meta:
         model = EventRegistration
@@ -255,42 +337,146 @@ class EventRegistrationSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(
                 "You are already registered for this event.")
 
+        is_group_event = self._is_group_event(selected_event)
         try:
             if getattr(user, 'role', None) == 'student':
-                registration_id = (getattr(user, 'registration_id', None) or '').strip()
-                participant_pk = None
-                if registration_id.startswith('SPP-'):
-                    try:
-                        participant_pk = int(registration_id.split('-', 1)[1])
-                    except Exception:
-                        participant_pk = None
+                if is_group_event:
+                    resolved_group = self._resolve_group_entry_for_student_group_event(user, selected_event)
+                    data['_resolved_group_entry'] = resolved_group
+                else:
+                    registration_id = (getattr(user, 'registration_id', None) or '').strip()
+                    participant_pk = None
+                    if registration_id.startswith('SPP-'):
+                        try:
+                            participant_pk = int(registration_id.split('-', 1)[1])
+                        except Exception:
+                            participant_pk = None
 
-                if participant_pk is None:
-                    raise serializers.ValidationError(
-                        'Your school-approved event selection was not found. Please contact your school coordinator.')
+                    if participant_pk is None:
+                        raise serializers.ValidationError(
+                            'Your school-approved event selection was not found. Please contact your school coordinator.')
 
-                from users.workflow_models import SchoolParticipant
-                participant = SchoolParticipant.objects.prefetch_related('events').filter(pk=participant_pk).first()
-                if participant is None:
-                    raise serializers.ValidationError(
-                        'Your school-approved event selection was not found. Please contact your school coordinator.')
+                    from users.workflow_models import SchoolParticipant
+                    participant = SchoolParticipant.objects.prefetch_related('events').filter(pk=participant_pk).first()
+                    if participant is None:
+                        raise serializers.ValidationError(
+                            'Your school-approved event selection was not found. Please contact your school coordinator.')
 
-                allowed_event_ids = set(participant.events.values_list('id', flat=True))
-                if selected_event.id not in allowed_event_ids:
-                    raise serializers.ValidationError(
-                        'You are not allowed to register for this event. It was not selected by your school.')
+                    allowed_event_ids = set(participant.events.values_list('id', flat=True))
+                    if selected_event.id not in allowed_event_ids:
+                        raise serializers.ValidationError(
+                            'You are not allowed to register for this event. It was not selected by your school.')
         except serializers.ValidationError:
             raise
         except Exception:
             raise serializers.ValidationError('Unable to validate school-approved event selection. Please try again later.')
 
+        self._validate_catalog_gender_eligibility(user=user, selected_event=selected_event)
+
         return data
 
     def create(self, validated_data):
         # Remove write-only fields not present on the model
+        resolved_group_entry = validated_data.pop('_resolved_group_entry', None)
+        validated_data.pop('group_id', None)
         validated_data.pop('first_name', None)
         validated_data.pop('last_name', None)
+
+        if resolved_group_entry is not None:
+            validated_data['school_group_entry'] = resolved_group_entry
+            validated_data['group_reference_id'] = resolved_group_entry.group_id
+            validated_data['group_leader_name'] = resolved_group_entry.leader_full_name
+
         return super().create(validated_data)
+
+    def _is_group_event(self, selected_event):
+        event_definition = getattr(selected_event, 'event_definition', None)
+        participation_type = getattr(event_definition, 'participation_type', None)
+        return getattr(participation_type, 'type_name', None) == 'GROUP'
+
+    def _resolve_group_entry_for_student_group_event(self, user, selected_event):
+        group_id = (self.initial_data.get('group_id') or '').strip().upper()
+        if not group_id:
+            raise serializers.ValidationError(
+                'group_id is required for group event registration.'
+            )
+
+        if getattr(user, 'school', None) is None:
+            raise serializers.ValidationError(
+                'Your school profile is missing. Please contact your coordinator.'
+            )
+
+        full_name = f"{(user.first_name or '').strip()} {(user.last_name or '').strip()}".strip()
+
+        from users.workflow_models import SchoolGroupEntry
+        group_entry = SchoolGroupEntry.objects.filter(
+            school__school=user.school,
+            status='approved',
+            group_id__iexact=group_id,
+            events=selected_event,
+        ).filter(
+            Q(leader_user=user) |
+            (Q(leader_user__isnull=True) & Q(leader_full_name__iexact=full_name))
+        ).first()
+
+        if group_entry is None:
+            raise serializers.ValidationError(
+                'You are not authorized to register this group for the selected event.'
+            )
+
+        return group_entry
+
+    def _validate_catalog_gender_eligibility(self, user, selected_event):
+        # Enforce only for student registrations on catalog-linked events.
+        if getattr(user, 'role', None) != 'student':
+            return
+
+        if getattr(selected_event, 'event_definition_id', None) is None:
+            return
+
+        section = getattr(user, 'section', None)
+        if not section:
+            raise serializers.ValidationError(
+                'Your class/section is missing. Please contact your school coordinator.'
+            )
+
+        from catalog.models import EventRule
+
+        base_rules_qs = EventRule.objects.filter(
+            event_id=selected_event.event_definition_id,
+            level__level_code=section,
+        )
+
+        if getattr(selected_event, 'event_variant_id', None):
+            variant_specific_qs = base_rules_qs.filter(variant_id=selected_event.event_variant_id)
+            rules_qs = variant_specific_qs if variant_specific_qs.exists() else base_rules_qs.filter(variant__isnull=True)
+        else:
+            rules_qs = base_rules_qs.filter(variant__isnull=True)
+
+        eligible_genders = set(rules_qs.values_list('gender_eligibility', flat=True))
+        if not eligible_genders:
+            raise serializers.ValidationError(
+                'No eligibility rule is configured for your level in this event.'
+            )
+
+        if 'MIXED' in eligible_genders:
+            return
+
+        participant_gender = (getattr(user, 'gender', None) or '').strip().upper()
+        if not participant_gender:
+            raise serializers.ValidationError(
+                'Your gender is not set. Please update your profile before registering for this event.'
+            )
+
+        if participant_gender not in {'BOYS', 'GIRLS'}:
+            raise serializers.ValidationError(
+                'Your gender value is invalid. Please contact admin.'
+            )
+
+        if participant_gender not in eligible_genders:
+            raise serializers.ValidationError(
+                'You are not eligible to register for this event based on gender.'
+            )
 
 
 class ParticipantVerificationSerializer(serializers.ModelSerializer):

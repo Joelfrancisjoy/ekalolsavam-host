@@ -55,6 +55,10 @@ class User(AbstractUser):
         ('volunteer', 'Volunteer'),
         ('school', 'School')
     ]
+    GENDER_CHOICES = [
+        ('BOYS', 'Boys'),
+        ('GIRLS', 'Girls'),
+    ]
     APPROVAL_STATUS_CHOICES = [
         ('pending', 'Pending'),
         ('approved', 'Approved'),
@@ -70,6 +74,7 @@ class User(AbstractUser):
     school_category_extra = models.CharField(max_length=10, blank=True, null=True)
     # Academic class/standard for students (1-12). Used to derive LP/UP/HS/HSS section.
     student_class = models.PositiveSmallIntegerField(null=True, blank=True)
+    gender = models.CharField(max_length=10, choices=GENDER_CHOICES, null=True, blank=True)
 
     availability = models.CharField(
         max_length=20,

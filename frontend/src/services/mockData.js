@@ -79,11 +79,11 @@ export const mockVenues = [
 ];
 
 export const mockUsers = [
-  { id: 1, username: "admin", first_name: "Admin", last_name: "User", role: "admin", email: "admin@example.com" },
-  { id: 2, username: "judge1", first_name: "Dr. Priya", last_name: "Sharma", role: "judge", email: "priya@example.com" },
-  { id: 3, username: "judge2", first_name: "Prof. Raj", last_name: "Kumar", role: "judge", email: "raj@example.com" },
-  { id: 4, username: "vol1", first_name: "Anita", last_name: "Singh", role: "volunteer", email: "anita@example.com" },
-  { id: 5, username: "vol2", first_name: "Vikram", last_name: "Patel", role: "volunteer", email: "vikram@example.com" }
+  { id: 1, username: "admin", first_name: "Admin", last_name: "User", role: "admin", email: "admin@example.com", gender: "BOYS" },
+  { id: 2, username: "judge1", first_name: "Dr. Priya", last_name: "Sharma", role: "judge", email: "priya@example.com", gender: "GIRLS" },
+  { id: 3, username: "judge2", first_name: "Prof. Raj", last_name: "Kumar", role: "judge", email: "raj@example.com", gender: "BOYS" },
+  { id: 4, username: "vol1", first_name: "Anita", last_name: "Singh", role: "volunteer", email: "anita@example.com", gender: "GIRLS" },
+  { id: 5, username: "vol2", first_name: "Vikram", last_name: "Patel", role: "volunteer", email: "vikram@example.com", gender: "BOYS" }
 ];
 
 export const mockRegistrations = [
@@ -99,7 +99,8 @@ export const mockRegistrations = [
       first_name: "John",
       last_name: "Doe",
       school: { name: "ABC School" },
-      section: "Class 10A"
+      section: "Class 10A",
+      gender: "BOYS"
     },
     event_details: mockEvents[0]
   },
@@ -115,7 +116,8 @@ export const mockRegistrations = [
       first_name: "Jane",
       last_name: "Smith",
       school: { name: "XYZ School" },
-      section: "Class 9B"
+      section: "Class 9B",
+      gender: "GIRLS"
     },
     event_details: mockEvents[1]
   }
@@ -144,8 +146,10 @@ export const mockResults = [
 
 // Helper function to check if backend is available
 export const isBackendAvailable = () => {
-  // For demo purposes, assume backend is not available if no API_URL is set
-  return !!process.env.REACT_APP_API_URL;
+  // Use mock services only when explicitly requested.
+  // Default to real backend so production/dev works even without REACT_APP_API_URL.
+  const useMock = String(process.env.REACT_APP_USE_MOCK || '').toLowerCase() === 'true';
+  return !useMock;
 };
 
 // Simulate API delay

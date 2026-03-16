@@ -64,6 +64,23 @@ class SchoolParticipantAdmin(admin.ModelAdmin):
     readonly_fields = ('submitted_at', 'verified_by_volunteer', 'verified_at')
 
 
+@admin.register(workflow_models.SchoolGroupEntry)
+class SchoolGroupEntryAdmin(admin.ModelAdmin):
+    list_display = ('group_id', 'school', 'group_class', 'gender_category', 'participant_count',
+                    'leader_full_name', 'status', 'submitted_at')
+    list_filter = ('group_class', 'gender_category', 'status', 'source', 'submitted_at')
+    search_fields = ('group_id', 'school__username', 'leader_full_name', 'review_notes')
+    filter_horizontal = ('events',)
+    readonly_fields = ('submitted_at', 'updated_at', 'reviewed_at')
+
+
+@admin.register(workflow_models.SchoolGroupMember)
+class SchoolGroupMemberAdmin(admin.ModelAdmin):
+    list_display = ('group_entry', 'member_order', 'first_name', 'last_name', 'is_leader')
+    list_filter = ('is_leader',)
+    search_fields = ('group_entry__group_id', 'first_name', 'last_name')
+
+
 @admin.register(workflow_models.SchoolVolunteerAssignment)
 class SchoolVolunteerAssignmentAdmin(admin.ModelAdmin):
     list_display = ('school', 'volunteer', 'assigned_at', 'is_active', 'assigned_by')

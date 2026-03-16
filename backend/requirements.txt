@@ -21,3 +21,6 @@ psycopg[binary]>=3.2
 
 # DB URL parser
 dj-database-url>=1.0.0
+
+# Data seeding / factories
+factory-boy>=3.3.0

@@ -1,11 +1,17 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { eventServiceAdapter as eventService, resultServiceAdapter as resultService } from '../services/serviceAdapter';
+import {
+  eventServiceAdapter as eventService,
+  resultServiceAdapter as resultService,
+  userServiceAdapter as userService
+} from '../services/serviceAdapter';
 import http from '../services/http-common';
 import UserInfoHeader from '../components/UserInfoHeader';
 import StudentFeedbackDisplay from '../components/StudentFeedbackDisplay';
 import feedbackService from '../services/feedbackService';
 import authManager from '../utils/authManager';
+import { GENDER_OPTIONS, getGenderLabel, normalizeGenderValue } from '../constants/gender';
+import { COORDINATOR_HELP_TEXT, extractApiErrorMessage, mapGenderRuleErrorToUi } from '../utils/genderEligibility';
 
 // Static data for Live Results Carousel
 const staticResultsForCarousel = [
@@ -158,6 +164,102 @@ const pickDistinct = (len, n) => {
     set.add(Math.floor(Math.random() * len));
   }
   return Array.from(set);
+};
+
+const normalizeIdList = (value) => {
+  if (!Array.isArray(value)) return [];
+  return Array.from(
+    new Set(
+      value
+        .map((item) => (typeof item === 'object' ? item?.id : item))
+        .map((item) => Number(item))
+        .filter((item) => Number.isInteger(item) && item > 0)
+    )
+  );
+};
+
+const getAllowedEventIds = (payload) => {
+  if (Array.isArray(payload)) {
+    return normalizeIdList(payload);
+  }
+  const candidates = [
+    normalizeIdList(payload?.event_ids),
+    normalizeIdList(payload?.allowed_event_ids),
+    normalizeIdList(payload?.allowed_events)
+  ];
+  return candidates.find((candidate) => candidate.length > 0) || [];
+};
+
+const getGroupEntryEventIds = (entry) => {
+  return normalizeIdList(
+    entry?.event_ids ||
+    entry?.events ||
+    entry?.events_display
+  );
+};
+
+const getGroupEntryEventsDisplay = (entry) => {
+  if (Array.isArray(entry?.events_display)) {
+    return entry.events_display
+      .map((item) => (typeof item === 'string' ? item : item?.name || item?.event_name || ''))
+      .filter(Boolean);
+  }
+  if (Array.isArray(entry?.events)) {
+    return entry.events
+      .map((item) => (typeof item === 'string' ? item : item?.name || item?.event_name || ''))
+      .filter(Boolean);
+  }
+  return [];
+};
+
+const getAllowedGroupEntries = (payload) => {
+  const candidates = [
+    payload?.group_entries,
+    payload?.approved_group_entries,
+    payload?.groups,
+    payload?.approved_groups,
+    payload?.group_participants,
+    payload?.group_registrations
+  ];
+
+  const list = candidates.find((candidate) => Array.isArray(candidate)) || [];
+  return list
+    .map((entry, index) => {
+      const participants = Array.isArray(entry?.participants) ? entry.participants : [];
+      const leaderIndex = Number(entry?.leader_index);
+      const leaderFromIndex = Number.isInteger(leaderIndex) && leaderIndex > 0 && leaderIndex <= participants.length
+        ? participants[leaderIndex - 1]
+        : null;
+      const leaderFullName = entry?.leader_full_name ||
+        `${leaderFromIndex?.first_name || ''} ${leaderFromIndex?.last_name || ''}`.trim();
+
+      return {
+        id: entry?.id ?? entry?.group_entry_id ?? `${entry?.group_id || 'GROUP'}-${index}`,
+        group_id: String(entry?.group_id || '').trim().toUpperCase(),
+        group_class: entry?.group_class || '',
+        gender_category: entry?.gender_category || '',
+        participant_count: Number(entry?.participant_count || participants.length || 0) || 0,
+        leader_index: leaderIndex || null,
+        leader_full_name: leaderFullName || '-',
+        participants,
+        event_ids: getGroupEntryEventIds(entry),
+        events_display: getGroupEntryEventsDisplay(entry),
+        status: String(entry?.status || '').toLowerCase(),
+        source: entry?.source || '',
+        review_notes: entry?.review_notes || ''
+      };
+    })
+    .filter((entry) => entry.group_id);
+};
+
+const parseAllowedEventsPayload = (payload) => {
+  const eventIds = getAllowedEventIds(payload);
+  const groupEntries = getAllowedGroupEntries(payload || {});
+  if (eventIds.length > 0) {
+    return { eventIds, groupEntries };
+  }
+  const groupEventIds = Array.from(new Set(groupEntries.flatMap((entry) => entry.event_ids || [])));
+  return { eventIds: groupEventIds, groupEntries };
 };
 
 // Create a QR image Data URL using a public QR service, then draw to canvas (so we get a stable data URL)
@@ -549,6 +651,15 @@ const LiveResultsCarousel = ({ results = [] }) => {
 const TopRightFloatingMenu = ({ onOpen }) => {
   const iconData = [
     {
+      key: 'profile',
+      label: 'Edit Profile',
+      description: 'Update your profile details and gender information',
+      icon: 'M12 2A5 5 0 0 1 17 7A5 5 0 0 1 12 12A5 5 0 0 1 7 7A5 5 0 0 1 12 2M12 14.2C16 14.2 19.2 16 19.2 18.2V20H4.8V18.2C4.8 16 8 14.2 12 14.2M20.7 7.04C20.95 6.79 21.34 6.78 21.6 7.04L22.96 8.4C23.22 8.66 23.21 9.05 22.96 9.3L20.08 12.18L17.82 9.92L20.7 7.04M17.11 10.63L19.37 12.89L12.64 19.62H10.38V17.36L17.11 10.63Z',
+      gradient: 'from-cyan-400 via-blue-500 to-indigo-600',
+      shadowColor: 'shadow-cyan-500/25',
+      accentColor: 'cyan'
+    },
+    {
       key: 'register',
       label: 'Event Registration',
       description: 'Join exciting cultural events and showcase your talents',
@@ -692,6 +803,7 @@ const Modal = ({ open, title, onClose, children }) => {
 
 const StudentDashboard = () => {
   const { t } = useTranslation();
+  const PUBLISHED_EVENTS_INITIAL_VISIBLE = 6;
   const [open, setOpen] = useState(null); // 'register' | 'qr' | 'feedback' | 'results' | 'schedule'
   const [registrations, setRegistrations] = useState([]); // server-side list (unchanged usage)
   const [publishedResults, setPublishedResults] = useState([]);
@@ -702,6 +814,7 @@ const StudentDashboard = () => {
   const [currentUser, setCurrentUser] = useState(null);
 
   const [allowedEventIds, setAllowedEventIds] = useState(null); // null=loading, []=none
+  const [allowedGroupEntries, setAllowedGroupEntries] = useState([]);
 
   const [mustResetPasswordOpen, setMustResetPasswordOpen] = useState(false);
   const [newPassword, setNewPassword] = useState('');
@@ -720,14 +833,34 @@ const StudentDashboard = () => {
   const [firstNameError, setFirstNameError] = useState('');
   const [lastNameError, setLastNameError] = useState('');
   const [registrationError, setRegistrationError] = useState('');
+  const [registrationHelpText, setRegistrationHelpText] = useState('');
+  const [registrationCta, setRegistrationCta] = useState(null);
+  const [coordinatorRequestCopied, setCoordinatorRequestCopied] = useState(false);
   const [latestRegistration, setLatestRegistration] = useState(null); // { studentName, categoryLabel, eventName, chessNumber, qrDataUrl }
   const [isIdentityVerified, setIsIdentityVerified] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
   const [isRegistering, setIsRegistering] = useState(false); // Loading state for registration
+  const [selectedGroupId, setSelectedGroupId] = useState('');
   const [showAllEvents, setShowAllEvents] = useState(false); // Toggle for showing all events
+  const [showAllPublishedEvents, setShowAllPublishedEvents] = useState(false);
   const [selectedRegistrationIndex, setSelectedRegistrationIndex] = useState(0); // Index of selected registration
   const [allRegistrationsWithQR, setAllRegistrationsWithQR] = useState([]); // All registrations with QR codes
   const [isGeneratingQR, setIsGeneratingQR] = useState(false); // Loading state for QR generation
+  const [profileForm, setProfileForm] = useState({
+    first_name: '',
+    last_name: '',
+    phone: '',
+    gender: ''
+  });
+  const [profileError, setProfileError] = useState('');
+  const [profileSaving, setProfileSaving] = useState(false);
+  const [profileReturnTarget, setProfileReturnTarget] = useState(null);
+
+  const hasMorePublishedEvents = publishedEvents.length > PUBLISHED_EVENTS_INITIAL_VISIBLE;
+  const visiblePublishedEvents = useMemo(
+    () => (showAllPublishedEvents ? publishedEvents : publishedEvents.slice(0, PUBLISHED_EVENTS_INITIAL_VISIBLE)),
+    [publishedEvents, showAllPublishedEvents, PUBLISHED_EVENTS_INITIAL_VISIBLE]
+  );
 
   // Feedback state
   const [feedbackRating, setFeedbackRating] = useState(0);
@@ -748,7 +881,66 @@ const StudentDashboard = () => {
     return null;
   }, [allRegistrationsWithQR, selectedRegistrationIndex]);
 
+  useEffect(() => {
+    if (!hasMorePublishedEvents && showAllPublishedEvents) {
+      setShowAllPublishedEvents(false);
+    }
+  }, [hasMorePublishedEvents, showAllPublishedEvents]);
+
+  const clearRegistrationFeedback = () => {
+    setRegistrationError('');
+    setRegistrationHelpText('');
+    setRegistrationCta(null);
+    setCoordinatorRequestCopied(false);
+  };
+
+  const setRegistrationFailure = (message) => {
+    setRegistrationError(message);
+    setRegistrationHelpText('');
+    setRegistrationCta(null);
+    setCoordinatorRequestCopied(false);
+  };
+
+  const showMappedRegistrationError = (error) => {
+    const mapped = mapGenderRuleErrorToUi(error);
+    if (!mapped) return false;
+    setRegistrationError(mapped.message);
+    setRegistrationHelpText(mapped.helperText || '');
+    setRegistrationCta(mapped.cta || null);
+    setCoordinatorRequestCopied(false);
+    return true;
+  };
+
+  const openProfileEditor = (returnTarget = null) => {
+    setProfileError('');
+    setProfileReturnTarget(returnTarget);
+    setOpen('profile');
+  };
+
+  const closeProfileEditor = () => {
+    setProfileError('');
+    const nextTarget = profileReturnTarget;
+    setProfileReturnTarget(null);
+    setOpen(nextTarget || null);
+  };
+
+  const handleCoordinatorCta = async () => {
+    setCoordinatorRequestCopied(false);
+    try {
+      if (navigator?.clipboard?.writeText) {
+        await navigator.clipboard.writeText(COORDINATOR_HELP_TEXT);
+        setCoordinatorRequestCopied(true);
+      }
+    } catch (_) {
+      setCoordinatorRequestCopied(false);
+    }
+  };
+
   const handleOpen = async (key) => {
+    if (key === 'profile') {
+      setProfileReturnTarget(null);
+      setProfileError('');
+    }
     setOpen(key);
     if (key === 'qr') {
       if ((!allRegistrationsWithQR || allRegistrationsWithQR.length === 0) && registrations && registrations.length > 0) {
@@ -777,7 +969,7 @@ const StudentDashboard = () => {
 
   const handleClose = () => {
     setOpen(null);
-    setRegistrationError('');
+    clearRegistrationFeedback();
     setFeedbackError('');
   };
 
@@ -786,7 +978,7 @@ const StudentDashboard = () => {
     const v = raw.toUpperCase();
     setFirstName(v);
     setIsIdentityVerified(false);
-    setRegistrationError('');
+    clearRegistrationFeedback();
     if (!v) {
       setFirstNameError('');
       return;
@@ -807,7 +999,7 @@ const StudentDashboard = () => {
     const v = raw.toUpperCase();
     setLastName(v);
     setIsIdentityVerified(false);
-    setRegistrationError('');
+    clearRegistrationFeedback();
     if (!v) {
       setLastNameError('');
       return;
@@ -824,7 +1016,7 @@ const StudentDashboard = () => {
   };
 
   const handleIdentityVerification = async () => {
-    setRegistrationError('');
+    clearRegistrationFeedback();
     if (!firstName || !lastName || firstNameError || lastNameError) return;
     setIsVerifying(true);
     try {
@@ -832,7 +1024,7 @@ const StudentDashboard = () => {
       const b = `${currentUser?.last_name || ''}`.toUpperCase();
       if (a && b && (a !== firstName || b !== lastName)) {
         setIsIdentityVerified(false);
-        setRegistrationError(`Name Mismatch: The provided name '${firstName} ${lastName}' does not match your registered name '${currentUser?.first_name || ''} ${currentUser?.last_name || ''}'. Please use your exact registered name.`);
+        setRegistrationFailure(`Name Mismatch: The provided name '${firstName} ${lastName}' does not match your registered name '${currentUser?.first_name || ''} ${currentUser?.last_name || ''}'. Please use your exact registered name.`);
       } else {
         setIsIdentityVerified(true);
       }
@@ -842,30 +1034,48 @@ const StudentDashboard = () => {
   };
 
   const handleRegister = async () => {
-    setRegistrationError('');
+    clearRegistrationFeedback();
     if (!isIdentityVerified) {
-      setRegistrationError('Please verify your identity before registering.');
+      setRegistrationFailure('Please verify your identity before registering.');
+      return;
+    }
+    if (!normalizeGenderValue(currentUser?.gender)) {
+      showMappedRegistrationError({ response: { data: { error: 'Your gender is not set on your profile.' } } });
       return;
     }
     if (!selectedCategory || !selectedEvent) {
-      setRegistrationError('Please select a category and event.');
+      setRegistrationFailure('Please select a category and event.');
       return;
     }
-    const selectedEventObj = (filteredCategoryEvents || []).find(e => e?.name === selectedEvent) || (events || []).find(e => e?.name === selectedEvent && e?.category === selectedCategory) || (events || []).find(e => e?.name === selectedEvent);
+
     const eventId = selectedEventObj?.id;
     if (!eventId) {
-      setRegistrationError('Selected event not found. Please refresh and try again.');
+      setRegistrationFailure('Selected event not found. Please refresh and try again.');
       return;
     }
 
     if (allowedEventIdSet && !allowedEventIdSet.has(eventId)) {
-      setRegistrationError('No events available. Your school has not selected this event.');
+      setRegistrationFailure('No events available. Your school has not selected this event.');
+      return;
+    }
+
+    if (requiresSelectedGroup && !selectedGroupId) {
+      setRegistrationFailure('This is a group event. Please select your approved group ID before registering.');
+      return;
+    }
+    if (selectedGroupId && !selectedGroupEntry) {
+      setRegistrationFailure('Selected group ID is not approved for this event. Please choose a valid group entry.');
       return;
     }
 
     setIsRegistering(true);
     try {
-      const reg = await eventService.registerForEvent(eventId, firstName, lastName);
+      const reg = await eventService.registerForEvent(
+        eventId,
+        firstName,
+        lastName,
+        requiresSelectedGroup ? selectedGroupId : ''
+      );
       const freshRegs = await eventService.listMyRegistrations();
       setRegistrations(Array.isArray(freshRegs) ? freshRegs : []);
 
@@ -884,9 +1094,12 @@ const StudentDashboard = () => {
       setSelectedRegistrationIndex(0);
       setSelectedCategory('');
       setSelectedEvent('');
+      setSelectedGroupId('');
     } catch (e) {
-      const msg = e?.response?.data?.detail || e?.response?.data?.error || (typeof e?.response?.data === 'string' ? e.response.data : '') || e?.message || 'Failed to register.';
-      setRegistrationError(msg);
+      if (!showMappedRegistrationError(e)) {
+        const msg = extractApiErrorMessage(e) || 'Failed to register.';
+        setRegistrationFailure(msg);
+      }
     } finally {
       setIsRegistering(false);
     }
@@ -934,17 +1147,23 @@ const StudentDashboard = () => {
     }
   };
 
-  // Group events by category from API data
+  const allowedPublishedEvents = useMemo(() => {
+    if (!Array.isArray(events) || !Array.isArray(allowedEventIds)) return [];
+    const idSet = new Set(allowedEventIds);
+    return events.filter((event) => idSet.has(event.id));
+  }, [events, allowedEventIds]);
+
+  // Group student-eligible events by category
   const eventsByCategory = useMemo(() => {
     const grouped = {};
-    events.forEach(event => {
+    allowedPublishedEvents.forEach(event => {
       if (!grouped[event.category]) {
         grouped[event.category] = [];
       }
       grouped[event.category].push(event.name);
     });
     return grouped;
-  }, [events]);
+  }, [allowedPublishedEvents]);
 
   // Get available categories from API data with enhanced mapping
   const availableCategories = useMemo(() => {
@@ -956,7 +1175,7 @@ const StudentDashboard = () => {
       'theatre': 'Theatre / Performance Arts'
     };
 
-    // Show all categories for better UX, but track which have published events
+    // Show only categories that have student-eligible events
     const allCategories = ['dance', 'music', 'literary', 'visual_arts', 'theatre'];
 
     return allCategories.map(key => ({
@@ -965,9 +1184,9 @@ const StudentDashboard = () => {
       icon: CATEGORIES.find(c => c.key === key)?.icon || '🎯',
       color: CATEGORIES.find(c => c.key === key)?.color || 'from-gray-500 to-gray-600',
       eventCount: eventsByCategory[key]?.length || 0,
-      hasPublishedEvents: (events || []).some(event => event.category === key)
-    }));
-  }, [eventsByCategory, events]);
+      hasPublishedEvents: (allowedPublishedEvents || []).some(event => event.category === key)
+    })).filter((category) => category.eventCount > 0);
+  }, [eventsByCategory, allowedPublishedEvents]);
 
   // Fetch read-only data for student (robust to partial failures)
   useEffect(() => {
@@ -1024,10 +1243,12 @@ const StudentDashboard = () => {
         // Fetch allowed events for this student (school-selected)
         try {
           const allowedRes = await http.get('/api/auth/students/allowed-events/');
-          const ids = allowedRes?.data?.event_ids;
-          setAllowedEventIds(Array.isArray(ids) ? ids : []);
+          const parsedAllowedData = parseAllowedEventsPayload(allowedRes?.data || {});
+          setAllowedEventIds(Array.isArray(parsedAllowedData.eventIds) ? parsedAllowedData.eventIds : []);
+          setAllowedGroupEntries(Array.isArray(parsedAllowedData.groupEntries) ? parsedAllowedData.groupEntries : []);
         } catch (e) {
           setAllowedEventIds([]);
+          setAllowedGroupEntries([]);
         }
 
       } catch (error) {
@@ -1039,6 +1260,7 @@ const StudentDashboard = () => {
           setEvents([]);
           setDemoSchedule([]);
           setAllowedEventIds([]);
+          setAllowedGroupEntries([]);
         }
       } finally {
         if (mounted) setLoading(false);
@@ -1054,10 +1276,87 @@ const StudentDashboard = () => {
 
   const filteredCategoryEvents = useMemo(() => {
     if (!selectedCategory) return [];
-    const categoryEvents = (events || []).filter(event => event?.category === selectedCategory);
     if (allowedEventIdSet === null) return [];
-    return categoryEvents.filter(event => allowedEventIdSet.has(event.id));
-  }, [events, selectedCategory, allowedEventIdSet]);
+    return (allowedPublishedEvents || []).filter(event => event?.category === selectedCategory);
+  }, [selectedCategory, allowedEventIdSet, allowedPublishedEvents]);
+
+  const selectedEventObj = useMemo(() => {
+    if (!selectedCategory || !selectedEvent) return null;
+    return (filteredCategoryEvents || []).find((event) => event?.name === selectedEvent) ||
+      (events || []).find((event) => event?.name === selectedEvent && event?.category === selectedCategory) ||
+      (events || []).find((event) => event?.name === selectedEvent) ||
+      null;
+  }, [selectedCategory, selectedEvent, filteredCategoryEvents, events]);
+
+  const selectedEventParticipationType = useMemo(() => {
+    return String(
+      selectedEventObj?.event_definition_details?.participation_type_details?.type_name ||
+      selectedEventObj?.event_definition_details?.participation_type ||
+      selectedEventObj?.participation_type ||
+      ''
+    ).toUpperCase();
+  }, [selectedEventObj]);
+
+  const isSelectedEventLikelyGroup = useMemo(() => {
+    if (!selectedEventObj) return false;
+    return selectedEventParticipationType === 'GROUP';
+  }, [selectedEventObj, selectedEventParticipationType]);
+
+  const selectedEventGroupEntries = useMemo(() => {
+    if (!selectedEventObj || !Array.isArray(allowedGroupEntries)) return [];
+
+    const directMatches = allowedGroupEntries.filter((entry) => {
+      const eventIds = Array.isArray(entry?.event_ids) ? entry.event_ids : [];
+      return eventIds.includes(selectedEventObj.id);
+    });
+    if (directMatches.length > 0) return directMatches;
+
+    if (isSelectedEventLikelyGroup) {
+      return allowedGroupEntries.filter((entry) => !Array.isArray(entry?.event_ids) || entry.event_ids.length === 0);
+    }
+    return [];
+  }, [selectedEventObj, allowedGroupEntries, isSelectedEventLikelyGroup]);
+
+  const selectedGroupEntry = useMemo(() => {
+    if (!selectedGroupId) return null;
+    return (selectedEventGroupEntries || []).find((entry) => entry?.group_id === selectedGroupId) || null;
+  }, [selectedEventGroupEntries, selectedGroupId]);
+
+  const requiresSelectedGroup = useMemo(() => {
+    return isSelectedEventLikelyGroup || selectedEventGroupEntries.length > 0;
+  }, [isSelectedEventLikelyGroup, selectedEventGroupEntries]);
+
+  const eventNameById = useMemo(() => {
+    const map = {};
+    (events || []).forEach((event) => {
+      if (event?.id !== null && event?.id !== undefined) {
+        map[String(event.id)] = event.name;
+      }
+    });
+    return map;
+  }, [events]);
+
+  useEffect(() => {
+    if (!selectedCategory) return;
+    const isStillAvailable = availableCategories.some((category) => category.key === selectedCategory);
+    if (!isStillAvailable) {
+      setSelectedCategory('');
+      setSelectedEvent('');
+      setSelectedGroupId('');
+    }
+  }, [availableCategories, selectedCategory]);
+
+  useEffect(() => {
+    if (!selectedGroupId) return;
+    const stillAvailable = selectedEventGroupEntries.some((entry) => entry?.group_id === selectedGroupId);
+    if (!stillAvailable) {
+      setSelectedGroupId('');
+    }
+  }, [selectedGroupId, selectedEventGroupEntries]);
+
+  useEffect(() => {
+    setSelectedGroupId('');
+  }, [selectedCategory, selectedEvent]);
 
   useEffect(() => {
     if (currentUser && currentUser.role === 'student' && currentUser.must_reset_password) {
@@ -1065,6 +1364,15 @@ const StudentDashboard = () => {
     } else {
       setMustResetPasswordOpen(false);
     }
+  }, [currentUser]);
+
+  useEffect(() => {
+    setProfileForm({
+      first_name: currentUser?.first_name || '',
+      last_name: currentUser?.last_name || '',
+      phone: currentUser?.phone || '',
+      gender: normalizeGenderValue(currentUser?.gender)
+    });
   }, [currentUser]);
 
   const submitPasswordReset = async (e) => {
@@ -1100,6 +1408,61 @@ const StudentDashboard = () => {
       setPasswordResetError(msg);
     } finally {
       setPasswordResetLoading(false);
+    }
+  };
+
+  const submitProfileUpdate = async (e) => {
+    e.preventDefault();
+    setProfileError('');
+
+    const firstNameValue = String(profileForm.first_name || '').trim();
+    const lastNameValue = String(profileForm.last_name || '').trim();
+    const phoneValue = String(profileForm.phone || '').trim();
+    const normalizedGender = normalizeGenderValue(profileForm.gender);
+
+    if (!firstNameValue || !lastNameValue) {
+      setProfileError('First name and last name are required.');
+      return;
+    }
+    if (!normalizedGender) {
+      setProfileError('Please select your gender.');
+      return;
+    }
+    if (!currentUser?.id) {
+      setProfileError('Unable to update profile right now. Please refresh and try again.');
+      return;
+    }
+
+    const payload = {
+      first_name: firstNameValue,
+      last_name: lastNameValue,
+      phone: phoneValue,
+      gender: normalizedGender
+    };
+
+    setProfileSaving(true);
+    try {
+      if (typeof userService?.update === 'function') {
+        await userService.update(currentUser.id, payload);
+      } else {
+        await http.patch(`/api/auth/users/${currentUser.id}/`, payload);
+      }
+
+      try {
+        const userRes = await http.get('/api/auth/current/');
+        setCurrentUser(userRes.data);
+      } catch (_) {
+        setCurrentUser((prev) => ({ ...(prev || {}), ...payload }));
+      }
+
+      clearRegistrationFeedback();
+      const nextTarget = profileReturnTarget;
+      setProfileReturnTarget(null);
+      setOpen(nextTarget || null);
+    } catch (err) {
+      setProfileError(extractApiErrorMessage(err) || 'Failed to update profile.');
+    } finally {
+      setProfileSaving(false);
     }
   };
 
@@ -1647,24 +2010,38 @@ const StudentDashboard = () => {
           {publishedEvents.length === 0 ? (
             <div className="text-center py-10 text-emerald-700">No events are currently published.</div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {publishedEvents.map(ev => (
-                <div key={ev.id} className="rounded-xl border border-emerald-200 bg-white shadow hover:shadow-md transition-all duration-200 p-5">
-                  <div className="flex items-start justify-between mb-3">
-                    <div>
-                      <div className="text-sm text-emerald-700 mb-1 capitalize">{ev.category}</div>
-                      <h4 className="text-lg font-semibold text-emerald-900">{ev.name}</h4>
+            <>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {visiblePublishedEvents.map(ev => (
+                  <div key={ev.id} className="rounded-xl border border-emerald-200 bg-white shadow hover:shadow-md transition-all duration-200 p-5">
+                    <div className="flex items-start justify-between mb-3">
+                      <div>
+                        <div className="text-sm text-emerald-700 mb-1 capitalize">{ev.category}</div>
+                        <h4 className="text-lg font-semibold text-emerald-900">{ev.name}</h4>
+                      </div>
+                      <span className="px-2 py-0.5 text-xs rounded bg-emerald-50 text-emerald-700 border border-emerald-100">Published</span>
                     </div>
-                    <span className="px-2 py-0.5 text-xs rounded bg-emerald-50 text-emerald-700 border border-emerald-100">Published</span>
+                    <div className="text-sm text-emerald-800/90 space-y-1">
+                      <div className="flex items-center gap-2"><span>📅</span><span>{ev.date}</span></div>
+                      <div className="flex items-center gap-2"><span>⏰</span><span>{ev.start_time} – {ev.end_time}</span></div>
+                      <div className="flex items-center gap-2"><span>📍</span><span>{ev.venue_details?.name || ev.venue || '-'}</span></div>
+                    </div>
                   </div>
-                  <div className="text-sm text-emerald-800/90 space-y-1">
-                    <div className="flex items-center gap-2"><span>📅</span><span>{ev.date}</span></div>
-                    <div className="flex items-center gap-2"><span>⏰</span><span>{ev.start_time} – {ev.end_time}</span></div>
-                    <div className="flex items-center gap-2"><span>📍</span><span>{ev.venue_details?.name || ev.venue || '-'}</span></div>
-                  </div>
+                ))}
+              </div>
+
+              {hasMorePublishedEvents && (
+                <div className="mt-6 flex justify-center">
+                  <button
+                    type="button"
+                    onClick={() => setShowAllPublishedEvents((prev) => !prev)}
+                    className="px-4 py-2 rounded-lg border border-emerald-300 text-emerald-800 hover:bg-emerald-50 transition-colors duration-200 font-medium"
+                  >
+                    {showAllPublishedEvents ? 'Show Less' : 'Show More'}
+                  </button>
                 </div>
-              ))}
-            </div>
+              )}
+            </>
           )}
         </div>
 
@@ -1817,6 +2194,92 @@ const StudentDashboard = () => {
       </div>
 
       {/* Modals */}
+      <Modal open={open === 'profile'} title="Edit Profile" onClose={closeProfileEditor}>
+        <form onSubmit={submitProfileUpdate} className="space-y-5">
+          <div className="rounded-xl border border-blue-200 bg-blue-50 p-4">
+            <p className="text-blue-900 font-semibold">Current gender: {getGenderLabel(currentUser?.gender)}</p>
+            {profileReturnTarget === 'register' && (
+              <p className="text-sm text-blue-700 mt-1">Save your profile and you will return to event registration.</p>
+            )}
+          </div>
+
+          {profileError && (
+            <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+              {profileError}
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">First Name</label>
+              <input
+                type="text"
+                value={profileForm.first_name}
+                onChange={(e) => setProfileForm((prev) => ({ ...prev, first_name: e.target.value }))}
+                className="w-full px-4 py-3 border-2 border-amber-200 rounded-xl focus:ring-2 focus:ring-amber-400 focus:border-amber-400"
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">Last Name</label>
+              <input
+                type="text"
+                value={profileForm.last_name}
+                onChange={(e) => setProfileForm((prev) => ({ ...prev, last_name: e.target.value }))}
+                className="w-full px-4 py-3 border-2 border-amber-200 rounded-xl focus:ring-2 focus:ring-amber-400 focus:border-amber-400"
+                required
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">Phone</label>
+              <input
+                type="text"
+                value={profileForm.phone}
+                onChange={(e) => setProfileForm((prev) => ({ ...prev, phone: e.target.value }))}
+                className="w-full px-4 py-3 border-2 border-amber-200 rounded-xl focus:ring-2 focus:ring-amber-400 focus:border-amber-400"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">Gender</label>
+              <select
+                value={profileForm.gender}
+                onChange={(e) => setProfileForm((prev) => ({ ...prev, gender: e.target.value }))}
+                className="w-full px-4 py-3 border-2 border-amber-200 rounded-xl focus:ring-2 focus:ring-amber-400 focus:border-amber-400 bg-white"
+                required
+              >
+                <option value="">Select gender</option>
+                {GENDER_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div className="flex items-center justify-end gap-3 pt-2">
+            <button
+              type="button"
+              onClick={closeProfileEditor}
+              className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50"
+              disabled={profileSaving}
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={profileSaving}
+              className="px-5 py-2.5 rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {profileSaving ? 'Saving...' : 'Save Profile'}
+            </button>
+          </div>
+        </form>
+      </Modal>
+
       {/* Event Registration Modal - Enhanced */}
       <Modal open={open === 'register'} title="Event Registration" onClose={handleClose}>
         <div className="space-y-8">
@@ -1994,7 +2457,77 @@ const StudentDashboard = () => {
                   <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd"></path>
                 </svg>
               </div>
-              <div className="text-red-800 font-medium">{registrationError}</div>
+              <div className="flex-1">
+                <div className="text-red-800 font-medium">{registrationError}</div>
+                {registrationHelpText && (
+                  <div className="text-red-700 text-sm mt-1">{registrationHelpText}</div>
+                )}
+                {registrationCta && (
+                  <div className="mt-3 flex flex-wrap items-center gap-3">
+                    {registrationCta.type === 'update_profile' ? (
+                      <button
+                        type="button"
+                        onClick={() => openProfileEditor('register')}
+                        className="px-3 py-1.5 rounded-lg bg-red-100 text-red-800 border border-red-300 text-sm font-semibold hover:bg-red-200 transition-colors"
+                      >
+                        {registrationCta.label}
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={handleCoordinatorCta}
+                        className="px-3 py-1.5 rounded-lg bg-red-100 text-red-800 border border-red-300 text-sm font-semibold hover:bg-red-200 transition-colors"
+                      >
+                        {registrationCta.label}
+                      </button>
+                    )}
+                    {registrationCta.type === 'contact_coordinator' && coordinatorRequestCopied && (
+                      <span className="text-xs text-red-700">Guidance copied to clipboard</span>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {allowedGroupEntries.length > 0 && (
+            <div className="bg-gradient-to-r from-indigo-50 to-blue-50 rounded-2xl p-6 border border-indigo-200">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 bg-gradient-to-br from-indigo-500 to-blue-500 rounded-lg flex items-center justify-center">
+                    <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M6 3a1 1 0 00-1 1v1H4a2 2 0 00-2 2v1h16V7a2 2 0 00-2-2h-1V4a1 1 0 10-2 0v1H7V4a1 1 0 00-1-1zm12 7H2v6a2 2 0 002 2h12a2 2 0 002-2v-6zM7 13a1 1 0 011-1h4a1 1 0 110 2H8a1 1 0 01-1-1z" clipRule="evenodd"></path>
+                    </svg>
+                  </div>
+                  <h3 className="text-lg font-bold text-indigo-800" style={{ fontFamily: 'Cinzel, serif' }}>Approved Group Entries</h3>
+                </div>
+                <span className="text-sm font-semibold text-indigo-700">{allowedGroupEntries.length} total</span>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {allowedGroupEntries.map((entry) => {
+                  const eventLabels = (entry.events_display && entry.events_display.length > 0)
+                    ? entry.events_display
+                    : (entry.event_ids || []).map((id) => eventNameById[String(id)] || `Event #${id}`);
+
+                  return (
+                    <div key={String(entry.id)} className="bg-white border border-indigo-200 rounded-xl p-4">
+                      <div className="flex items-center justify-between">
+                        <div className="font-bold text-indigo-900">{entry.group_id}</div>
+                        <span className="text-xs px-2 py-0.5 rounded bg-indigo-100 text-indigo-700 border border-indigo-200">
+                          {entry.group_class || '-'}
+                        </span>
+                      </div>
+                      <div className="mt-2 text-sm text-indigo-800">
+                        <div><strong>Leader:</strong> {entry.leader_full_name || '-'}</div>
+                        <div><strong>Participants:</strong> {entry.participant_count || '-'}</div>
+                        <div><strong>Gender:</strong> {entry.gender_category || '-'}</div>
+                        <div className="mt-1"><strong>Events:</strong> {eventLabels.length > 0 ? eventLabels.join(', ') : '-'}</div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           )}
 
@@ -2010,12 +2543,26 @@ const StudentDashboard = () => {
                 <h3 className="text-lg font-bold text-blue-800" style={{ fontFamily: 'Cinzel, serif' }}>Select Category</h3>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                {availableCategories.map((c) => (
+                {allowedEventIdSet === null ? (
+                  <div className="col-span-3 text-center py-12">
+                    <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600 mx-auto"></div>
+                  </div>
+                ) : availableCategories.length === 0 ? (
+                  <div className="col-span-3 text-center py-10 bg-white rounded-xl border border-blue-200">
+                    <h4 className="text-lg font-bold text-blue-900 mb-2">No eligible categories available</h4>
+                    <p className="text-blue-700">
+                      We could not find any event categories assigned to your account yet.
+                    </p>
+                    <p className="text-sm text-blue-600 mt-2">
+                      Please contact your school coordinator to assign events.
+                    </p>
+                  </div>
+                ) : availableCategories.map((c) => (
                   <button
                     key={c.key}
                     onClick={() => {
                       if (!isIdentityVerified) {
-                        setRegistrationError('Please verify your identity before selecting a category.');
+                        setRegistrationFailure('Please verify your identity before selecting a category.');
                         return;
                       }
                       setSelectedCategory(c.key);
@@ -2107,7 +2654,7 @@ const StudentDashboard = () => {
                       key={event.id}
                       onClick={() => {
                         if (!isIdentityVerified) {
-                          setRegistrationError('Please verify your identity before selecting an event.');
+                          setRegistrationFailure('Please verify your identity before selecting an event.');
                           return;
                         }
                         setSelectedEvent(event.name);
@@ -2156,6 +2703,68 @@ const StudentDashboard = () => {
             </div>
           )}
 
+          {selectedEvent && requiresSelectedGroup && (
+            <div className="bg-gradient-to-r from-indigo-50 to-violet-50 rounded-2xl p-6 border border-indigo-200">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-8 h-8 bg-gradient-to-br from-indigo-500 to-violet-500 rounded-lg flex items-center justify-center">
+                  <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M10 2a8 8 0 00-8 8v1a3 3 0 003 3h1a1 1 0 100-2H5a1 1 0 01-1-1v-1a6 6 0 0112 0v1a1 1 0 01-1 1h-1a1 1 0 100 2h1a3 3 0 003-3v-1a8 8 0 00-8-8z" clipRule="evenodd"></path>
+                    <path d="M8 11a2 2 0 114 0v3a2 2 0 11-4 0v-3z"></path>
+                  </svg>
+                </div>
+                <h3 className="text-lg font-bold text-indigo-800" style={{ fontFamily: 'Cinzel, serif' }}>Select Approved Group ID</h3>
+              </div>
+
+              {selectedEventGroupEntries.length === 0 ? (
+                <div className="bg-white border border-indigo-200 rounded-xl p-4 text-indigo-800">
+                  <p className="font-semibold">No approved group entry is available for this group event.</p>
+                  <p className="text-sm mt-1">Please contact your school coordinator to submit and approve a group entry before registering.</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {selectedEventGroupEntries.map((entry) => {
+                    const isSelected = selectedGroupId === entry.group_id;
+                    const eventLabels = (entry.events_display && entry.events_display.length > 0)
+                      ? entry.events_display
+                      : (entry.event_ids || []).map((id) => eventNameById[String(id)] || `Event #${id}`);
+
+                    return (
+                      <label
+                        key={`${entry.group_id}-${entry.id}`}
+                        className={`block rounded-xl border-2 p-4 cursor-pointer transition-all duration-200 ${isSelected ? 'border-indigo-400 bg-indigo-100 ring-2 ring-indigo-200' : 'border-indigo-200 bg-white hover:bg-indigo-50'}`}
+                      >
+                        <div className="flex items-start gap-3">
+                          <input
+                            type="radio"
+                            name="group_id"
+                            value={entry.group_id}
+                            checked={isSelected}
+                            onChange={(e) => setSelectedGroupId(e.target.value)}
+                            className="mt-1 h-4 w-4 text-indigo-600 border-indigo-300 focus:ring-indigo-500"
+                            aria-label={`Select group ${entry.group_id}`}
+                          />
+                          <div className="flex-1">
+                            <div className="flex items-center justify-between">
+                              <div className="font-bold text-indigo-900">{entry.group_id}</div>
+                              <span className="text-xs px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 border border-indigo-200">
+                                {entry.group_class || '-'}
+                              </span>
+                            </div>
+                            <div className="text-sm text-indigo-800 mt-1">
+                              <div><strong>Leader:</strong> {entry.leader_full_name || '-'}</div>
+                              <div><strong>Participants:</strong> {entry.participant_count || '-'}</div>
+                              <div><strong>Events:</strong> {eventLabels.length > 0 ? eventLabels.join(', ') : '-'}</div>
+                            </div>
+                          </div>
+                        </div>
+                      </label>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Action Section */}
           <div className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-2xl p-6 border border-purple-200">
             <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
@@ -2172,6 +2781,11 @@ const StudentDashboard = () => {
                       <div className="text-purple-600 text-sm">
                         <strong>{availableCategories.find(c => c.key === selectedCategory)?.label}</strong> • {selectedEvent}
                       </div>
+                      {requiresSelectedGroup && (
+                        <div className="text-purple-700 text-xs mt-1">
+                          Group ID: <strong>{selectedGroupId || 'Select a group ID to continue'}</strong>
+                        </div>
+                      )}
                     </div>
                   </div>
                 ) : (
@@ -2190,8 +2804,8 @@ const StudentDashboard = () => {
               </div>
               <button
                 onClick={handleRegister}
-                disabled={!isIdentityVerified || !selectedCategory || !selectedEvent || isRegistering}
-                className={`px-8 py-4 rounded-xl text-white font-bold text-lg transition-all duration-300 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none disabled:hover:scale-100 ${isIdentityVerified && selectedCategory && selectedEvent && !isRegistering
+                disabled={!isIdentityVerified || !selectedCategory || !selectedEvent || (requiresSelectedGroup && !selectedGroupId) || isRegistering}
+                className={`px-8 py-4 rounded-xl text-white font-bold text-lg transition-all duration-300 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none disabled:hover:scale-100 ${isIdentityVerified && selectedCategory && selectedEvent && (!requiresSelectedGroup || !!selectedGroupId) && !isRegistering
                   ? 'bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 shadow-lg hover:shadow-xl'
                   : 'bg-gray-400 cursor-not-allowed'
                   }`}

@@ -1,0 +1,1151 @@
+{
+  "categories": [
+    "LITERARY",
+    "MUSIC",
+    "DANCE",
+    "THEATRE",
+    "FINE_ARTS",
+    "TRADITIONAL_ARTS"
+  ],
+  "levels": [
+    {
+      "level_code": "LP",
+      "level_name": "Lower Primary"
+    },
+    {
+      "level_code": "UP",
+      "level_name": "Upper Primary"
+    },
+    {
+      "level_code": "HS",
+      "level_name": "High School"
+    },
+    {
+      "level_code": "HSS",
+      "level_name": "Higher Secondary School"
+    }
+  ],
+  "participation_types": [
+    "INDIVIDUAL",
+    "GROUP"
+  ],
+  "events": [
+    {
+      "event_code": "EVT001",
+      "event_name": "Speech",
+      "category": "LITERARY",
+      "participation_type": "INDIVIDUAL",
+      "variants": [
+        "Malayalam",
+        "English",
+        "Hindi",
+        "Arabic"
+      ],
+      "rules": [
+        {
+          "level": "LP",
+          "variant": "Malayalam",
+          "gender_eligibility": "MIXED",
+          "duration_minutes": 5
+        },
+        {
+          "level": "UP",
+          "variant": "Malayalam",
+          "gender_eligibility": "MIXED",
+          "duration_minutes": 5
+        },
+        {
+          "level": "HS",
+          "variant": "Malayalam",
+          "gender_eligibility": "MIXED",
+          "duration_minutes": 5
+        },
+        {
+          "level": "HSS",
+          "variant": "Malayalam",
+          "gender_eligibility": "MIXED",
+          "duration_minutes": 5
+        },
+        {
+          "level": "LP",
+          "variant": "English",
+          "gender_eligibility": "MIXED",
+          "duration_minutes": 5
+        },
+        {
+          "level": "UP",
+          "variant": "English",
+          "gender_eligibility": "MIXED",
+          "duration_minutes": 5
+        },
+        {
+          "level": "HS",
+          "variant": "English",
+          "gender_eligibility": "MIXED",
+          "duration_minutes": 5
+        },
+        {
+          "level": "HSS",
+          "variant": "English",
+          "gender_eligibility": "MIXED",
+          "duration_minutes": 5
+        },
+        {
+          "level": "UP",
+          "variant": "Hindi",
+          "gender_eligibility": "MIXED",
+          "duration_minutes": 5
+        },
+        {
+          "level": "HS",
+          "variant": "Hindi",
+          "gender_eligibility": "MIXED",
+          "duration_minutes": 5
+        },
+        {
+          "level": "HSS",
+          "variant": "Hindi",
+          "gender_eligibility": "MIXED",
+          "duration_minutes": 5
+        },
+        {
+          "level": "UP",
+          "variant": "Arabic",
+          "gender_eligibility": "MIXED",
+          "duration_minutes": 5
+        },
+        {
+          "level": "HS",
+          "variant": "Arabic",
+          "gender_eligibility": "MIXED",
+          "duration_minutes": 5
+        },
+        {
+          "level": "HSS",
+          "variant": "Arabic",
+          "gender_eligibility": "MIXED",
+          "duration_minutes": 5
+        }
+      ]
+    },
+    {
+      "event_code": "EVT002",
+      "event_name": "Poetry Recitation",
+      "category": "LITERARY",
+      "participation_type": "INDIVIDUAL",
+      "variants": [
+        "Malayalam",
+        "English",
+        "Hindi",
+        "Arabic"
+      ],
+      "rules": [
+        {
+          "level": "LP",
+          "variant": "Malayalam",
+          "gender_eligibility": "MIXED",
+          "duration_minutes": 4
+        },
+        {
+          "level": "UP",
+          "variant": "Malayalam",
+          "gender_eligibility": "MIXED",
+          "duration_minutes": 4
+        },
+        {
+          "level": "HS",
+          "variant": "Malayalam",
+          "gender_eligibility": "MIXED",
+          "duration_minutes": 4
+        },
+        {
+          "level": "HSS",
+          "variant": "Malayalam",
+          "gender_eligibility": "MIXED",
+          "duration_minutes": 4
+        },
+        {
+          "level": "LP",
+          "variant": "English",
+          "gender_eligibility": "MIXED",
+          "duration_minutes": 4
+        },
+        {
+          "level": "UP",
+          "variant": "English",
+          "gender_eligibility": "MIXED",
+          "duration_minutes": 4
+        },
+        {
+          "level": "HS",
+          "variant": "English",
+          "gender_eligibility": "MIXED",
+          "duration_minutes": 4
+        },
+        {
+          "level": "HSS",
+          "variant": "English",
+          "gender_eligibility": "MIXED",
+          "duration_minutes": 4
+        }
+      ]
+    },
+    {
+      "event_code": "EVT003",
+      "event_name": "Essay Writing",
+      "category": "LITERARY",
+      "participation_type": "INDIVIDUAL",
+      "variants": [
+        "Malayalam",
+        "English",
+        "Hindi",
+        "Arabic"
+      ],
+      "rules": [
+        {
+          "level": "HS",
+          "variant": "Malayalam",
+          "gender_eligibility": "MIXED",
+          "duration_minutes": 60
+        },
+        {
+          "level": "HSS",
+          "variant": "Malayalam",
+          "gender_eligibility": "MIXED",
+          "duration_minutes": 60
+        },
+        {
+          "level": "HS",
+          "variant": "English",
+          "gender_eligibility": "MIXED",
+          "duration_minutes": 60
+        },
+        {
+          "level": "HSS",
+          "variant": "English",
+          "gender_eligibility": "MIXED",
+          "duration_minutes": 60
+        },
+        {
+          "level": "HS",
+          "variant": "Hindi",
+          "gender_eligibility": "MIXED",
+          "duration_minutes": 60
+        },
+        {
+          "level": "HSS",
+          "variant": "Hindi",
+          "gender_eligibility": "MIXED",
+          "duration_minutes": 60
+        },
+        {
+          "level": "HS",
+          "variant": "Arabic",
+          "gender_eligibility": "MIXED",
+          "duration_minutes": 60
+        },
+        {
+          "level": "HSS",
+          "variant": "Arabic",
+          "gender_eligibility": "MIXED",
+          "duration_minutes": 60
+        }
+      ]
+    },
+    {
+      "event_code": "EVT004",
+      "event_name": "Classical Music",
+      "category": "MUSIC",
+      "participation_type": "INDIVIDUAL",
+      "rules": [
+        {
+          "level": "UP",
+          "gender_eligibility": "MIXED",
+          "duration_minutes": 6
+        },
+        {
+          "level": "HS",
+          "gender_eligibility": "MIXED",
+          "duration_minutes": 6
+        },
+        {
+          "level": "HSS",
+          "gender_eligibility": "MIXED",
+          "duration_minutes": 7
+        }
+      ]
+    },
+    {
+      "event_code": "EVT005",
+      "event_name": "Light Music",
+      "category": "MUSIC",
+      "participation_type": "INDIVIDUAL",
+      "rules": [
+        {
+          "level": "LP",
+          "gender_eligibility": "MIXED",
+          "duration_minutes": 4
+        },
+        {
+          "level": "UP",
+          "gender_eligibility": "MIXED",
+          "duration_minutes": 5
+        },
+        {
+          "level": "HS",
+          "gender_eligibility": "MIXED",
+          "duration_minutes": 6
+        },
+        {
+          "level": "HSS",
+          "gender_eligibility": "MIXED",
+          "duration_minutes": 6
+        }
+      ]
+    },
+    {
+      "event_code": "EVT006",
+      "event_name": "Bharatanatyam",
+      "category": "DANCE",
+      "participation_type": "INDIVIDUAL",
+      "rules": [
+        {
+          "level": "LP",
+          "gender_eligibility": "GIRLS",
+          "duration_minutes": 5
+        },
+        {
+          "level": "UP",
+          "gender_eligibility": "GIRLS",
+          "duration_minutes": 6
+        },
+        {
+          "level": "HS",
+          "gender_eligibility": "GIRLS",
+          "duration_minutes": 7
+        },
+        {
+          "level": "HSS",
+          "gender_eligibility": "GIRLS",
+          "duration_minutes": 7
+        }
+      ]
+    },
+    {
+      "event_code": "EVT007",
+      "event_name": "Mohiniyattam",
+      "category": "DANCE",
+      "participation_type": "INDIVIDUAL",
+      "rules": [
+        {
+          "level": "LP",
+          "gender_eligibility": "GIRLS",
+          "duration_minutes": 5
+        },
+        {
+          "level": "UP",
+          "gender_eligibility": "GIRLS",
+          "duration_minutes": 6
+        },
+        {
+          "level": "HS",
+          "gender_eligibility": "GIRLS",
+          "duration_minutes": 7
+        },
+        {
+          "level": "HSS",
+          "gender_eligibility": "GIRLS",
+          "duration_minutes": 7
+        }
+      ]
+    },
+    {
+      "event_code": "EVT008",
+      "event_name": "Kuchipudi",
+      "category": "DANCE",
+      "participation_type": "INDIVIDUAL",
+      "rules": [
+        {
+          "level": "UP",
+          "gender_eligibility": "MIXED",
+          "duration_minutes": 6
+        },
+        {
+          "level": "HS",
+          "gender_eligibility": "MIXED",
+          "duration_minutes": 7
+        },
+        {
+          "level": "HSS",
+          "gender_eligibility": "MIXED",
+          "duration_minutes": 7
+        }
+      ]
+    },
+    {
+      "event_code": "EVT009",
+      "event_name": "Mono Act",
+      "category": "THEATRE",
+      "participation_type": "INDIVIDUAL",
+      "rules": [
+        {
+          "level": "LP",
+          "gender_eligibility": "MIXED",
+          "duration_minutes": 4
+        },
+        {
+          "level": "UP",
+          "gender_eligibility": "MIXED",
+          "duration_minutes": 5
+        },
+        {
+          "level": "HS",
+          "gender_eligibility": "MIXED",
+          "duration_minutes": 6
+        },
+        {
+          "level": "HSS",
+          "gender_eligibility": "MIXED",
+          "duration_minutes": 6
+        }
+      ]
+    },
+    {
+      "event_code": "EVT010",
+      "event_name": "Mime",
+      "category": "THEATRE",
+      "participation_type": "INDIVIDUAL",
+      "rules": [
+        {
+          "level": "HS",
+          "gender_eligibility": "MIXED",
+          "duration_minutes": 5
+        },
+        {
+          "level": "HSS",
+          "gender_eligibility": "MIXED",
+          "duration_minutes": 5
+        }
+      ]
+    },
+    {
+      "event_code": "EVT011",
+      "event_name": "Oil Painting",
+      "category": "FINE_ARTS",
+      "participation_type": "INDIVIDUAL",
+      "rules": [
+        {
+          "level": "UP",
+          "gender_eligibility": "MIXED",
+          "duration_minutes": 120
+        },
+        {
+          "level": "HS",
+          "gender_eligibility": "MIXED",
+          "duration_minutes": 120
+        },
+        {
+          "level": "HSS",
+          "gender_eligibility": "MIXED",
+          "duration_minutes": 120
+        }
+      ]
+    },
+    {
+      "event_code": "EVT012",
+      "event_name": "Water Colour",
+      "category": "FINE_ARTS",
+      "participation_type": "INDIVIDUAL",
+      "rules": [
+        {
+          "level": "UP",
+          "gender_eligibility": "MIXED",
+          "duration_minutes": 120
+        },
+        {
+          "level": "HS",
+          "gender_eligibility": "MIXED",
+          "duration_minutes": 120
+        },
+        {
+          "level": "HSS",
+          "gender_eligibility": "MIXED",
+          "duration_minutes": 120
+        }
+      ]
+    },
+    {
+      "event_code": "EVT013",
+      "event_name": "Group Song",
+      "category": "MUSIC",
+      "participation_type": "GROUP",
+      "rules": [
+        {
+          "level": "LP",
+          "gender_eligibility": "MIXED",
+          "min_participants": 5,
+          "max_participants": 10,
+          "duration_minutes": 6
+        },
+        {
+          "level": "UP",
+          "gender_eligibility": "MIXED",
+          "min_participants": 5,
+          "max_participants": 10,
+          "duration_minutes": 7
+        },
+        {
+          "level": "HS",
+          "gender_eligibility": "MIXED",
+          "min_participants": 5,
+          "max_participants": 10,
+          "duration_minutes": 7
+        },
+        {
+          "level": "HSS",
+          "gender_eligibility": "MIXED",
+          "min_participants": 5,
+          "max_participants": 10,
+          "duration_minutes": 7
+        }
+      ]
+    },
+    {
+      "event_code": "EVT014",
+      "event_name": "Oppana",
+      "category": "TRADITIONAL_ARTS",
+      "participation_type": "GROUP",
+      "rules": [
+        {
+          "level": "UP",
+          "gender_eligibility": "GIRLS",
+          "min_participants": 7,
+          "max_participants": 12,
+          "duration_minutes": 10
+        },
+        {
+          "level": "HS",
+          "gender_eligibility": "GIRLS",
+          "min_participants": 7,
+          "max_participants": 12,
+          "duration_minutes": 10
+        },
+        {
+          "level": "HSS",
+          "gender_eligibility": "GIRLS",
+          "min_participants": 7,
+          "max_participants": 12,
+          "duration_minutes": 10
+        }
+      ]
+    },
+    {
+      "event_code": "EVT015",
+      "event_name": "Drama",
+      "category": "THEATRE",
+      "participation_type": "GROUP",
+      "rules": [
+        {
+          "level": "UP",
+          "gender_eligibility": "MIXED",
+          "min_participants": 10,
+          "max_participants": 20,
+          "duration_minutes": 30
+        },
+        {
+          "level": "HS",
+          "gender_eligibility": "MIXED",
+          "min_participants": 10,
+          "max_participants": 20,
+          "duration_minutes": 30
+        },
+        {
+          "level": "HSS",
+          "gender_eligibility": "MIXED",
+          "min_participants": 10,
+          "max_participants": 20,
+          "duration_minutes": 30
+        }
+      ]
+    },
+    {
+      "event_code": "EVT016",
+      "event_name": "Story Writing",
+      "category": "LITERARY",
+      "participation_type": "INDIVIDUAL",
+      "variants": [
+        "Malayalam",
+        "English",
+        "Hindi",
+        "Arabic"
+      ],
+      "rules": [
+        {
+          "level": "HS",
+          "variant": "Malayalam",
+          "gender_eligibility": "MIXED",
+          "duration_minutes": 60
+        },
+        {
+          "level": "HSS",
+          "variant": "Malayalam",
+          "gender_eligibility": "MIXED",
+          "duration_minutes": 60
+        },
+        {
+          "level": "HS",
+          "variant": "English",
+          "gender_eligibility": "MIXED",
+          "duration_minutes": 60
+        },
+        {
+          "level": "HSS",
+          "variant": "English",
+          "gender_eligibility": "MIXED",
+          "duration_minutes": 60
+        },
+        {
+          "level": "HS",
+          "variant": "Hindi",
+          "gender_eligibility": "MIXED",
+          "duration_minutes": 60
+        },
+        {
+          "level": "HSS",
+          "variant": "Hindi",
+          "gender_eligibility": "MIXED",
+          "duration_minutes": 60
+        },
+        {
+          "level": "HS",
+          "variant": "Arabic",
+          "gender_eligibility": "MIXED",
+          "duration_minutes": 60
+        },
+        {
+          "level": "HSS",
+          "variant": "Arabic",
+          "gender_eligibility": "MIXED",
+          "duration_minutes": 60
+        }
+      ]
+    },
+    {
+      "event_code": "EVT017",
+      "event_name": "Poetry Writing",
+      "category": "LITERARY",
+      "participation_type": "INDIVIDUAL",
+      "variants": [
+        "Malayalam",
+        "English",
+        "Hindi",
+        "Arabic"
+      ],
+      "rules": [
+        {
+          "level": "HS",
+          "variant": "Malayalam",
+          "gender_eligibility": "MIXED",
+          "duration_minutes": 60
+        },
+        {
+          "level": "HSS",
+          "variant": "Malayalam",
+          "gender_eligibility": "MIXED",
+          "duration_minutes": 60
+        },
+        {
+          "level": "HS",
+          "variant": "English",
+          "gender_eligibility": "MIXED",
+          "duration_minutes": 60
+        },
+        {
+          "level": "HSS",
+          "variant": "English",
+          "gender_eligibility": "MIXED",
+          "duration_minutes": 60
+        }
+      ]
+    },
+    {
+      "event_code": "EVT018",
+      "event_name": "Mappila Song",
+      "category": "MUSIC",
+      "participation_type": "INDIVIDUAL",
+      "rules": [
+        {
+          "level": "HS",
+          "gender_eligibility": "MIXED",
+          "duration_minutes": 6
+        },
+        {
+          "level": "HSS",
+          "gender_eligibility": "MIXED",
+          "duration_minutes": 6
+        }
+      ]
+    },
+    {
+      "event_code": "EVT019",
+      "event_name": "Ghazal",
+      "category": "MUSIC",
+      "participation_type": "INDIVIDUAL",
+      "rules": [
+        {
+          "level": "HSS",
+          "gender_eligibility": "MIXED",
+          "duration_minutes": 7
+        }
+      ]
+    },
+    {
+      "event_code": "EVT020",
+      "event_name": "Pencil Drawing",
+      "category": "FINE_ARTS",
+      "participation_type": "INDIVIDUAL",
+      "rules": [
+        {
+          "level": "LP",
+          "gender_eligibility": "MIXED",
+          "duration_minutes": 90
+        },
+        {
+          "level": "UP",
+          "gender_eligibility": "MIXED",
+          "duration_minutes": 120
+        }
+      ]
+    },
+    {
+      "event_code": "EVT021",
+      "event_name": "Cartoon",
+      "category": "FINE_ARTS",
+      "participation_type": "INDIVIDUAL",
+      "rules": [
+        {
+          "level": "UP",
+          "gender_eligibility": "MIXED",
+          "duration_minutes": 120
+        },
+        {
+          "level": "HS",
+          "gender_eligibility": "MIXED",
+          "duration_minutes": 120
+        }
+      ]
+    },
+    {
+      "event_code": "EVT022",
+      "event_name": "Collage",
+      "category": "FINE_ARTS",
+      "participation_type": "INDIVIDUAL",
+      "rules": [
+        {
+          "level": "HS",
+          "gender_eligibility": "MIXED",
+          "duration_minutes": 120
+        },
+        {
+          "level": "HSS",
+          "gender_eligibility": "MIXED",
+          "duration_minutes": 120
+        }
+      ]
+    },
+    {
+      "event_code": "EVT023",
+      "event_name": "Colouring",
+      "category": "FINE_ARTS",
+      "participation_type": "INDIVIDUAL",
+      "rules": [
+        {
+          "level": "LP",
+          "gender_eligibility": "MIXED",
+          "duration_minutes": 60
+        }
+      ]
+    },
+    {
+      "event_code": "EVT024",
+      "event_name": "Mimicry",
+      "category": "THEATRE",
+      "participation_type": "INDIVIDUAL",
+      "rules": [
+        {
+          "level": "UP",
+          "gender_eligibility": "MIXED",
+          "duration_minutes": 5
+        },
+        {
+          "level": "HS",
+          "gender_eligibility": "MIXED",
+          "duration_minutes": 6
+        },
+        {
+          "level": "HSS",
+          "gender_eligibility": "MIXED",
+          "duration_minutes": 6
+        }
+      ]
+    },
+    {
+      "event_code": "EVT025",
+      "event_name": "Group Dance",
+      "category": "DANCE",
+      "participation_type": "GROUP",
+      "rules": [
+        {
+          "level": "UP",
+          "gender_eligibility": "MIXED",
+          "min_participants": 6,
+          "max_participants": 12,
+          "duration_minutes": 8
+        },
+        {
+          "level": "HS",
+          "gender_eligibility": "MIXED",
+          "min_participants": 6,
+          "max_participants": 12,
+          "duration_minutes": 8
+        },
+        {
+          "level": "HSS",
+          "gender_eligibility": "MIXED",
+          "min_participants": 6,
+          "max_participants": 12,
+          "duration_minutes": 8
+        }
+      ]
+    },
+    {
+      "event_code": "EVT026",
+      "event_name": "Folk Dance",
+      "category": "DANCE",
+      "participation_type": "GROUP",
+      "rules": [
+        {
+          "level": "LP",
+          "gender_eligibility": "MIXED",
+          "min_participants": 6,
+          "max_participants": 12,
+          "duration_minutes": 7
+        },
+        {
+          "level": "UP",
+          "gender_eligibility": "MIXED",
+          "min_participants": 6,
+          "max_participants": 12,
+          "duration_minutes": 7
+        },
+        {
+          "level": "HS",
+          "gender_eligibility": "MIXED",
+          "min_participants": 6,
+          "max_participants": 12,
+          "duration_minutes": 8
+        },
+        {
+          "level": "HSS",
+          "gender_eligibility": "MIXED",
+          "min_participants": 6,
+          "max_participants": 12,
+          "duration_minutes": 8
+        }
+      ]
+    },
+    {
+      "event_code": "EVT027",
+      "event_name": "Kolkali",
+      "category": "TRADITIONAL_ARTS",
+      "participation_type": "GROUP",
+      "rules": [
+        {
+          "level": "UP",
+          "gender_eligibility": "BOYS",
+          "min_participants": 8,
+          "max_participants": 12,
+          "duration_minutes": 10
+        },
+        {
+          "level": "HS",
+          "gender_eligibility": "BOYS",
+          "min_participants": 8,
+          "max_participants": 12,
+          "duration_minutes": 10
+        },
+        {
+          "level": "HSS",
+          "gender_eligibility": "BOYS",
+          "min_participants": 8,
+          "max_participants": 12,
+          "duration_minutes": 10
+        }
+      ]
+    },
+    {
+      "event_code": "EVT028",
+      "event_name": "Duffmuttu",
+      "category": "TRADITIONAL_ARTS",
+      "participation_type": "GROUP",
+      "rules": [
+        {
+          "level": "UP",
+          "gender_eligibility": "BOYS",
+          "min_participants": 8,
+          "max_participants": 12,
+          "duration_minutes": 10
+        },
+        {
+          "level": "HS",
+          "gender_eligibility": "BOYS",
+          "min_participants": 8,
+          "max_participants": 12,
+          "duration_minutes": 10
+        },
+        {
+          "level": "HSS",
+          "gender_eligibility": "BOYS",
+          "min_participants": 8,
+          "max_participants": 12,
+          "duration_minutes": 10
+        }
+      ]
+    },
+    {
+      "event_code": "EVT029",
+      "event_name": "Thiruvathirakkali",
+      "category": "TRADITIONAL_ARTS",
+      "participation_type": "GROUP",
+      "rules": [
+        {
+          "level": "UP",
+          "gender_eligibility": "GIRLS",
+          "min_participants": 8,
+          "max_participants": 12,
+          "duration_minutes": 10
+        },
+        {
+          "level": "HS",
+          "gender_eligibility": "GIRLS",
+          "min_participants": 8,
+          "max_participants": 12,
+          "duration_minutes": 10
+        },
+        {
+          "level": "HSS",
+          "gender_eligibility": "GIRLS",
+          "min_participants": 8,
+          "max_participants": 12,
+          "duration_minutes": 10
+        }
+      ]
+    },
+    {
+      "event_code": "EVT030",
+      "event_name": "Margamkali",
+      "category": "TRADITIONAL_ARTS",
+      "participation_type": "GROUP",
+      "rules": [
+        {
+          "level": "HS",
+          "gender_eligibility": "GIRLS",
+          "min_participants": 8,
+          "max_participants": 12,
+          "duration_minutes": 10
+        },
+        {
+          "level": "HSS",
+          "gender_eligibility": "GIRLS",
+          "min_participants": 8,
+          "max_participants": 12,
+          "duration_minutes": 10
+        }
+      ]
+    },
+    {
+      "event_code": "EVT031",
+      "event_name": "Parichamuttukali",
+      "category": "TRADITIONAL_ARTS",
+      "participation_type": "GROUP",
+      "rules": [
+        {
+          "level": "HS",
+          "gender_eligibility": "BOYS",
+          "min_participants": 8,
+          "max_participants": 12,
+          "duration_minutes": 10
+        }
+      ]
+    },
+    {
+      "event_code": "EVT032",
+      "event_name": "Poorakkali",
+      "category": "TRADITIONAL_ARTS",
+      "participation_type": "GROUP",
+      "rules": [
+        {
+          "level": "HSS",
+          "gender_eligibility": "BOYS",
+          "min_participants": 8,
+          "max_participants": 12,
+          "duration_minutes": 10
+        }
+      ]
+    },
+    {
+      "event_code": "EVT033",
+      "event_name": "Panchavadyam",
+      "category": "MUSIC",
+      "participation_type": "GROUP",
+      "rules": [
+        {
+          "level": "HS",
+          "gender_eligibility": "MIXED",
+          "min_participants": 5,
+          "max_participants": 15,
+          "duration_minutes": 15
+        },
+        {
+          "level": "HSS",
+          "gender_eligibility": "MIXED",
+          "min_participants": 5,
+          "max_participants": 15,
+          "duration_minutes": 15
+        }
+      ]
+    },
+    {
+      "event_code": "EVT034",
+      "event_name": "Vanchippattu",
+      "category": "MUSIC",
+      "participation_type": "GROUP",
+      "rules": [
+        {
+          "level": "UP",
+          "gender_eligibility": "MIXED",
+          "min_participants": 6,
+          "max_participants": 12,
+          "duration_minutes": 10
+        },
+        {
+          "level": "HS",
+          "gender_eligibility": "MIXED",
+          "min_participants": 6,
+          "max_participants": 12,
+          "duration_minutes": 10
+        },
+        {
+          "level": "HSS",
+          "gender_eligibility": "MIXED",
+          "min_participants": 6,
+          "max_participants": 12,
+          "duration_minutes": 10
+        }
+      ]
+    },
+    {
+      "event_code": "EVT035",
+      "event_name": "Band",
+      "category": "MUSIC",
+      "participation_type": "GROUP",
+      "rules": [
+        {
+          "level": "HS",
+          "gender_eligibility": "MIXED",
+          "min_participants": 6,
+          "max_participants": 15,
+          "duration_minutes": 12
+        },
+        {
+          "level": "HSS",
+          "gender_eligibility": "MIXED",
+          "min_participants": 6,
+          "max_participants": 15,
+          "duration_minutes": 12
+        }
+      ]
+    },
+    {
+      "event_code": "EVT036",
+      "event_name": "Western Band / Jazz / Triple",
+      "category": "MUSIC",
+      "participation_type": "GROUP",
+      "rules": [
+        {
+          "level": "HSS",
+          "gender_eligibility": "MIXED",
+          "min_participants": 6,
+          "max_participants": 15,
+          "duration_minutes": 12
+        }
+      ]
+    },
+    {
+      "event_code": "EVT037",
+      "event_name": "Skit",
+      "category": "THEATRE",
+      "participation_type": "GROUP",
+      "rules": [
+        {
+          "level": "LP",
+          "gender_eligibility": "MIXED",
+          "min_participants": 5,
+          "max_participants": 12,
+          "duration_minutes": 15
+        },
+        {
+          "level": "UP",
+          "gender_eligibility": "MIXED",
+          "min_participants": 5,
+          "max_participants": 12,
+          "duration_minutes": 15
+        }
+      ]
+    },
+    {
+      "event_code": "EVT038",
+      "event_name": "Chavittu Nadakam",
+      "category": "THEATRE",
+      "participation_type": "GROUP",
+      "rules": [
+        {
+          "level": "HS",
+          "gender_eligibility": "MIXED",
+          "min_participants": 10,
+          "max_participants": 20,
+          "duration_minutes": 30
+        },
+        {
+          "level": "HSS",
+          "gender_eligibility": "MIXED",
+          "min_participants": 10,
+          "max_participants": 20,
+          "duration_minutes": 30
+        }
+      ]
+    },
+    {
+      "event_code": "EVT039",
+      "event_name": "Yakshagana",
+      "category": "THEATRE",
+      "participation_type": "GROUP",
+      "rules": [
+        {
+          "level": "HS",
+          "gender_eligibility": "MIXED",
+          "min_participants": 10,
+          "max_participants": 20,
+          "duration_minutes": 30
+        },
+        {
+          "level": "HSS",
+          "gender_eligibility": "MIXED",
+          "min_participants": 10,
+          "max_participants": 20,
+          "duration_minutes": 30
+        }
+      ]
+    }
+  ]
+}

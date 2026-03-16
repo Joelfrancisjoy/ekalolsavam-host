@@ -3,6 +3,8 @@ from django.core import signing
 from .workflow_models import (
     AdminIssuedID,
     SchoolParticipant,
+    SchoolGroupEntry,
+    SchoolGroupMember,
     SchoolVolunteerAssignment,
     SchoolStanding,
     IDSignupRequest
@@ -58,7 +60,7 @@ class SchoolParticipantSerializer(serializers.ModelSerializer):
     class Meta:
         model = SchoolParticipant
         fields = ['id', 'school', 'school_name', 'participant_id', 'first_name', 'last_name',
-                 'student_class', 'section', 'events', 'events_display', 'submitted_at',
+                 'student_class', 'section', 'gender', 'events', 'events_display', 'submitted_at',
                  'verified_by_volunteer', 'verified_at', 'volunteer', 'user_account', 'status']
         read_only_fields = ['submitted_at', 'verified_by_volunteer', 'verified_at', 'volunteer']
 
@@ -135,6 +137,7 @@ class SchoolParticipantSerializer(serializers.ModelSerializer):
                 return {
                     'username': user.username,
                     'section': user.section,
+                    'gender': user.gender,
                     'is_active': user.is_active,
                     'user_id': user.id,
                     'temporary_password': temp_password,
@@ -148,6 +151,52 @@ class SchoolParticipantSerializer(serializers.ModelSerializer):
         if obj.verified_by_volunteer:
             return 'approved'
         return 'pending'
+
+
+class SchoolGroupMemberSerializer(serializers.ModelSerializer):
+    full_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = SchoolGroupMember
+        fields = ['id', 'member_order', 'first_name', 'last_name', 'full_name', 'is_leader']
+
+    def get_full_name(self, obj):
+        return f"{obj.first_name} {obj.last_name}".strip()
+
+
+class SchoolGroupEntrySerializer(serializers.ModelSerializer):
+    school_name = serializers.CharField(source='school.username', read_only=True)
+    events_display = serializers.SerializerMethodField()
+    members = SchoolGroupMemberSerializer(many=True, read_only=True)
+    leader_user_details = serializers.SerializerMethodField()
+    reviewed_by_username = serializers.CharField(source='reviewed_by.username', read_only=True, allow_null=True)
+
+    class Meta:
+        model = SchoolGroupEntry
+        fields = [
+            'id', 'school', 'school_name', 'group_id', 'group_class', 'gender_category',
+            'participant_count', 'leader_full_name', 'leader_user', 'leader_user_details',
+            'events', 'events_display', 'members', 'status', 'review_notes',
+            'reviewed_at', 'reviewed_by', 'reviewed_by_username',
+            'source', 'submitted_at', 'updated_at',
+        ]
+        read_only_fields = ['submitted_at', 'updated_at', 'reviewed_at', 'reviewed_by']
+
+    def get_events_display(self, obj):
+        return [{"id": e.id, "name": e.name} for e in obj.events.all()]
+
+    def get_leader_user_details(self, obj):
+        leader = getattr(obj, 'leader_user', None)
+        if leader is None:
+            return None
+        return {
+            'id': leader.id,
+            'username': leader.username,
+            'first_name': leader.first_name,
+            'last_name': leader.last_name,
+            'registration_id': leader.registration_id,
+            'approval_status': leader.approval_status,
+        }
 
 
 class SchoolVolunteerAssignmentSerializer(serializers.ModelSerializer):

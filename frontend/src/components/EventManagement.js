@@ -3,6 +3,8 @@ import { eventServiceAdapter as eventService, userServiceAdapter as userService 
 import scoreService from '../services/scoreService';
 import AnomalyFlagIndicator from './AnomalyFlagIndicator';
 import AnomalyDetailsModal from './AnomalyDetailsModal';
+import catalogService from '../services/catalogService';
+import authManager from '../utils/authManager';
 
 const CATEGORY_OPTIONS = [
     { value: 'dance', label: 'Dance / Folk Arts', icon: '💃', color: 'from-pink-500 to-rose-500' },
@@ -10,6 +12,7 @@ const CATEGORY_OPTIONS = [
     { value: 'literary', label: 'Literary', icon: '📚', color: 'from-green-500 to-emerald-500' },
     { value: 'visual_arts', label: 'Visual Arts', icon: '🎨', color: 'from-purple-500 to-violet-500' },
     { value: 'theatre', label: 'Theatre / Drama', icon: '🎭', color: 'from-orange-500 to-amber-500' },
+    { value: 'traditional_arts', label: 'Traditional Arts', icon: '🪘', color: 'from-slate-600 to-slate-800' },
 ];
 
 // Unused - kept for reference
@@ -21,18 +24,12 @@ const CATEGORY_OPTIONS = [
 //     theatre: ['Mime', 'Mono Act', 'Drama', 'Mimicry', 'Ottan Thullal']
 // };
 
-const AVAILABLE_EVENTS = {
-    dance: ['Bharatanatyam', 'Mohiniyattam', 'Kathakali', 'Thiruvathirakali', 'Oppana'],
-    music: ['Light Music', 'Classical Music', 'Mappila Songs', 'Violin (Eastern)', 'Panchavadyam'],
-    literary: ['Essay Writing (Malayalam)', 'Poetry Recitation', 'Speech (Malayalam)', 'Quiz', 'Aksharaslokam'],
-    visual_arts: ['Cartoon', 'Painting – Water Colour', 'Painting – Oil Colour', 'Collage', 'Painting – Pencil'],
-    theatre: ['Mime', 'Mono Act', 'Drama', 'Mimicry', 'Ottan Thullal']
-};
-
 const initialEventState = {
     name: '',
     description: '',
     category: 'dance',
+    event_definition: '',
+    event_variant: '',
     date: '', // YYYY-MM-DD
     start_time: '', // HH:MM
     end_time: '', // HH:MM
@@ -48,11 +45,17 @@ const EventManagement = () => {
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState('');
     const [success, setSuccess] = useState('');
+    const [warnings, setWarnings] = useState([]);
 
     const [events, setEvents] = useState([]);
     const [venues, setVenues] = useState([]);
     const [judges, setJudges] = useState([]);
     const [volunteers, setVolunteers] = useState([]);
+
+    const [catalogEvents, setCatalogEvents] = useState([]);
+    const [catalogLevels, setCatalogLevels] = useState([]);
+    const [catalogRules, setCatalogRules] = useState([]);
+    const [catalogVariantsByEventId, setCatalogVariantsByEventId] = useState({});
 
     const [filters, setFilters] = useState({ category: '', date: '' });
     const [search, setSearch] = useState('');
@@ -86,7 +89,6 @@ const EventManagement = () => {
 
     useEffect(() => {
         loadAll();
-        loadAnomalies();
     }, []);
 
     const loadAnomalies = async () => {
@@ -99,42 +101,235 @@ const EventManagement = () => {
         }
     };
 
+    const mapCatalogCategoryToEventCategory = (catalogCategoryName) => {
+        const mapping = {
+            DANCE: 'dance',
+            MUSIC: 'music',
+            THEATRE: 'theatre',
+            LITERARY: 'literary',
+            FINE_ARTS: 'visual_arts',
+            TRADITIONAL_ARTS: 'traditional_arts',
+        };
+        return mapping[catalogCategoryName] || '';
+    };
+
+    const catalogEventsByCategory = useMemo(() => {
+        const grouped = {};
+        (catalogEvents || []).forEach((ev) => {
+            const catalogCat = ev?.category_details?.category_name;
+            const key = mapCatalogCategoryToEventCategory(catalogCat);
+            if (!key) return;
+            if (!grouped[key]) grouped[key] = [];
+            grouped[key].push(ev);
+        });
+        Object.keys(grouped).forEach((k) => {
+            grouped[k].sort((a, b) => String(a.event_name || '').localeCompare(String(b.event_name || '')));
+        });
+        return grouped;
+    }, [catalogEvents]);
+
+    const catalogEventsById = useMemo(() => {
+        const byId = {};
+        (catalogEvents || []).forEach((ev) => {
+            if (ev?.id !== null && ev?.id !== undefined) {
+                byId[String(ev.id)] = ev;
+            }
+        });
+        return byId;
+    }, [catalogEvents]);
+
+    const levelCodeById = useMemo(() => {
+        const byId = {};
+        (catalogLevels || []).forEach((lvl) => {
+            if (lvl?.id !== null && lvl?.id !== undefined) {
+                byId[String(lvl.id)] = String(lvl.level_code || '').toUpperCase();
+            }
+        });
+        return byId;
+    }, [catalogLevels]);
+
+    const sortLevelCodes = (codes = []) => {
+        const order = { LP: 0, UP: 1, HS: 2, HSS: 3 };
+        const unique = Array.from(new Set((codes || []).map((c) => String(c || '').toUpperCase().trim()).filter(Boolean)));
+        unique.sort((a, b) => {
+            const ra = Object.prototype.hasOwnProperty.call(order, a) ? order[a] : 99;
+            const rb = Object.prototype.hasOwnProperty.call(order, b) ? order[b] : 99;
+            if (ra !== rb) return ra - rb;
+            return a.localeCompare(b);
+        });
+        return unique;
+    };
+
+    const resolvedEvents = useMemo(() => {
+        const rulesByEvent = {};
+        (catalogRules || []).forEach((rule) => {
+            const eventId = rule?.event;
+            if (eventId === null || eventId === undefined) return;
+            const key = String(eventId);
+            if (!rulesByEvent[key]) rulesByEvent[key] = [];
+            rulesByEvent[key].push(rule);
+        });
+
+        return (events || []).map((ev) => {
+            const definitionId = ev?.event_definition_details?.id ?? ev?.event_definition ?? null;
+            const catalogDefinition = definitionId !== null && definitionId !== undefined
+                ? (ev?.event_definition_details || catalogEventsById[String(definitionId)] || null)
+                : null;
+
+            const resolvedName = String(catalogDefinition?.event_name || ev?.name || '').trim();
+            const resolvedCategory = ev?.category || mapCatalogCategoryToEventCategory(catalogDefinition?.category_details?.category_name) || '';
+            const catalogCode = String(catalogDefinition?.event_code || '').trim();
+            const variantName = String(ev?.event_variant_details?.variant_name || '').trim();
+
+            const selectedVariantRaw = ev?.event_variant_details?.id ?? ev?.event_variant ?? null;
+            const selectedVariant = selectedVariantRaw === null || selectedVariantRaw === undefined || selectedVariantRaw === ''
+                ? null
+                : Number(selectedVariantRaw);
+
+            const eventRules = definitionId !== null && definitionId !== undefined ? (rulesByEvent[String(definitionId)] || []) : [];
+            const matchingRules = eventRules.filter((rule) => {
+                const ruleVariantRaw = rule?.variant ?? rule?.variant_details?.id ?? null;
+                if (selectedVariant === null) {
+                    return ruleVariantRaw === null || ruleVariantRaw === undefined || ruleVariantRaw === '';
+                }
+                if (ruleVariantRaw === null || ruleVariantRaw === undefined || ruleVariantRaw === '') {
+                    return true;
+                }
+                return Number(ruleVariantRaw) === selectedVariant;
+            });
+
+            const levelCodes = sortLevelCodes((matchingRules.length ? matchingRules : eventRules).map((rule) => (
+                String(
+                    rule?.level_details?.level_code ||
+                    levelCodeById[String(rule?.level)] ||
+                    ''
+                ).toUpperCase()
+            )));
+
+            return {
+                ...ev,
+                resolved_name: resolvedName || ev?.name || '',
+                resolved_category: resolvedCategory,
+                catalog_event_code: catalogCode,
+                catalog_variant_name: variantName,
+                eligibility_level_codes: levelCodes,
+            };
+        });
+    }, [events, catalogEventsById, catalogRules, levelCodeById]);
+
+    const getVariantsForEventDefinition = async (eventDefinitionId) => {
+        if (!eventDefinitionId) return [];
+        try {
+            const existing = catalogVariantsByEventId[String(eventDefinitionId)];
+            if (existing) return existing;
+            const data = await catalogService.listVariants(eventDefinitionId);
+            const list = data || [];
+            setCatalogVariantsByEventId((prev) => ({ ...prev, [String(eventDefinitionId)]: list }));
+            return list;
+        } catch (e) {
+            return [];
+        }
+    };
+
     const loadAll = async () => {
         try {
             setLoading(true);
-            const [evData, venueData] = await Promise.all([
+            setWarnings([]);
+
+            const results = await Promise.allSettled([
                 eventService.listEvents(),
                 eventService.listVenues(),
+                catalogService.listEventDefinitions(),
+                catalogService.listLevels(),
+                catalogService.listRules(),
+                userService.list({ role: 'judge' }),
+                userService.list({ role: 'volunteer' }),
+                scoreService.getEventAnomalies(),
             ]);
-            setEvents(evData);
-            setVenues(venueData);
-            // Try to fetch judges list (expects backend to support role filter)
-            try {
-                const judgeUsers = await userService.list({ role: 'judge' });
-                setJudges(judgeUsers);
-            } catch (_) {
-                // fallback: load all users and let admin pick from them
+
+            const evRes = results[0];
+            const venueRes = results[1];
+            const catalogRes = results[2];
+            const levelsRes = results[3];
+            const rulesRes = results[4];
+            const judgesRes = results[5];
+            const volunteersRes = results[6];
+            const anomaliesRes = results[7];
+
+            if (evRes.status === 'fulfilled') {
+                setEvents(evRes.value);
+            }
+            if (venueRes.status === 'fulfilled') {
+                setVenues(venueRes.value);
+            }
+
+            if (catalogRes.status === 'fulfilled') {
+                setCatalogEvents(catalogRes.value || []);
+            } else {
+                console.warn('Failed to load catalog event definitions:', catalogRes.reason);
+                setCatalogEvents([]);
+                setWarnings((prev) => ([...prev, 'Event catalog is unavailable right now. Event names cannot be validated until catalog service recovers.']))
+            }
+
+            if (levelsRes.status === 'fulfilled') {
+                setCatalogLevels(levelsRes.value || []);
+            } else {
+                console.warn('Failed to load catalog levels:', levelsRes.reason);
+                setCatalogLevels([]);
+                setWarnings((prev) => ([...prev, 'Level catalog is unavailable right now. LP/UP/HS/HSS labels may be incomplete.']))
+            }
+
+            if (rulesRes.status === 'fulfilled') {
+                setCatalogRules(rulesRes.value || []);
+            } else {
+                console.warn('Failed to load catalog rules:', rulesRes.reason);
+                setCatalogRules([]);
+                setWarnings((prev) => ([...prev, 'Eligibility rules are unavailable right now. Level labels may be incomplete.']))
+            }
+
+            if (anomaliesRes.status === 'fulfilled') {
+                setEventAnomalies(anomaliesRes.value || {});
+            }
+
+            const needsJudgeFallback = judgesRes.status !== 'fulfilled';
+            const needsVolunteerFallback = volunteersRes.status !== 'fulfilled';
+
+            if (!needsJudgeFallback) setJudges(judgesRes.value || []);
+            if (!needsVolunteerFallback) setVolunteers(volunteersRes.value || []);
+
+            if (needsJudgeFallback || needsVolunteerFallback) {
                 try {
                     const allUsers = await userService.list();
-                    setJudges(allUsers);
+                    if (needsJudgeFallback) setJudges(allUsers || []);
+                    if (needsVolunteerFallback) setVolunteers((allUsers || []).filter((u) => u.role === 'volunteer'));
                 } catch (e2) {
-                    // ignore
+                    if (needsJudgeFallback) setJudges([]);
+                    if (needsVolunteerFallback) setVolunteers([]);
+                    setWarnings((prev) => ([...prev, 'Unable to load judges/volunteers due to a server error. Assignments may be limited until the backend is fixed.']))
                 }
             }
-            // load volunteers list similarly
-            try {
-                const volunteerUsers = await userService.list({ role: 'volunteer' });
-                setVolunteers(volunteerUsers);
-            } catch (_) {
-                try {
-                    const allUsers = await userService.list();
-                    setVolunteers(allUsers.filter(u => u.role === 'volunteer'));
-                } catch (e2) { /* ignore */ }
+
+            if (evRes.status === 'rejected' || venueRes.status === 'rejected') {
+                const err = (evRes.status === 'rejected' ? evRes.reason : venueRes.reason);
+                const status = err?.response?.status;
+                if (status === 401) {
+                    setError('Session expired. Please login again.');
+                    authManager.redirectToLogin('admin data fetch unauthorized');
+                } else {
+                    setError('Failed to load data');
+                }
+            } else {
+                setError('');
             }
-            setError('');
         } catch (err) {
-            console.error('Failed to load events/venues', err);
-            setError('Failed to load data');
+            console.error('Failed to load admin event management data', err);
+            const status = err?.response?.status;
+            if (status === 401) {
+                setError('Session expired. Please login again.');
+                authManager.redirectToLogin('admin data fetch unauthorized');
+            } else {
+                setError('Failed to load data');
+            }
         } finally {
             setLoading(false);
         }
@@ -167,23 +362,26 @@ const EventManagement = () => {
         await reloadEvents();
     };
 
-    const totalEvents = useMemo(() => events.length, [events]);
-    const publishedCount = useMemo(() => events.filter(e => e.is_published).length, [events]);
-    const categoryCount = useMemo(() => new Set(events.map(e => e.category)).size, [events]);
-    const venueCount = useMemo(() => new Set(events.map(e => e.venue)).size, [events]);
+    const totalEvents = useMemo(() => resolvedEvents.length, [resolvedEvents]);
+    const publishedCount = useMemo(() => resolvedEvents.filter((e) => e.is_published).length, [resolvedEvents]);
+    const categoryCount = useMemo(
+        () => new Set(resolvedEvents.map((e) => e.resolved_category || e.category).filter(Boolean)).size,
+        [resolvedEvents]
+    );
+    const venueCount = useMemo(() => new Set(resolvedEvents.map((e) => e.venue)).size, [resolvedEvents]);
 
     const filteredEvents = useMemo(() => {
-        let list = events;
+        let list = resolvedEvents;
         if (publishedOnly) list = list.filter(e => e.is_published);
         if (search.trim()) {
             const q = search.toLowerCase();
             list = list.filter(e =>
-                (e.name || '').toLowerCase().includes(q) ||
+                (e.resolved_name || e.name || '').toLowerCase().includes(q) ||
                 (e.description || '').toLowerCase().includes(q)
             );
         }
         return list;
-    }, [events, publishedOnly, search]);
+    }, [resolvedEvents, publishedOnly, search]);
 
     // Dashboard enhancements: selection, sorting, pagination
     const [selectedIds, setSelectedIds] = useState([]);
@@ -198,13 +396,13 @@ const EventManagement = () => {
         list.sort((a, b) => {
             const getValue = (ev) => {
                 switch (key) {
-                    case 'name': return (ev.name || '').toLowerCase();
-                    case 'category': return (ev.category || '').toLowerCase();
+                    case 'name': return (ev.resolved_name || ev.name || '').toLowerCase();
+                    case 'category': return (ev.resolved_category || ev.category || '').toLowerCase();
                     case 'date': return ev.date || '';
                     case 'start_time': return ev.start_time || '';
                     case 'venue': return String(ev.venue || '');
                     case 'is_published': return ev.is_published ? 1 : 0;
-                    default: return (ev.name || '').toLowerCase();
+                    default: return (ev.resolved_name || ev.name || '').toLowerCase();
                 }
             };
             const va = getValue(a);
@@ -307,8 +505,8 @@ const EventManagement = () => {
             const judgeIds = (ev.judges && ev.judges.length ? ev.judges : ((ev.judges_details || []).map(u => u.id))) || [];
             const volunteerIds = (ev.volunteers && ev.volunteers.length ? ev.volunteers : ((ev.volunteers_details || []).map(u => u.id))) || [];
             const map = {
-                name: ev.name || '',
-                category: ev.category || '',
+                name: ev.resolved_name || ev.name || '',
+                category: ev.resolved_category || ev.category || '',
                 date: ev.date || '',
                 time: `${ev.start_time || ''} - ${ev.end_time || ''}`.trim(),
                 venue: venueName(ev.venue),
@@ -348,10 +546,13 @@ const EventManagement = () => {
 
     const openEdit = (event) => {
         setEditingId(event.id);
+        const resolvedCategory = event.resolved_category || event.category || mapCatalogCategoryToEventCategory(event?.event_definition_details?.category_details?.category_name) || 'dance';
         setFormData({
-            name: event.name || '',
+            name: event.resolved_name || event.name || '',
             description: event.description || '',
-            category: event.category || 'dance',
+            category: resolvedCategory,
+            event_definition: event.event_definition ? String(event.event_definition) : '',
+            event_variant: event.event_variant ? String(event.event_variant) : '',
             date: event.date || '',
             start_time: event.start_time?.slice(0, 5) || '',
             end_time: event.end_time?.slice(0, 5) || '',
@@ -371,15 +572,31 @@ const EventManagement = () => {
                 ...prev,
                 [name]: type === 'number' ? Number(value) : value,
             };
-            // Reset name if category changed and current name is not in the new category
             if (name === 'category') {
-                const newCategoryEvents = AVAILABLE_EVENTS[value] || [];
-                if (newData.name && !newCategoryEvents.includes(newData.name)) {
-                    newData.name = '';
-                }
+                newData.event_definition = '';
+                newData.event_variant = '';
+                newData.name = '';
             }
             return newData;
         });
+    };
+
+    const handleSelectEventDefinition = async (evDef) => {
+        if (!evDef) return;
+        const catalogCat = evDef?.category_details?.category_name;
+        const categoryValue = mapCatalogCategoryToEventCategory(catalogCat);
+        const participationType = evDef?.participation_type_details?.type_name;
+        const variants = await getVariantsForEventDefinition(evDef.id);
+
+        setFormData((prev) => ({
+            ...prev,
+            category: categoryValue || prev.category,
+            event_definition: String(evDef.id),
+            event_variant: variants.length ? String(variants[0].id) : '',
+            name: evDef.event_name || '',
+            description: evDef.event_name || prev.description,
+            max_participants: participationType === 'INDIVIDUAL' ? 1 : prev.max_participants,
+        }));
     };
 
     const handleJudgesChange = (e) => {
@@ -415,6 +632,15 @@ const EventManagement = () => {
                 judges: formData.judges || [],
                 volunteers: formData.volunteers || [],
             };
+
+            if (payload.event_definition === '') payload.event_definition = null;
+            if (payload.event_variant === '') payload.event_variant = null;
+            if (payload.event_definition !== null && payload.event_definition !== undefined) {
+                payload.event_definition = Number(payload.event_definition);
+            }
+            if (payload.event_variant !== null && payload.event_variant !== undefined) {
+                payload.event_variant = Number(payload.event_variant);
+            }
 
             // Client-side time validations
             const [sh, sm] = (payload.start_time || '').split(':').map(Number);
@@ -557,7 +783,7 @@ const EventManagement = () => {
     }
 
     return (
-        <div className="max-w-7xl mx-auto p-8">
+        <div className="max-w-[90rem] mx-auto p-6 md:p-8">
             <div className="bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 rounded-2xl border border-slate-200 shadow-lg p-8 mb-8">
                 <div className="flex items-start justify-between mb-8">
                     <div>
@@ -591,39 +817,60 @@ const EventManagement = () => {
                 {success && (
                     <div className="mx-6 mt-4 p-4 bg-green-50 border border-green-200 rounded-md text-green-800 text-sm">{success}</div>
                 )}
+                {!!warnings.length && (
+                    <div className="mx-6 mt-4 p-4 bg-amber-50 border border-amber-200 rounded-md text-amber-900 text-sm space-y-2">
+                        {warnings.map((w, idx) => (
+                            <div key={idx}>{w}</div>
+                        ))}
+                    </div>
+                )}
 
                 <div className="p-8">
                     {activeTab === 'list' && (
                         <>
-                            <Filters
-                                filters={filters}
-                                onChange={handleFilterChange}
-                                onApply={applyFilters}
-                                search={search}
-                                onSearch={setSearch}
-                                publishedOnly={publishedOnly}
-                                onPublishedOnlyChange={setPublishedOnly}
-                            />
-                            <QuickFilters
-                                publishedOnly={publishedOnly}
-                                onTogglePublished={() => applyQuickPublished(!publishedOnly)}
-                                onToday={applyQuickToday}
-                                onClearDate={clearQuickDate}
-                                currentCategory={filters.category}
-                                onCategory={applyQuickCategory}
-                            />
-                            <Toolbar
-                                selectedCount={selectedIds.length}
-                                onClearSelection={clearSelection}
-                                onPublish={() => bulkPublish(true)}
-                                onUnpublish={() => bulkPublish(false)}
-                                onDelete={bulkDelete}
-                                rowDensity={rowDensity}
-                                onChangeDensity={setRowDensity}
-                                columnsVisible={columnsVisible}
-                                onToggleColumn={toggleColumn}
-                                onExportCSV={exportCSV}
-                            />
+                            <div className="bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 rounded-2xl border border-slate-200 shadow-sm p-6 mb-6">
+                                <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-6">
+                                    <div className="flex-1">
+                                        <h3 className="text-2xl font-bold text-slate-900 mb-1">Browse & Manage Events</h3>
+                                        <p className="text-slate-600 font-medium">Use filters, quick chips, and bulk actions to manage events faster.</p>
+                                    </div>
+                                    <div className="flex items-center gap-3">
+                                        <button onClick={reloadAllEvents} className="px-5 py-3 rounded-xl border-2 text-slate-700 border-slate-300 hover:bg-white hover:border-slate-400 transition-all duration-200 font-semibold">Refresh</button>
+                                        <button onClick={openCreate} className="px-6 py-3 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 text-white hover:from-indigo-700 hover:to-purple-700 shadow-md hover:shadow-lg transition-all duration-200 font-semibold">New Event</button>
+                                    </div>
+                                </div>
+                                <div className="mt-6">
+                                    <Filters
+                                        filters={filters}
+                                        onChange={handleFilterChange}
+                                        onApply={applyFilters}
+                                        search={search}
+                                        onSearch={setSearch}
+                                        publishedOnly={publishedOnly}
+                                        onPublishedOnlyChange={setPublishedOnly}
+                                    />
+                                    <QuickFilters
+                                        publishedOnly={publishedOnly}
+                                        onTogglePublished={() => applyQuickPublished(!publishedOnly)}
+                                        onToday={applyQuickToday}
+                                        onClearDate={clearQuickDate}
+                                        currentCategory={filters.category}
+                                        onCategory={applyQuickCategory}
+                                    />
+                                    <Toolbar
+                                        selectedCount={selectedIds.length}
+                                        onClearSelection={clearSelection}
+                                        onPublish={() => bulkPublish(true)}
+                                        onUnpublish={() => bulkPublish(false)}
+                                        onDelete={bulkDelete}
+                                        rowDensity={rowDensity}
+                                        onChangeDensity={setRowDensity}
+                                        columnsVisible={columnsVisible}
+                                        onToggleColumn={toggleColumn}
+                                        onExportCSV={exportCSV}
+                                    />
+                                </div>
+                            </div>
                             <EventList
                                 events={currentPageEvents}
                                 venues={venues}
@@ -676,7 +923,9 @@ const EventManagement = () => {
                             venues={venues}
                             judges={judges}
                             volunteers={volunteers}
-                            availableEvents={AVAILABLE_EVENTS}
+                            catalogEventsByCategory={catalogEventsByCategory}
+                            catalogVariantsByEventId={catalogVariantsByEventId}
+                            onSelectEventDefinition={handleSelectEventDefinition}
                             data={formData}
                             onChange={handleChange}
                             onJudgesChange={handleJudgesChange}
@@ -695,7 +944,7 @@ const EventManagement = () => {
 
 const Filters = ({ filters, onChange, onApply, search, onSearch, publishedOnly, onPublishedOnlyChange }) => {
     return (
-        <div className="bg-gradient-to-r from-slate-50 to-blue-50 p-6 rounded-xl mb-6 border border-slate-200 shadow-sm">
+        <div className="bg-white/80 backdrop-blur p-6 rounded-xl mb-6 border border-slate-200 shadow-sm">
             <h3 className="text-xl font-bold text-slate-900 mb-4">Filter Events</h3>
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
                 <div>
@@ -738,6 +987,18 @@ const EventList = ({ events, venues, judges, volunteers = [], onEdit, onDelete, 
         literary: 'bg-emerald-50 text-emerald-700 border-emerald-200',
         visual_arts: 'bg-violet-50 text-violet-700 border-violet-200',
         theatre: 'bg-amber-50 text-amber-700 border-amber-200',
+        traditional_arts: 'bg-slate-100 text-slate-800 border-slate-300',
+    };
+
+    const getCatalogMeta = (ev) => {
+        const code = ev?.catalog_event_code || ev?.event_definition_details?.event_code || '';
+        const variant = ev?.catalog_variant_name || ev?.event_variant_details?.variant_name || '';
+        const levels = Array.isArray(ev?.eligibility_level_codes) ? ev.eligibility_level_codes : [];
+        return {
+            code,
+            variant,
+            levels,
+        };
     };
 
     if (!events.length) {
@@ -772,104 +1033,128 @@ const EventList = ({ events, venues, judges, volunteers = [], onEdit, onDelete, 
                         {columnsVisible.judges && <th className="px-8 py-4 text-left text-sm font-bold text-slate-700 uppercase tracking-wider">Judges</th>}
                         {columnsVisible.volunteers && <th className="px-8 py-4 text-left text-sm font-bold text-slate-700 uppercase tracking-wider">Volunteers</th>}
                         {columnsVisible.published && <th className="px-4"><SortHeader label="Published" col="is_published" /></th>}
-                        {columnsVisible.actions && <th className="px-8 py-4 text-left text-sm font-bold text-slate-700 uppercase tracking-wider">Actions</th>}
+                        {columnsVisible.actions && <th className="px-8 py-4 text-left text-sm font-bold text-slate-700 uppercase tracking-wider sticky right-0 bg-gradient-to-r from-slate-50 to-blue-50">Actions</th>}
                     </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-slate-100">
                     {events.map((ev) => (
-                        <tr key={ev.id} className="odd:bg-white even:bg-slate-50 hover:bg-blue-50 transition-colors duration-200">
-                            <td className={`px-8 ${density === 'compact' ? 'py-3' : 'py-6'} whitespace-nowrap`}>
-                                <input type="checkbox" checked={selectedIds.includes(ev.id)} onChange={() => onToggleRowSelect(ev.id)} className="w-5 h-5 text-indigo-600 border-slate-300 rounded focus:ring-indigo-500" />
-                            </td>
-                            {columnsVisible.name && (
-                                <td className={`px-8 ${density === 'compact' ? 'py-3' : 'py-6'}`}>
-                                    <div className="flex items-center gap-3">
-                                        <div>
-                                            <div className="text-base font-bold text-slate-900">{ev.name}</div>
-                                            <div className="text-sm text-slate-600 max-w-xs truncate mt-1">{ev.description}</div>
-                                        </div>
-                                        {eventAnomalies[ev.id] && (
-                                            <AnomalyFlagIndicator
-                                                count={eventAnomalies[ev.id].total_flagged}
-                                                unreviewed={eventAnomalies[ev.id].unreviewed}
-                                                onClick={() => onViewAnomalies(ev.id)}
-                                            />
-                                        )}
-                                    </div>
-                                </td>
-                            )}
-                            {columnsVisible.category && (
-                                <td className={`px-8 ${density === 'compact' ? 'py-3' : 'py-6'} whitespace-nowrap text-base`}>
-                                    <span className={`inline-flex items-center px-3 py-1.5 rounded-full text-sm font-semibold border-2 ${CATEGORY_BADGE[ev.category] || 'bg-slate-100 text-slate-700 border-slate-300'}`} title={ev.category}>
-                                        {ev.category}
-                                    </span>
-                                </td>
-                            )}
-                            {columnsVisible.date && (
-                                <td className={`px-8 ${density === 'compact' ? 'py-3' : 'py-6'} whitespace-nowrap text-base text-slate-700 font-semibold`}>{ev.date}</td>
-                            )}
-                            {columnsVisible.time && (
-                                <td className={`px-8 ${density === 'compact' ? 'py-3' : 'py-6'} whitespace-nowrap text-base text-slate-700`}>
-                                    <span className="inline-flex items-center px-3 py-1.5 rounded-full bg-blue-100 text-blue-800 text-sm font-semibold border border-blue-200">
-                                        {ev.start_time} - {ev.end_time}
-                                    </span>
-                                </td>
-                            )}
-                            {columnsVisible.venue && (
-                                <td className={`px-8 ${density === 'compact' ? 'py-3' : 'py-6'} whitespace-nowrap text-base text-slate-700`}>
-                                    <span className="inline-flex items-center px-3 py-1.5 rounded-full bg-slate-100 text-slate-800 text-sm font-semibold border border-slate-200">
-                                        {venueLabel(ev.venue)}
-                                    </span>
-                                </td>
-                            )}
-                            {columnsVisible.judges && (
-                                <td className={`px-8 ${density === 'compact' ? 'py-3' : 'py-6'} whitespace-nowrap text-base text-slate-700`}>
-                                    <div className="flex flex-wrap gap-2">
-                                        {(((ev.judges && ev.judges.length ? ev.judges : ((ev.judges_details || []).map(u => u.id))) || []).slice(0, 3)).map((jid) => (
-                                            <span key={jid} className="px-2.5 py-0.5 text-xs bg-indigo-50 text-indigo-700 rounded-full font-semibold border border-indigo-200" title="Judge">
-                                                {judgeName(jid)}
+                        (() => {
+                            const catalogMeta = getCatalogMeta(ev);
+                            return (
+                                <tr key={ev.id} className="odd:bg-white even:bg-slate-50 hover:bg-blue-50 transition-colors duration-200">
+                                    <td className={`px-8 ${density === 'compact' ? 'py-3' : 'py-6'} whitespace-nowrap`}>
+                                        <input type="checkbox" checked={selectedIds.includes(ev.id)} onChange={() => onToggleRowSelect(ev.id)} className="w-5 h-5 text-indigo-600 border-slate-300 rounded focus:ring-indigo-500" />
+                                    </td>
+                                    {columnsVisible.name && (
+                                        <td className={`px-8 ${density === 'compact' ? 'py-3' : 'py-6'}`}>
+                                            <div className="flex items-center gap-3">
+                                                <div>
+                                                    <div className="text-base font-bold text-slate-900">{ev.resolved_name || ev.name}</div>
+                                                    {(catalogMeta.code || catalogMeta.variant || catalogMeta.levels.length > 0) && (
+                                                        <div className="mt-1 flex flex-wrap items-center gap-2">
+                                                            {catalogMeta.code && (
+                                                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200">
+                                                                    {catalogMeta.code}
+                                                                </span>
+                                                            )}
+                                                            {catalogMeta.variant && (
+                                                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200">
+                                                                    {catalogMeta.variant}
+                                                                </span>
+                                                            )}
+                                                            {catalogMeta.levels.map((levelCode) => (
+                                                                <span key={`${ev.id}-${levelCode}`} className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200">
+                                                                    {levelCode}
+                                                                </span>
+                                                            ))}
+                                                        </div>
+                                                    )}
+                                                    <div className="text-sm text-slate-600 max-w-xs truncate mt-1">{ev.description}</div>
+                                                </div>
+                                                {eventAnomalies[ev.id] && (
+                                                    <AnomalyFlagIndicator
+                                                        count={eventAnomalies[ev.id].total_flagged}
+                                                        unreviewed={eventAnomalies[ev.id].unreviewed}
+                                                        onClick={() => onViewAnomalies(ev.id)}
+                                                    />
+                                                )}
+                                            </div>
+                                        </td>
+                                    )}
+                                    {columnsVisible.category && (
+                                        <td className={`px-8 ${density === 'compact' ? 'py-3' : 'py-6'} whitespace-nowrap text-base`}>
+                                            <span className={`inline-flex items-center px-3 py-1.5 rounded-full text-sm font-semibold border-2 ${CATEGORY_BADGE[ev.resolved_category || ev.category] || 'bg-slate-100 text-slate-700 border-slate-300'}`} title={ev.resolved_category || ev.category}>
+                                                {ev.resolved_category || ev.category}
                                             </span>
-                                        ))}
-                                        {(((ev.judges && ev.judges.length ? ev.judges : ((ev.judges_details || []).map(u => u.id))) || []).length > 3) && (
-                                            <span className="px-2.5 py-0.5 text-xs bg-indigo-100 text-indigo-800 rounded-full font-semibold border border-indigo-200">+{(((ev.judges && ev.judges.length ? ev.judges : ((ev.judges_details || []).map(u => u.id))) || []).length - 3)} more</span>
-                                        )}
-                                    </div>
-                                </td>
-                            )}
-                            {columnsVisible.volunteers && (
-                                <td className={`px-8 ${density === 'compact' ? 'py-3' : 'py-6'} whitespace-nowrap text-base text-slate-700`}>
-                                    <div className="flex flex-wrap gap-2">
-                                        {(((ev.volunteers && ev.volunteers.length ? ev.volunteers : ((ev.volunteers_details || []).map(u => u.id))) || []).slice(0, 3)).map((vid) => (
-                                            <span key={vid} className="px-2.5 py-0.5 text-xs bg-emerald-50 text-emerald-700 rounded-full font-semibold border border-emerald-200" title="Volunteer">
-                                                {volunteerName(vid)}
+                                        </td>
+                                    )}
+                                    {columnsVisible.date && (
+                                        <td className={`px-8 ${density === 'compact' ? 'py-3' : 'py-6'} whitespace-nowrap text-base text-slate-700 font-semibold`}>{ev.date}</td>
+                                    )}
+                                    {columnsVisible.time && (
+                                        <td className={`px-8 ${density === 'compact' ? 'py-3' : 'py-6'} whitespace-nowrap text-base text-slate-700`}>
+                                            <span className="inline-flex items-center px-3 py-1.5 rounded-full bg-blue-100 text-blue-800 text-sm font-semibold border border-blue-200">
+                                                {ev.start_time} - {ev.end_time}
                                             </span>
-                                        ))}
-                                        {(((ev.volunteers && ev.volunteers.length ? ev.volunteers : ((ev.volunteers_details || []).map(u => u.id))) || []).length > 3) && (
-                                            <span className="px-2.5 py-0.5 text-xs bg-emerald-100 text-emerald-800 rounded-full font-semibold border border-emerald-200">+{(((ev.volunteers && ev.volunteers.length ? ev.volunteers : ((ev.volunteers_details || []).map(u => u.id))) || []).length - 3)} more</span>
-                                        )}
-                                    </div>
-                                </td>
-                            )}
-                            {columnsVisible.published && (
-                                <td className={`px-8 ${density === 'compact' ? 'py-3' : 'py-6'} whitespace-nowrap text-base text-slate-700`}>
-                                    <label className="inline-flex items-center cursor-pointer">
-                                        <input type="checkbox" className="sr-only peer" checked={!!ev.is_published} onChange={() => onTogglePublish(ev)} />
-                                        <div className="w-12 h-6 bg-slate-200 rounded-full peer peer-checked:bg-green-500 transition-colors relative">
-                                            <div className="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transform transition-transform peer-checked:translate-x-6"></div>
-                                        </div>
-                                        <span className="ml-3 text-sm font-semibold text-slate-600">{ev.is_published ? 'Published' : 'Hidden'}</span>
-                                    </label>
-                                </td>
-                            )}
-                            {columnsVisible.actions && (
-                                <td className={`px-8 ${density === 'compact' ? 'py-3' : 'py-6'} whitespace-nowrap text-base font-semibold space-x-3`}>
-                                    <button title="Edit" aria-label="Edit" onClick={() => onEdit(ev)} className="inline-flex items-center px-4 py-2 rounded-lg border-2 text-blue-700 border-blue-300 hover:bg-blue-50 hover:border-blue-400 transition-all duration-200 font-semibold">Edit</button>
-                                    <button title={ev.is_published ? 'Unpublish' : 'Publish'} aria-label="Toggle publish" onClick={() => onTogglePublish(ev)} className={`inline-flex items-center px-4 py-2 rounded-lg border-2 transition-all duration-200 font-semibold ${ev.is_published ? 'text-indigo-700 border-indigo-300 hover:bg-indigo-50 hover:border-indigo-400' : 'text-slate-700 border-slate-300 hover:bg-slate-50 hover:border-slate-400'}`}>{ev.is_published ? 'Unpublish' : 'Publish'}</button>
-                                    <VolunteerAssignDropdown event={ev} volunteers={volunteers} onAssign={onAssignVolunteers} />
-                                    <button title="Delete" aria-label="Delete" onClick={() => onDelete(ev.id)} className="inline-flex items-center px-4 py-2 rounded-lg border-2 text-red-700 border-red-300 hover:bg-red-50 hover:border-red-400 transition-all duration-200 font-semibold">Delete</button>
-                                </td>
-                            )}
-                        </tr>
+                                        </td>
+                                    )}
+                                    {columnsVisible.venue && (
+                                        <td className={`px-8 ${density === 'compact' ? 'py-3' : 'py-6'} whitespace-nowrap text-base text-slate-700`}>
+                                            <span className="inline-flex items-center px-3 py-1.5 rounded-full bg-slate-100 text-slate-800 text-sm font-semibold border border-slate-200">
+                                                {venueLabel(ev.venue)}
+                                            </span>
+                                        </td>
+                                    )}
+                                    {columnsVisible.judges && (
+                                        <td className={`px-8 ${density === 'compact' ? 'py-3' : 'py-6'} whitespace-nowrap text-base text-slate-700`}>
+                                            <div className="flex flex-wrap gap-2">
+                                                {(((ev.judges && ev.judges.length ? ev.judges : ((ev.judges_details || []).map(u => u.id))) || []).slice(0, 3)).map((jid) => (
+                                                    <span key={jid} className="px-2.5 py-0.5 text-xs bg-indigo-50 text-indigo-700 rounded-full font-semibold border border-indigo-200" title="Judge">
+                                                        {judgeName(jid)}
+                                                    </span>
+                                                ))}
+                                                {(((ev.judges && ev.judges.length ? ev.judges : ((ev.judges_details || []).map(u => u.id))) || []).length > 3) && (
+                                                    <span className="px-2.5 py-0.5 text-xs bg-indigo-100 text-indigo-800 rounded-full font-semibold border border-indigo-200">+{(((ev.judges && ev.judges.length ? ev.judges : ((ev.judges_details || []).map(u => u.id))) || []).length - 3)} more</span>
+                                                )}
+                                            </div>
+                                        </td>
+                                    )}
+                                    {columnsVisible.volunteers && (
+                                        <td className={`px-8 ${density === 'compact' ? 'py-3' : 'py-6'} whitespace-nowrap text-base text-slate-700`}>
+                                            <div className="flex flex-wrap gap-2">
+                                                {(((ev.volunteers && ev.volunteers.length ? ev.volunteers : ((ev.volunteers_details || []).map(u => u.id))) || []).slice(0, 3)).map((vid) => (
+                                                    <span key={vid} className="px-2.5 py-0.5 text-xs bg-emerald-50 text-emerald-700 rounded-full font-semibold border border-emerald-200" title="Volunteer">
+                                                        {volunteerName(vid)}
+                                                    </span>
+                                                ))}
+                                                {(((ev.volunteers && ev.volunteers.length ? ev.volunteers : ((ev.volunteers_details || []).map(u => u.id))) || []).length > 3) && (
+                                                    <span className="px-2.5 py-0.5 text-xs bg-emerald-100 text-emerald-800 rounded-full font-semibold border border-emerald-200">+{(((ev.volunteers && ev.volunteers.length ? ev.volunteers : ((ev.volunteers_details || []).map(u => u.id))) || []).length - 3)} more</span>
+                                                )}
+                                            </div>
+                                        </td>
+                                    )}
+                                    {columnsVisible.published && (
+                                        <td className={`px-8 ${density === 'compact' ? 'py-3' : 'py-6'} whitespace-nowrap text-base text-slate-700`}>
+                                            <label className="inline-flex items-center cursor-pointer">
+                                                <input type="checkbox" className="sr-only peer" checked={!!ev.is_published} onChange={() => onTogglePublish(ev)} />
+                                                <div className="w-12 h-6 bg-slate-200 rounded-full peer peer-checked:bg-green-500 transition-colors relative">
+                                                    <div className="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transform transition-transform peer-checked:translate-x-6"></div>
+                                                </div>
+                                                <span className="ml-3 text-sm font-semibold text-slate-600">{ev.is_published ? 'Published' : 'Hidden'}</span>
+                                            </label>
+                                        </td>
+                                    )}
+                                    {columnsVisible.actions && (
+                                        <td className={`px-8 ${density === 'compact' ? 'py-3' : 'py-6'} whitespace-nowrap text-base font-semibold space-x-3 sticky right-0 ${selectedIds.includes(ev.id) ? 'bg-blue-50' : 'bg-white'} border-l border-slate-200`}>
+                                            <button title="Edit" aria-label="Edit" onClick={() => onEdit(ev)} className="inline-flex items-center px-4 py-2 rounded-lg border-2 text-blue-700 border-blue-300 hover:bg-blue-50 hover:border-blue-400 transition-all duration-200 font-semibold">Edit</button>
+                                            <button title={ev.is_published ? 'Unpublish' : 'Publish'} aria-label="Toggle publish" onClick={() => onTogglePublish(ev)} className={`inline-flex items-center px-4 py-2 rounded-lg border-2 transition-all duration-200 font-semibold ${ev.is_published ? 'text-indigo-700 border-indigo-300 hover:bg-indigo-50 hover:border-indigo-400' : 'text-slate-700 border-slate-300 hover:bg-slate-50 hover:border-slate-400'}`}>{ev.is_published ? 'Unpublish' : 'Publish'}</button>
+                                            <VolunteerAssignDropdown event={ev} volunteers={volunteers} onAssign={onAssignVolunteers} />
+                                            <button title="Delete" aria-label="Delete" onClick={() => onDelete(ev.id)} className="inline-flex items-center px-4 py-2 rounded-lg border-2 text-red-700 border-red-300 hover:bg-red-50 hover:border-red-400 transition-all duration-200 font-semibold">Delete</button>
+                                        </td>
+                                    )}
+                                </tr>
+                            );
+                        })()
                     ))}
                 </tbody>
             </table>
@@ -880,6 +1165,18 @@ const EventList = ({ events, venues, judges, volunteers = [], onEdit, onDelete, 
 const VolunteerAssignDropdown = ({ event, volunteers, onAssign }) => {
     const [open, setOpen] = useState(false);
     const [selection, setSelection] = useState(event.volunteers || []);
+    useEffect(() => {
+        setSelection(event.volunteers || []);
+    }, [event.volunteers]);
+    useEffect(() => {
+        if (!open) return;
+        const onDocMouseDown = (e) => {
+            const root = e.target?.closest?.('[data-volunteer-assign-root="true"]');
+            if (!root) setOpen(false);
+        };
+        document.addEventListener('mousedown', onDocMouseDown);
+        return () => document.removeEventListener('mousedown', onDocMouseDown);
+    }, [open]);
     const toggle = () => setOpen(!open);
     const apply = async () => {
         await onAssign(event.id, selection);
@@ -890,7 +1187,7 @@ const VolunteerAssignDropdown = ({ event, volunteers, onAssign }) => {
         setSelection(vals);
     };
     return (
-        <span className="relative inline-block">
+        <span className="relative inline-block" data-volunteer-assign-root="true">
             <button onClick={toggle} className="inline-flex items-center px-4 py-2 rounded-lg border-2 text-emerald-700 border-emerald-300 hover:bg-emerald-50 hover:border-emerald-400 transition-all duration-200 font-semibold">Assign Volunteers</button>
             {open && (
                 <div className="absolute right-0 mt-2 z-20 bg-white border border-slate-200 rounded-xl shadow-xl p-4 w-72">
@@ -944,8 +1241,9 @@ const DeleteConfirmModal = ({ onCancel, onConfirm }) => {
 };
 
 const Toolbar = ({ selectedCount, onClearSelection, onPublish, onUnpublish, onDelete, rowDensity, onChangeDensity, columnsVisible, onToggleColumn, onExportCSV }) => {
+    const [colsOpen, setColsOpen] = useState(false);
     return (
-        <div className="flex items-center justify-between mb-6 bg-slate-50 p-4 rounded-xl border border-slate-200">
+        <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-4 mb-6 bg-white/80 backdrop-blur p-4 rounded-xl border border-slate-200">
             <div className="flex items-center gap-4">
                 <span className="text-base font-semibold text-slate-700">Selected: <span className="font-bold text-indigo-600">{selectedCount}</span></span>
                 <button onClick={onClearSelection} disabled={!selectedCount} className={`px-4 py-2 text-sm font-semibold rounded-lg border-2 transition-all duration-200 ${selectedCount ? 'text-slate-700 border-slate-300 hover:bg-slate-50 hover:border-slate-400' : 'text-slate-400 border-slate-200 cursor-not-allowed'}`}>Clear</button>
@@ -966,16 +1264,22 @@ const Toolbar = ({ selectedCount, onClearSelection, onPublish, onUnpublish, onDe
                 </div>
                 <div className="flex items-center gap-3">
                     <span className="text-sm font-semibold text-slate-700">Columns</span>
-                    <div className="relative group">
-                        <button className="px-4 py-2 text-sm font-semibold rounded-lg border-2 text-slate-700 border-slate-300 hover:bg-slate-50 hover:border-slate-400 transition-all duration-200">Show/Hide</button>
-                        <div className="absolute right-0 mt-2 hidden group-hover:block bg-white border border-slate-200 rounded-xl shadow-xl p-4 z-20 w-48">
-                            {Object.keys(columnsVisible).map((key) => (
-                                <label key={key} className="flex items-center gap-3 py-2 text-base text-slate-700">
-                                    <input type="checkbox" checked={columnsVisible[key]} onChange={() => onToggleColumn(key)} className="w-4 h-4 text-indigo-600 border-slate-300 rounded focus:ring-indigo-500" />
-                                    <span className="capitalize font-medium">{key.replace('_', ' ')}</span>
-                                </label>
-                            ))}
-                        </div>
+                    <div className="relative">
+                        <button onClick={() => setColsOpen((v) => !v)} className="px-4 py-2 text-sm font-semibold rounded-lg border-2 text-slate-700 border-slate-300 hover:bg-slate-50 hover:border-slate-400 transition-all duration-200">Show/Hide</button>
+                        {colsOpen && (
+                            <>
+                                <div className="fixed inset-0 z-10" aria-hidden="true" onClick={() => setColsOpen(false)}></div>
+                                <div className="absolute right-0 mt-2 bg-white border border-slate-200 rounded-xl shadow-xl p-4 z-20 w-56">
+                                    <div className="text-sm font-bold text-slate-900 mb-2">Visible columns</div>
+                                    {Object.keys(columnsVisible).map((key) => (
+                                        <label key={key} className="flex items-center gap-3 py-2 text-base text-slate-700">
+                                            <input type="checkbox" checked={columnsVisible[key]} onChange={() => onToggleColumn(key)} className="w-4 h-4 text-indigo-600 border-slate-300 rounded focus:ring-indigo-500" />
+                                            <span className="capitalize font-medium">{key.replace('_', ' ')}</span>
+                                        </label>
+                                    ))}
+                                </div>
+                            </>
+                        )}
                     </div>
                 </div>
             </div>
@@ -1006,8 +1310,10 @@ const Pagination = ({ page, totalPages, totalItems, pageSize, onPageSizeChange, 
     );
 };
 
-const EventForm = ({ venues, judges, volunteers, availableEvents, data, onChange, onJudgesChange, onVolunteersChange, onCancel, onSubmit, saving, isEditing }) => {
+const EventForm = ({ venues, judges, volunteers, catalogEventsByCategory, catalogVariantsByEventId, onSelectEventDefinition, data, onChange, onJudgesChange, onVolunteersChange, onCancel, onSubmit, saving, isEditing }) => {
     const showFormFields = !!data.category;
+    const eventsForCategory = (catalogEventsByCategory && data.category) ? (catalogEventsByCategory[data.category] || []) : [];
+    const variantsForSelected = data.event_definition ? (catalogVariantsByEventId[String(data.event_definition)] || []) : [];
 
     return (
         <div className="max-w-5xl mx-auto">
@@ -1038,10 +1344,10 @@ const EventForm = ({ venues, judges, volunteers, availableEvents, data, onChange
                                     <span className="text-3xl mr-4">{category.icon}</span>
                                     <span className="text-lg font-bold text-slate-900">{category.label}</span>
                                 </div>
-                                <div className="text-base text-slate-600 font-semibold">{(availableEvents[category.value] || []).length} events available</div>
-                            </button>
-                        ))}
-                    </div>
+                                    <div className="text-base text-slate-600 font-semibold">{(catalogEventsByCategory && catalogEventsByCategory[category.value] ? (catalogEventsByCategory[category.value] || []).length : 0)} events available</div>
+                                </button>
+                            ))}
+                        </div>
                 </div>
 
                 {showFormFields && (
@@ -1055,19 +1361,21 @@ const EventForm = ({ venues, judges, volunteers, availableEvents, data, onChange
                             <div className="md:col-span-2">
                                 <label className="block text-xl font-semibold text-slate-700 mb-3 font-display">Event Name</label>
                                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                                    {(availableEvents[data.category] || []).map((eventName) => (
+                                    {eventsForCategory.map((evDef) => (
                                         <button
-                                            key={eventName}
+                                            key={evDef.id}
                                             type="button"
-                                            onClick={() => onChange({ target: { name: 'name', value: eventName } })}
-                                            className={`p-5 rounded-xl border-2 transition-all duration-200 text-left hover:shadow-lg ${data.name === eventName
+                                            onClick={() => {
+                                                onSelectEventDefinition(evDef);
+                                            }}
+                                            className={`p-5 rounded-xl border-2 transition-all duration-200 text-left hover:shadow-lg ${data.name === evDef.event_name
                                                 ? 'border-green-400 bg-green-100 shadow-lg scale-[1.02]'
                                                 : 'border-slate-200 bg-white hover:border-slate-300 hover:shadow-md'
                                                 }`}
                                         >
                                             <div className="flex items-center justify-between gap-3">
-                                                <span className="text-lg font-bold text-slate-900">{eventName}</span>
-                                                {data.name === eventName && (
+                                                <span className="text-lg font-bold text-slate-900">{evDef.event_name}</span>
+                                                {data.name === evDef.event_name && (
                                                     <span className="text-green-700 font-bold">✓</span>
                                                 )}
                                             </div>
@@ -1075,8 +1383,35 @@ const EventForm = ({ venues, judges, volunteers, availableEvents, data, onChange
                                         </button>
                                     ))}
                                 </div>
+                                {eventsForCategory.length === 0 && (
+                                    <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 text-amber-900 px-4 py-3 text-sm">
+                                        No catalog events are configured for this category yet. Add event definitions in Catalog Event Management to keep names correct.
+                                    </div>
+                                )}
                                 <input type="hidden" name="name" value={data.name || ''} />
                             </div>
+
+                            {eventsForCategory.length > 0 && variantsForSelected.length > 0 && (
+                                <div className="md:col-span-2">
+                                    <label className="block text-xl font-semibold text-slate-700 mb-3 font-display">Variant</label>
+                                    <select
+                                        name="event_variant"
+                                        value={data.event_variant || ''}
+                                        onChange={onChange}
+                                        className="mt-1 block w-full border-slate-300 rounded-lg shadow-sm text-base py-4 px-4 focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                                    >
+                                        {variantsForSelected.map((v) => (
+                                            <option key={v.id} value={String(v.id)}>{v.variant_name}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                            )}
+
+                            {eventsForCategory.length > 0 && (
+                                <>
+                                    <input type="hidden" name="event_definition" value={data.event_definition || ''} />
+                                </>
+                            )}
                             <div className="md:col-span-2">
                                 <label className="block text-xl font-semibold text-slate-700 mb-3 font-display">Description</label>
                                 <textarea name="description" value={data.description} onChange={onChange} className="mt-1 block w-full border-slate-300 rounded-lg shadow-sm text-base py-4 px-4 focus:ring-2 focus:ring-green-500 focus:border-green-500" rows={4} placeholder="Add a brief description..." />

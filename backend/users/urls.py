@@ -12,12 +12,16 @@ from .views import (
 from .workflow_views import (
     AdminCreateSchoolView, AdminGenerateIDView, IDSignupView,
     IDSignupRequestListView, IDSignupRequestDetailView,
-    SchoolSubmitParticipantsView, SchoolGenerateStudentIDView,
+    SchoolSubmitParticipantsView, SchoolSubmitGroupParticipantsView,
+    SchoolViewOwnGroupParticipantsView, SchoolBulkImportGroupParticipantsView,
+    school_group_events, SchoolGenerateStudentIDView,
     VolunteerSchoolParticipantsView,
     VolunteerVerifyStudentView, AdminAssignVolunteerToSchoolView,
     SchoolStandingsView, AdminIssuedIDListView, AdminIssuedIDDetailView,
     SchoolViewOwnParticipantsView, check_id_validity,
     AdminSchoolParticipantsListView, admin_approve_school_participant,
+    AdminSchoolGroupParticipantsListView, admin_approve_school_group_participant,
+    admin_reject_school_group_participant,
     admin_bulk_approve_school_participants,
     student_allowed_events,
     admin_link_school_user_to_school_profile
@@ -76,6 +80,10 @@ urlpatterns = [
     # School: Submit participants and generate student IDs
     path('schools/participants/submit/', SchoolSubmitParticipantsView.as_view(), name='school-submit-participants'),
     path('schools/participants/', SchoolViewOwnParticipantsView.as_view(), name='school-view-own-participants'),
+    path('schools/group-participants/submit/', SchoolSubmitGroupParticipantsView.as_view(), name='school-submit-group-participants'),
+    path('schools/group-participants/', SchoolViewOwnGroupParticipantsView.as_view(), name='school-view-own-group-participants'),
+    path('schools/group-participants/import/', SchoolBulkImportGroupParticipantsView.as_view(), name='school-import-group-participants'),
+    path('schools/group-events/', school_group_events, name='school-group-events'),
     path('schools/students/generate-ids/', SchoolGenerateStudentIDView.as_view(), name='school-generate-student-ids'),
     
     # Volunteer: View and verify participants
@@ -91,6 +99,9 @@ urlpatterns = [
     path('admin/school-participants/', AdminSchoolParticipantsListView.as_view(), name='admin-school-participants-list'),
     path('admin/school-participants/<int:participant_id>/approve/', admin_approve_school_participant, name='admin-approve-school-participant'),
     path('admin/school-participants/bulk-approve/', admin_bulk_approve_school_participants, name='admin-bulk-approve-school-participants'),
+    path('admin/school-group-participants/', AdminSchoolGroupParticipantsListView.as_view(), name='admin-school-group-participants-list'),
+    path('admin/school-group-participants/<int:group_entry_id>/approve/', admin_approve_school_group_participant, name='admin-approve-school-group-participant'),
+    path('admin/school-group-participants/<int:group_entry_id>/reject/', admin_reject_school_group_participant, name='admin-reject-school-group-participant'),
 
     # Public: School standings
     path('standings/', SchoolStandingsView.as_view(), name='school-standings'),

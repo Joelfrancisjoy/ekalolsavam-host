@@ -146,6 +146,7 @@ const mockEventService = {
         section: participant.section,
         student_class: participant.student_class,
         school: participant.school,
+        gender: participant.gender || '',
       },
       participations,
     };
@@ -156,12 +157,14 @@ const mockEventService = {
     return mockRegistrations;
   },
 
-  registerForEvent: async (eventId, firstName, lastName) => {
+  registerForEvent: async (eventId, firstName, lastName, groupId = '', gender = 'BOYS') => {
     await delay();
     const event = mockEvents.find(e => e.id === parseInt(eventId));
     if (!event) {
       throw new Error('Event not found');
     }
+
+    const normalizedGender = String(gender || '').toUpperCase() === 'GIRLS' ? 'GIRLS' : 'BOYS';
 
     const newRegistration = {
       id: mockRegistrations.length + 1,
@@ -169,13 +172,16 @@ const mockEventService = {
       participant: mockRegistrations.length + 1,
       first_name: firstName,
       last_name: lastName,
+      group_id: String(groupId || '').trim().toUpperCase() || undefined,
+       gender: normalizedGender,
       chess_number: `CH${String(mockRegistrations.length + 1).padStart(3, '0')}`,
       registration_date: new Date().toISOString(),
       participant_details: {
         first_name: firstName,
         last_name: lastName,
         school: { name: "Demo School" },
-        section: "Class 10A"
+        section: "Class 10A",
+        gender: normalizedGender
       },
       event_details: event
     };

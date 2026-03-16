@@ -1050,16 +1050,18 @@ const UserCard = ({ user, onPhoneChange, onDelete, onUpdate }) => {
 // Enhanced Judge Actions Component
 const JudgeActions = ({ user, onUpdated, onDeleted }) => {
     const [busy, setBusy] = useState(false);
-    const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:8000';
 
     const approve = async () => {
         if (!window.confirm('Approve this judge?')) return;
         setBusy(true);
         try {
-            const res = await axios.patch(`${apiUrl}/api/auth/users/${user.id}/set-approval/`, { approval_status: 'approved' }, {
-                headers: { Authorization: `Bearer ${authManager.getTokens().access}` }
-            });
+            const res = await http.patch(`/api/auth/users/${user.id}/set-approval/`, { approval_status: 'approved' });
             onUpdated(res.data);
+        } catch (error) {
+            const status = error?.response?.status;
+            const apiError = error?.response?.data?.error || error?.response?.data?.detail;
+            const message = apiError || error?.message || 'Failed to approve judge.';
+            window.alert(status ? `[${status}] ${message}` : message);
         } finally {
             setBusy(false);
         }
@@ -1069,10 +1071,13 @@ const JudgeActions = ({ user, onUpdated, onDeleted }) => {
         if (!window.confirm('Reject this judge? This will delete the profile.')) return;
         setBusy(true);
         try {
-            const res = await axios.patch(`${apiUrl}/api/auth/users/${user.id}/set-approval/`, { approval_status: 'rejected' }, {
-                headers: { Authorization: `Bearer ${authManager.getTokens().access}` }
-            });
+            const res = await http.patch(`/api/auth/users/${user.id}/set-approval/`, { approval_status: 'rejected' });
             if (res.data?.approval_status === 'deleted') onDeleted(); else onUpdated(res.data);
+        } catch (error) {
+            const status = error?.response?.status;
+            const apiError = error?.response?.data?.error || error?.response?.data?.detail;
+            const message = apiError || error?.message || 'Failed to reject judge.';
+            window.alert(status ? `[${status}] ${message}` : message);
         } finally {
             setBusy(false);
         }
@@ -1093,16 +1098,18 @@ const JudgeActions = ({ user, onUpdated, onDeleted }) => {
 // Enhanced Volunteer Actions Component
 const VolunteerActions = ({ user, onUpdated, onDeleted }) => {
     const [busy, setBusy] = useState(false);
-    const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:8000';
 
     const approve = async () => {
         if (!window.confirm('Approve this volunteer?')) return;
         setBusy(true);
         try {
-            const res = await axios.patch(`${apiUrl}/api/auth/users/${user.id}/set-approval/`, { approval_status: 'approved' }, {
-                headers: { Authorization: `Bearer ${authManager.getTokens().access}` }
-            });
+            const res = await http.patch(`/api/auth/users/${user.id}/set-approval/`, { approval_status: 'approved' });
             onUpdated(res.data);
+        } catch (error) {
+            const status = error?.response?.status;
+            const apiError = error?.response?.data?.error || error?.response?.data?.detail;
+            const message = apiError || error?.message || 'Failed to approve volunteer.';
+            window.alert(status ? `[${status}] ${message}` : message);
         } finally {
             setBusy(false);
         }
@@ -1112,10 +1119,13 @@ const VolunteerActions = ({ user, onUpdated, onDeleted }) => {
         if (!window.confirm('Reject this volunteer? This will delete the profile.')) return;
         setBusy(true);
         try {
-            const res = await axios.patch(`${apiUrl}/api/auth/users/${user.id}/set-approval/`, { approval_status: 'rejected' }, {
-                headers: { Authorization: `Bearer ${authManager.getTokens().access}` }
-            });
+            const res = await http.patch(`/api/auth/users/${user.id}/set-approval/`, { approval_status: 'rejected' });
             if (res.data?.approval_status === 'deleted') onDeleted(); else onUpdated(res.data);
+        } catch (error) {
+            const status = error?.response?.status;
+            const apiError = error?.response?.data?.error || error?.response?.data?.detail;
+            const message = apiError || error?.message || 'Failed to reject volunteer.';
+            window.alert(status ? `[${status}] ${message}` : message);
         } finally {
             setBusy(false);
         }
@@ -1136,16 +1146,18 @@ const VolunteerActions = ({ user, onUpdated, onDeleted }) => {
 // Enhanced Student Actions Component (Blacklist functionality)
 const StudentActions = ({ user, onUpdated }) => {
     const [busy, setBusy] = useState(false);
-    const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:8000';
 
     const blacklist = async () => {
         if (!window.confirm('Blacklist this student? They will not be able to login.')) return;
         setBusy(true);
         try {
-            const res = await axios.patch(`${apiUrl}/api/auth/users/${user.id}/set-approval/`, { approval_status: 'rejected' }, {
-                headers: { Authorization: `Bearer ${authManager.getTokens().access}` }
-            });
+            const res = await http.patch(`/api/auth/users/${user.id}/set-approval/`, { approval_status: 'rejected' });
             onUpdated(res.data);
+        } catch (error) {
+            const status = error?.response?.status;
+            const apiError = error?.response?.data?.error || error?.response?.data?.detail;
+            const message = apiError || error?.message || 'Failed to blacklist student.';
+            window.alert(status ? `[${status}] ${message}` : message);
         } finally {
             setBusy(false);
         }
@@ -1155,10 +1167,13 @@ const StudentActions = ({ user, onUpdated }) => {
         if (!window.confirm('Remove this student from blacklist?')) return;
         setBusy(true);
         try {
-            const res = await axios.patch(`${apiUrl}/api/auth/users/${user.id}/set-approval/`, { approval_status: 'pending' }, {
-                headers: { Authorization: `Bearer ${authManager.getTokens().access}` }
-            });
+            const res = await http.patch(`/api/auth/users/${user.id}/set-approval/`, { approval_status: 'pending' });
             onUpdated(res.data);
+        } catch (error) {
+            const status = error?.response?.status;
+            const apiError = error?.response?.data?.error || error?.response?.data?.detail;
+            const message = apiError || error?.message || 'Failed to unblacklist student.';
+            window.alert(status ? `[${status}] ${message}` : message);
         } finally {
             setBusy(false);
         }

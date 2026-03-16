@@ -1,13 +1,21 @@
-import React, { useState, useEffect } from 'react';
-import { useTranslation } from 'react-i18next';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
 import http from '../services/http-common';
 import UserInfoHeader from '../components/UserInfoHeader';
 import Toast from '../components/Toast';
+import SchoolGroupParticipantsSection from '../components/SchoolGroupParticipantsSection';
+import { GENDER_OPTIONS, getGenderLabel, normalizeGenderValue } from '../constants/gender';
+
+const EMPTY_PARTICIPANT_FORM = {
+  participant_id: '',
+  first_name: '',
+  last_name: '',
+  student_class: '',
+  gender: '',
+  event_ids: []
+};
 
 const SchoolDashboard = () => {
-  const { t } = useTranslation();
   const navigate = useNavigate();
   const [activeSection, setActiveSection] = useState('participants');
   const [participants, setParticipants] = useState([]);
@@ -16,15 +24,14 @@ const SchoolDashboard = () => {
   const [events, setEvents] = useState([]);
   const [currentUser, setCurrentUser] = useState(null);
   const [toast, setToast] = useState({ message: '', type: 'success' });
+  const [editingParticipantId, setEditingParticipantId] = useState('');
+  const [bulkCsvText, setBulkCsvText] = useState('');
+  const [bulkRows, setBulkRows] = useState([]);
+  const [bulkErrors, setBulkErrors] = useState([]);
+  const [bulkSubmitting, setBulkSubmitting] = useState(false);
 
   // Form state for participant entry
-  const [formData, setFormData] = useState({
-    participant_id: '',
-    first_name: '',
-    last_name: '',
-    student_class: '',
-    event_ids: []
-  });
+  const [formData, setFormData] = useState({ ...EMPTY_PARTICIPANT_FORM });
 
   // Fetch participants for the current school user
   const fetchParticipants = async () => {
@@ -69,6 +76,43 @@ const SchoolDashboard = () => {
     setTimeout(() => setToast({ message: '', type: 'success' }), 3000);
   };
 
+  const resetParticipantForm = () => {
+    setFormData({ ...EMPTY_PARTICIPANT_FORM });
+    setEditingParticipantId('');
+  };
+
+  const getParticipantEventIds = (participant) => {
+    if (Array.isArray(participant?.event_ids) && participant.event_ids.length > 0) {
+      return participant.event_ids;
+    }
+    if (Array.isArray(participant?.events) && participant.events.length > 0) {
+      return participant.events
+        .map((item) => (typeof item === 'object' ? item?.id : item))
+        .filter((id) => id !== null && id !== undefined);
+    }
+    if (Array.isArray(participant?.events_display) && participant.events_display.length > 0) {
+      return participant.events_display
+        .map((item) => item?.id)
+        .filter((id) => id !== null && id !== undefined);
+    }
+    return [];
+  };
+
+  const editParticipant = (participant) => {
+    setFormData({
+      participant_id: participant?.participant_id || '',
+      first_name: participant?.first_name || '',
+      last_name: participant?.last_name || '',
+      student_class: participant?.student_class ? String(participant.student_class) : '',
+      gender: normalizeGenderValue(participant?.gender),
+      event_ids: getParticipantEventIds(participant)
+    });
+    setEditingParticipantId(participant?.participant_id || '');
+    setActiveSection('participants');
+    setError('');
+    showToast('Editing participant. Update details and submit.', 'info');
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
@@ -76,9 +120,17 @@ const SchoolDashboard = () => {
 
     try {
       // Validate form data
-      if (!formData.participant_id || !formData.first_name || !formData.last_name || !formData.student_class) {
+      if (!formData.participant_id || !formData.first_name || !formData.last_name || !formData.student_class || !formData.gender) {
         setError('All fields are required');
         showToast('All fields are required', 'error');
+        setLoading(false);
+        return;
+      }
+
+      const normalizedGender = normalizeGenderValue(formData.gender);
+      if (!normalizedGender) {
+        setError('Gender must be BOYS or GIRLS');
+        showToast('Gender must be BOYS or GIRLS', 'error');
         setLoading(false);
         return;
       }
@@ -97,29 +149,15 @@ const SchoolDashboard = () => {
           first_name: formData.first_name,
           last_name: formData.last_name,
           student_class: studentClassInt,
+          gender: normalizedGender,
           event_ids: formData.event_ids
         }]
       };
 
-      const response = await http.post('/api/auth/schools/participants/submit/', payload);
-
-      if (response.data.participants) {
-        // Option 1: Update state with response (as before)
-        // setParticipants(prev => [...prev, ...response.data.participants]);
-
-        // Option 2: Refresh from server to ensure consistency
-        await fetchParticipants();
-
-        setFormData({
-          participant_id: '',
-          first_name: '',
-          last_name: '',
-          student_class: '',
-          event_ids: []
-        });
-        // Show success toast
-        showToast('Participant submitted successfully! 🎉', 'success');
-      }
+      await http.post('/api/auth/schools/participants/submit/', payload);
+      await fetchParticipants();
+      resetParticipantForm();
+      showToast(editingParticipantId ? 'Participant updated successfully! ✅' : 'Participant submitted successfully! 🎉', 'success');
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to submit participant data');
       showToast('Failed to submit participant data', 'error');
@@ -135,6 +173,157 @@ const SchoolDashboard = () => {
         ? prev.event_ids.filter(id => id !== eventId)
         : [...prev.event_ids, eventId]
     }));
+  };
+
+  const splitCsvLine = (line) => {
+    const values = [];
+    let current = '';
+    let inQuotes = false;
+
+    for (let i = 0; i < line.length; i += 1) {
+      const char = line[i];
+      if (char === '"') {
+        if (inQuotes && line[i + 1] === '"') {
+          current += '"';
+          i += 1;
+        } else {
+          inQuotes = !inQuotes;
+        }
+      } else if (char === ',' && !inQuotes) {
+        values.push(current.trim());
+        current = '';
+      } else {
+        current += char;
+      }
+    }
+    values.push(current.trim());
+    return values;
+  };
+
+  const parseEventIdsCell = (value) => {
+    if (!value) return [];
+    return String(value)
+      .split(/[|;]/)
+      .map((item) => item.trim())
+      .filter(Boolean)
+      .map((item) => Number(item))
+      .filter((item) => Number.isInteger(item) && item > 0);
+  };
+
+  const parseBulkCsv = (raw) => {
+    const lines = String(raw || '')
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter(Boolean);
+
+    if (lines.length < 2) {
+      return { rows: [], errors: ['Please provide a CSV with a header and at least one participant row.'] };
+    }
+
+    const headers = splitCsvLine(lines[0]).map((header) => header.toLowerCase());
+    const requiredHeaders = ['participant_id', 'first_name', 'last_name', 'student_class', 'gender'];
+    const missingHeaders = requiredHeaders.filter((header) => !headers.includes(header));
+    if (missingHeaders.length > 0) {
+      return { rows: [], errors: [`Missing required headers: ${missingHeaders.join(', ')}`] };
+    }
+
+    const rows = [];
+    const errors = [];
+    for (let index = 1; index < lines.length; index += 1) {
+      const csvValues = splitCsvLine(lines[index]);
+      const rowData = {};
+      headers.forEach((header, valueIndex) => {
+        rowData[header] = (csvValues[valueIndex] || '').trim();
+      });
+
+      const rowErrors = [];
+      const participantId = rowData.participant_id;
+      const firstName = rowData.first_name;
+      const lastName = rowData.last_name;
+      const studentClass = Number(rowData.student_class);
+      const gender = normalizeGenderValue(rowData.gender);
+      const eventIds = parseEventIdsCell(rowData.event_ids);
+
+      if (!participantId) rowErrors.push('participant_id is required');
+      if (!firstName) rowErrors.push('first_name is required');
+      if (!lastName) rowErrors.push('last_name is required');
+      if (!Number.isInteger(studentClass) || studentClass < 1 || studentClass > 12) {
+        rowErrors.push('student_class must be an integer between 1 and 12');
+      }
+      if (!gender) rowErrors.push('gender must be BOYS or GIRLS');
+
+      if (rowData.event_ids && eventIds.length === 0) {
+        rowErrors.push('event_ids must use numeric IDs separated by | or ;');
+      }
+
+      if (rowErrors.length > 0) {
+        errors.push(`Row ${index + 1}: ${rowErrors.join('; ')}`);
+      } else {
+        rows.push({
+          participant_id: participantId,
+          first_name: firstName,
+          last_name: lastName,
+          student_class: studentClass,
+          gender,
+          event_ids: eventIds
+        });
+      }
+    }
+
+    return { rows, errors };
+  };
+
+  const handleParseBulk = () => {
+    const { rows, errors } = parseBulkCsv(bulkCsvText);
+    setBulkRows(rows);
+    setBulkErrors(errors);
+    if (errors.length > 0) {
+      showToast('Bulk import has validation errors', 'error');
+      return;
+    }
+    showToast(`Ready to import ${rows.length} participant(s)`, 'success');
+  };
+
+  const handleBulkFileUpload = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      setBulkCsvText(String(reader.result || ''));
+      setBulkRows([]);
+      setBulkErrors([]);
+    };
+    reader.readAsText(file);
+  };
+
+  const submitBulkImport = async () => {
+    setError('');
+    if (bulkRows.length === 0) {
+      setError('No valid participant rows available to import.');
+      showToast('No valid participant rows available to import.', 'error');
+      return;
+    }
+    if (bulkErrors.length > 0) {
+      setError('Please fix CSV validation errors before submitting.');
+      showToast('Please fix CSV validation errors before submitting.', 'error');
+      return;
+    }
+
+    setBulkSubmitting(true);
+    try {
+      await http.post('/api/auth/schools/participants/submit/', { participants: bulkRows });
+      await fetchParticipants();
+      showToast(`Imported ${bulkRows.length} participant(s) successfully! 🎉`, 'success');
+      setBulkCsvText('');
+      setBulkRows([]);
+      setBulkErrors([]);
+      setActiveSection('submitted');
+    } catch (err) {
+      setError(err.response?.data?.error || 'Failed to import participants');
+      showToast('Failed to import participants', 'error');
+    } finally {
+      setBulkSubmitting(false);
+    }
   };
 
   return (
@@ -171,6 +360,18 @@ const SchoolDashboard = () => {
                 )}
               </button>
               <button
+                onClick={() => setActiveSection('group-participants')}
+                className={`px-8 py-5 text-lg font-semibold transition-all duration-300 relative ${activeSection === 'group-participants'
+                  ? 'text-white'
+                  : 'text-indigo-200 hover:text-white'
+                  }`}
+              >
+                👥 Group Participants
+                {activeSection === 'group-participants' && (
+                  <div className="absolute bottom-0 left-0 right-0 h-1 bg-white rounded-t-full"></div>
+                )}
+              </button>
+              <button
                 onClick={() => setActiveSection('submitted')}
                 className={`px-8 py-5 text-lg font-semibold transition-all duration-300 relative ${activeSection === 'submitted'
                   ? 'text-white'
@@ -179,6 +380,18 @@ const SchoolDashboard = () => {
               >
                 📋 Submitted Participants
                 {activeSection === 'submitted' && (
+                  <div className="absolute bottom-0 left-0 right-0 h-1 bg-white rounded-t-full"></div>
+                )}
+              </button>
+              <button
+                onClick={() => setActiveSection('bulk')}
+                className={`px-8 py-5 text-lg font-semibold transition-all duration-300 relative ${activeSection === 'bulk'
+                  ? 'text-white'
+                  : 'text-indigo-200 hover:text-white'
+                  }`}
+              >
+                📥 Bulk Import
+                {activeSection === 'bulk' && (
                   <div className="absolute bottom-0 left-0 right-0 h-1 bg-white rounded-t-full"></div>
                 )}
               </button>
@@ -202,6 +415,22 @@ const SchoolDashboard = () => {
                       </svg>
                       <span>{error}</span>
                     </div>
+                  </div>
+                )}
+
+                {editingParticipantId && (
+                  <div className="bg-amber-50 border-2 border-amber-300 text-amber-900 px-6 py-4 rounded-xl shadow-sm flex items-center justify-between">
+                    <div>
+                      <p className="font-semibold">Editing Participant: {editingParticipantId}</p>
+                      <p className="text-sm">Update fields below and click submit to save changes.</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={resetParticipantForm}
+                      className="px-4 py-2 rounded-lg bg-white border border-amber-300 text-amber-900 font-semibold hover:bg-amber-100 transition-colors"
+                    >
+                      Cancel Edit
+                    </button>
                   </div>
                 )}
 
@@ -238,6 +467,26 @@ const SchoolDashboard = () => {
                         className="w-full px-5 py-4 text-lg border-2 border-gray-300 rounded-xl focus:ring-4 focus:ring-indigo-300 focus:border-indigo-500 transition-all duration-200 bg-gray-50 hover:bg-white"
                         placeholder="Enter Class"
                       />
+                    </div>
+
+                    {/* First Name */}
+                    <div className="space-y-3">
+                      <label className="block text-xl font-semibold text-gray-700">
+                        Gender <span className="text-red-500">*</span>
+                      </label>
+                      <select
+                        required
+                        value={formData.gender}
+                        onChange={(e) => setFormData({ ...formData, gender: e.target.value })}
+                        className="w-full px-5 py-4 text-lg border-2 border-gray-300 rounded-xl focus:ring-4 focus:ring-indigo-300 focus:border-indigo-500 transition-all duration-200 bg-gray-50 hover:bg-white"
+                      >
+                        <option value="">Select Gender</option>
+                        {GENDER_OPTIONS.map((option) => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
                     </div>
 
                     {/* First Name */}
@@ -301,16 +550,10 @@ const SchoolDashboard = () => {
                   <div className="flex justify-end space-x-4 pt-4">
                     <button
                       type="button"
-                      onClick={() => setFormData({
-                        participant_id: '',
-                        first_name: '',
-                        last_name: '',
-                        student_class: '',
-                        event_ids: []
-                      })}
+                      onClick={resetParticipantForm}
                       className="px-8 py-4 text-lg font-semibold border-2 border-gray-300 rounded-xl text-gray-700 hover:bg-gray-50 hover:border-gray-400 transition-all duration-200 shadow-sm hover:shadow-md"
                     >
-                      🗑️ Clear Form
+                      {editingParticipantId ? '✖ Cancel Edit' : '🗑️ Clear Form'}
                     </button>
                     <button
                       type="submit"
@@ -326,12 +569,16 @@ const SchoolDashboard = () => {
                           <span>Submitting...</span>
                         </span>
                       ) : (
-                        '✅ Submit Participant'
+                        editingParticipantId ? '✅ Update Participant' : '✅ Submit Participant'
                       )}
                     </button>
                   </div>
                 </form>
               </div>
+            )}
+
+            {activeSection === 'group-participants' && (
+              <SchoolGroupParticipantsSection showToast={showToast} />
             )}
 
             {activeSection === 'submitted' && (
@@ -424,6 +671,7 @@ const SchoolDashboard = () => {
                               <div>
                                 <p className="text-lg font-semibold text-gray-900">{p.first_name} {p.last_name}</p>
                                 <p className="text-base text-gray-500">Student</p>
+                                <p className="text-sm text-indigo-700 font-medium">Gender: {getGenderLabel(p.gender)}</p>
                                 {(p.status === 'approved' || p.verified_by_volunteer) && p.user_account && (
                                   <div className="mt-2 space-y-1">
                                     {p.user_account.username && (
@@ -482,22 +730,31 @@ const SchoolDashboard = () => {
 
                             {/* Status */}
                             <div className="col-span-2 flex items-center justify-center">
-                              {p.status === 'approved' || p.verified_by_volunteer ? (
-                                <span className="inline-flex items-center px-6 py-3 rounded-lg bg-green-50 text-green-700 border-2 border-green-200 text-lg font-bold">
-                                  <svg className="w-6 h-6 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                                  </svg>
-                                  Approved
-                                </span>
-                              ) : (
-                                <span className="inline-flex items-center px-6 py-3 rounded-lg bg-yellow-50 text-yellow-700 border-2 border-yellow-200 text-lg font-bold">
-                                  <svg className="w-6 h-6 mr-2 animate-spin" fill="none" viewBox="0 0 24 24">
-                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                  </svg>
-                                  Pending Approval
-                                </span>
-                              )}
+                              <div className="flex flex-col items-center gap-3">
+                                {p.status === 'approved' || p.verified_by_volunteer ? (
+                                  <span className="inline-flex items-center px-6 py-3 rounded-lg bg-green-50 text-green-700 border-2 border-green-200 text-lg font-bold">
+                                    <svg className="w-6 h-6 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                                    </svg>
+                                    Approved
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center px-6 py-3 rounded-lg bg-yellow-50 text-yellow-700 border-2 border-yellow-200 text-lg font-bold">
+                                    <svg className="w-6 h-6 mr-2 animate-spin" fill="none" viewBox="0 0 24 24">
+                                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                    </svg>
+                                    Pending Approval
+                                  </span>
+                                )}
+                                <button
+                                  type="button"
+                                  onClick={() => editParticipant(p)}
+                                  className="px-4 py-1.5 rounded-lg bg-indigo-100 text-indigo-800 border border-indigo-300 text-sm font-semibold hover:bg-indigo-200 transition-colors"
+                                >
+                                  Edit
+                                </button>
+                              </div>
                             </div>
                           </div>
 
@@ -527,6 +784,110 @@ const SchoolDashboard = () => {
                     </div>
                   </div>
                 )}
+              </div>
+            )}
+
+            {activeSection === 'bulk' && (
+              <div className="space-y-6">
+                <div className="flex items-center space-x-3 mb-2">
+                  <div className="w-2 h-12 bg-gradient-to-b from-indigo-500 to-purple-500 rounded-full"></div>
+                  <h2 className="text-3xl font-bold text-gray-800">Bulk Participant Import</h2>
+                </div>
+
+                <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-5">
+                  <p className="text-indigo-900 font-semibold mb-2">CSV format</p>
+                  <p className="text-indigo-800 text-sm">
+                    Required headers: <code>participant_id,first_name,last_name,student_class,gender</code>.
+                    Optional header: <code>event_ids</code> (numeric event IDs separated by <code>|</code> or <code>;</code>).
+                  </p>
+                  <p className="text-indigo-700 text-xs mt-2">
+                    Gender must be <code>BOYS</code> or <code>GIRLS</code>.
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  <div className="space-y-4">
+                    <label className="block text-lg font-semibold text-gray-700">Upload CSV file</label>
+                    <input
+                      type="file"
+                      accept=".csv,text/csv"
+                      onChange={handleBulkFileUpload}
+                      className="w-full text-sm text-gray-700"
+                    />
+
+                    <label className="block text-lg font-semibold text-gray-700">Or paste CSV content</label>
+                    <textarea
+                      value={bulkCsvText}
+                      onChange={(e) => setBulkCsvText(e.target.value)}
+                      rows={12}
+                      className="w-full p-4 border-2 border-gray-300 rounded-xl focus:ring-4 focus:ring-indigo-300 focus:border-indigo-500 font-mono text-sm"
+                      placeholder="participant_id,first_name,last_name,student_class,gender,event_ids"
+                    />
+
+                    <div className="flex flex-wrap gap-3">
+                      <button
+                        type="button"
+                        onClick={handleParseBulk}
+                        className="px-5 py-2.5 rounded-lg bg-indigo-600 text-white font-semibold hover:bg-indigo-700 transition-colors"
+                      >
+                        Preview Import
+                      </button>
+                      <button
+                        type="button"
+                        onClick={submitBulkImport}
+                        disabled={bulkSubmitting || bulkRows.length === 0 || bulkErrors.length > 0}
+                        className="px-5 py-2.5 rounded-lg bg-emerald-600 text-white font-semibold hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      >
+                        {bulkSubmitting ? 'Importing...' : `Import ${bulkRows.length || ''} Participant(s)`}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <div className="bg-white border border-gray-200 rounded-xl p-4">
+                      <h3 className="text-lg font-semibold text-gray-900 mb-2">Validation Summary</h3>
+                      {bulkErrors.length === 0 ? (
+                        <p className="text-sm text-green-700">No validation errors detected.</p>
+                      ) : (
+                        <ul className="list-disc pl-5 space-y-1 text-sm text-red-700 max-h-64 overflow-y-auto">
+                          {bulkErrors.map((item, index) => (
+                            <li key={`${item}-${index}`}>{item}</li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+
+                    <div className="bg-white border border-gray-200 rounded-xl p-4">
+                      <h3 className="text-lg font-semibold text-gray-900 mb-2">Parsed Participants ({bulkRows.length})</h3>
+                      {bulkRows.length === 0 ? (
+                        <p className="text-sm text-gray-600">No valid rows parsed yet.</p>
+                      ) : (
+                        <div className="max-h-64 overflow-y-auto">
+                          <table className="min-w-full text-sm">
+                            <thead>
+                              <tr className="text-left text-gray-600 border-b">
+                                <th className="py-2 pr-4">ID</th>
+                                <th className="py-2 pr-4">Name</th>
+                                <th className="py-2 pr-4">Class</th>
+                                <th className="py-2">Gender</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {bulkRows.map((row) => (
+                                <tr key={`${row.participant_id}-${row.first_name}-${row.last_name}`} className="border-b border-gray-100">
+                                  <td className="py-2 pr-4 font-medium text-gray-900">{row.participant_id}</td>
+                                  <td className="py-2 pr-4 text-gray-800">{row.first_name} {row.last_name}</td>
+                                  <td className="py-2 pr-4 text-gray-700">{row.student_class}</td>
+                                  <td className="py-2 text-gray-700">{getGenderLabel(row.gender)}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
               </div>
             )}
           </div>

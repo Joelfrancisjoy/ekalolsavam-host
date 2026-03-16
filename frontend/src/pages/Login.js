@@ -6,6 +6,7 @@ import axios from 'axios';
 import { userServiceAdapter as userService } from '../services/serviceAdapter';
 import EmailValidationChecker from '../components/EmailValidationChecker';
 import authManager from '../utils/authManager';
+import { GENDER_OPTIONS, normalizeGenderValue } from '../constants/gender';
 
 const Login = () => {
   const navigate = useNavigate();
@@ -26,7 +27,8 @@ const Login = () => {
     first_name: '',
     last_name: '',
     role: 'student',
-    phone: ''
+    phone: '',
+    gender: ''
   });
   const [collegeIdFile, setCollegeIdFile] = useState(null);
   const [staffIdFile, setStaffIdFile] = useState(null);
@@ -256,6 +258,11 @@ const Login = () => {
 
         // Registration: role-based multipart with required file fields
         if (formData.role === 'student') {
+          const normalizedGender = normalizeGenderValue(formData.gender);
+          if (!normalizedGender) {
+            setError('Please select your gender');
+            return;
+          }
           if (!collegeIdFile) {
             setError('College ID (JPEG) is required for student registration');
             return;
@@ -274,6 +281,7 @@ const Login = () => {
           fd.append('last_name', formData.last_name);
           fd.append('phone', phoneDigits);
           fd.append('role', 'student');
+          fd.append('gender', normalizedGender);
           fd.append('college_id_photo', collegeIdFile);
           fd.append('school', selectedSchoolId);
           if (schools.find((s) => String(s.id) === String(selectedSchoolId))?.category !== 'LP') {
@@ -748,6 +756,7 @@ const Login = () => {
                               setCollegeIdFile(null);
                               setSelectedSchoolId('');
                               setSchoolCategoryExtra('');
+                              setFormData((prev) => ({ ...prev, gender: '' }));
                             }
                             if (e.target.value !== 'volunteer') {
                               setStaffIdFile(null);
@@ -769,6 +778,27 @@ const Login = () => {
 
                       {formData.role === 'student' && (
                         <>
+                          <div>
+                            <label className="block text-sm font-semibold text-amber-800 mb-2">Gender</label>
+                            <select
+                              name="gender"
+                              value={formData.gender}
+                              onChange={handleInputChange}
+                              className="w-full px-4 py-3 border-2 border-amber-200 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-amber-500 transition-all duration-200 bg-amber-50/50 focus:bg-white text-amber-900"
+                              required
+                            >
+                              <option value="">Select gender</option>
+                              {GENDER_OPTIONS.map((option) => (
+                                <option key={option.value} value={option.value}>
+                                  {option.label}
+                                </option>
+                              ))}
+                            </select>
+                            {fieldErrors?.gender && (
+                              <p className="mt-1 text-sm text-red-600">{String(fieldErrors.gender)}</p>
+                            )}
+                          </div>
+
                           {/* School selection (required) */}
                           <div>
                             <label className="block text-sm font-semibold text-amber-800 mb-2">School</label>

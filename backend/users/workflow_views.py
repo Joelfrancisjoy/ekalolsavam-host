@@ -9,17 +9,21 @@ from django.db import IntegrityError, transaction
 from django.core.mail import send_mail
 from django.core import signing
 from django.utils import timezone
+from rest_framework.parsers import MultiPartParser, FormParser
 import secrets
 import re
 import os
+import csv
+import io
 
 from .models import User
 from .workflow_models import (
-    AdminIssuedID, SchoolParticipant, SchoolVolunteerAssignment,
+    AdminIssuedID, SchoolParticipant, SchoolGroupEntry, SchoolGroupMember, SchoolVolunteerAssignment,
     SchoolStanding, IDSignupRequest
 )
 from .workflow_serializers import (
     AdminIssuedIDSerializer, SchoolParticipantSerializer,
+    SchoolGroupEntrySerializer,
     SchoolVolunteerAssignmentSerializer, SchoolStandingSerializer,
     IDSignupRequestSerializer
 )
@@ -107,18 +111,42 @@ def student_allowed_events(request):
         except Exception:
             participant = None
 
-    if participant is None:
-        return Response({
-            'event_ids': [],
-            'participant_id': None,
-            'school_id': getattr(getattr(user, 'school', None), 'id', None),
-        })
+    event_ids = []
+    participant_id = None
+    if participant is not None:
+        participant_id = participant.pk
+        event_ids = list(participant.events.values_list('id', flat=True))
 
-    event_ids = list(participant.events.values_list('id', flat=True))
+    group_entries_payload = []
+    group_event_ids = set()
+    full_name = _normalize_person_name(user.first_name, user.last_name)
+    if getattr(user, 'school', None) is not None:
+        group_entries_qs = SchoolGroupEntry.objects.prefetch_related('events').filter(
+            school__school=user.school,
+            status='approved',
+        ).filter(
+            Q(leader_user=user) |
+            (Q(leader_user__isnull=True) & Q(leader_full_name__iexact=full_name))
+        ).order_by('-submitted_at')
+
+        for group_entry in group_entries_qs:
+            group_ids = list(group_entry.events.values_list('id', flat=True))
+            group_event_ids.update(group_ids)
+            group_entries_payload.append({
+                'group_entry_id': group_entry.id,
+                'group_id': group_entry.group_id,
+                'leader_full_name': group_entry.leader_full_name,
+                'leader_user_id': group_entry.leader_user_id,
+                'event_ids': group_ids,
+                'status': group_entry.status,
+            })
+
     return Response({
         'event_ids': event_ids,
-        'participant_id': participant.pk,
+        'participant_id': participant_id,
         'school_id': getattr(getattr(user, 'school', None), 'id', None),
+        'group_event_ids': sorted(group_event_ids),
+        'group_entries': group_entries_payload,
     })
 
 
@@ -168,6 +196,325 @@ def _student_placeholder_email(username):
 
 def _school_participant_registration_id(participant_pk):
     return f"SPP-{participant_pk}"
+
+
+GROUP_CLASS_CHOICES = {'LP', 'UP', 'HS', 'HSS'}
+GROUP_GENDER_CHOICES = {'BOYS', 'GIRLS', 'MIXED'}
+
+
+def _group_events_queryset():
+    from events.models import Event
+    return Event.objects.select_related(
+        'event_definition',
+        'event_definition__participation_type',
+    ).filter(
+        event_definition__participation_type__type_name='GROUP'
+    )
+
+
+def _normalize_person_name(first_name, last_name):
+    return f"{(first_name or '').strip()} {(last_name or '').strip()}".strip()
+
+
+def _resolve_group_leader_user(school_user, leader_first_name, leader_last_name):
+    participant_school = getattr(school_user, 'school', None)
+    if participant_school is None:
+        participant_school = _ensure_school_user_linked_to_school_profile(school_user)
+    if participant_school is None:
+        return None
+
+    return User.objects.filter(
+        role='student',
+        school=participant_school,
+        first_name__iexact=(leader_first_name or '').strip(),
+        last_name__iexact=(leader_last_name or '').strip(),
+        approval_status='approved',
+        is_active=True,
+    ).order_by('-id').first()
+
+
+def _parse_event_ids(event_ids):
+    if event_ids in [None, '']:
+        return []
+
+    if isinstance(event_ids, str):
+        tokens = [t.strip() for t in event_ids.split(',') if t.strip()]
+        parsed = []
+        for token in tokens:
+            try:
+                parsed.append(int(token))
+            except (TypeError, ValueError):
+                raise ValueError(f'Invalid event ID format: {token}')
+        return parsed
+
+    if not isinstance(event_ids, list):
+        raise ValueError('event_ids must be a list of integers')
+
+    parsed = []
+    for value in event_ids:
+        try:
+            parsed.append(int(value))
+        except (TypeError, ValueError):
+            raise ValueError(f'Invalid event ID format: {value}')
+    return parsed
+
+
+def _group_events_eligible_for_class_and_gender(events_queryset, group_class, gender_category):
+    from catalog.models import EventRule
+
+    events = list(events_queryset)
+    if not events:
+        return set()
+
+    definition_ids = {
+        event.event_definition_id
+        for event in events
+        if getattr(event, 'event_definition_id', None)
+    }
+    if not definition_ids:
+        return set()
+
+    rules = EventRule.objects.filter(
+        event_id__in=definition_ids,
+        level__level_code=group_class,
+    ).values('event_id', 'variant_id', 'gender_eligibility')
+
+    rules_by_event_definition = {}
+    for rule in rules:
+        rules_by_event_definition.setdefault(rule['event_id'], []).append(rule)
+
+    eligible_event_ids = set()
+    for event in events:
+        event_rules = rules_by_event_definition.get(event.event_definition_id, [])
+        if event.event_variant_id:
+            variant_rules = [rule for rule in event_rules if rule['variant_id'] == event.event_variant_id]
+            selected_rules = variant_rules if variant_rules else [
+                rule for rule in event_rules if rule['variant_id'] is None
+            ]
+        else:
+            selected_rules = [rule for rule in event_rules if rule['variant_id'] is None]
+
+        eligible_genders = {rule['gender_eligibility'] for rule in selected_rules}
+        if gender_category in eligible_genders:
+            eligible_event_ids.add(event.id)
+
+    return eligible_event_ids
+
+
+def _validate_group_event_ids(event_ids, group_class=None, gender_category=None):
+    parsed_ids = _parse_event_ids(event_ids)
+    if not parsed_ids:
+        return []
+
+    valid_events_queryset = _group_events_queryset().filter(id__in=parsed_ids)
+    valid_ids = set(valid_events_queryset.values_list('id', flat=True))
+    invalid_ids = sorted(set(parsed_ids) - valid_ids)
+    if invalid_ids:
+        raise ValueError(f'Invalid group event IDs: {invalid_ids}')
+
+    normalized_group_class = str(group_class or '').strip().upper()
+    normalized_gender_category = str(gender_category or '').strip().upper()
+    if normalized_group_class or normalized_gender_category:
+        if normalized_group_class not in GROUP_CLASS_CHOICES:
+            raise ValueError('group_class must be one of LP, UP, HS, HSS')
+        if normalized_gender_category not in GROUP_GENDER_CHOICES:
+            raise ValueError('gender_category must be one of BOYS, GIRLS, MIXED')
+
+        eligible_ids = _group_events_eligible_for_class_and_gender(
+            events_queryset=valid_events_queryset,
+            group_class=normalized_group_class,
+            gender_category=normalized_gender_category,
+        )
+        ineligible_ids = sorted(valid_ids - eligible_ids)
+        if ineligible_ids:
+            raise ValueError(
+                f'Ineligible group event IDs for group_class {normalized_group_class} '
+                f'and gender_category {normalized_gender_category}: {ineligible_ids}'
+            )
+
+    return sorted(valid_ids)
+
+
+def _normalize_member_payloads(participants):
+    if not isinstance(participants, list) or not participants:
+        raise ValueError('participants must be a non-empty list')
+
+    normalized = []
+    for idx, participant in enumerate(participants, start=1):
+        if not isinstance(participant, dict):
+            raise ValueError(f'Invalid participant format at position {idx}')
+
+        first_name = str(participant.get('first_name') or '').strip()
+        last_name = str(participant.get('last_name') or '').strip()
+        if not first_name or not last_name:
+            raise ValueError(f'First name and last name are required for participant at position {idx}')
+
+        normalized.append({
+            'member_order': idx,
+            'first_name': first_name,
+            'last_name': last_name,
+        })
+
+    return normalized
+
+
+def _resolve_leader_member(normalized_members, leader_index=None, leader_name=None):
+    leader_member = None
+
+    if leader_index not in [None, '']:
+        try:
+            leader_index_int = int(leader_index)
+        except (TypeError, ValueError):
+            raise ValueError('leader_index must be a valid integer')
+
+        if leader_index_int < 1 or leader_index_int > len(normalized_members):
+            raise ValueError('leader_index is out of range for participants')
+        leader_member = normalized_members[leader_index_int - 1]
+
+    if leader_name not in [None, '']:
+        leader_name_normalized = str(leader_name).strip().lower()
+        matches = [
+            member for member in normalized_members
+            if _normalize_person_name(member['first_name'], member['last_name']).lower() == leader_name_normalized
+        ]
+        if not matches:
+            raise ValueError('leader_name must match one of the participants')
+
+        if leader_member is not None and leader_member != matches[0]:
+            raise ValueError('leader_index and leader_name refer to different participants')
+
+        leader_member = matches[0]
+
+    if leader_member is None:
+        raise ValueError('Either leader_index or leader_name is required')
+
+    return leader_member
+
+
+def _read_compat_field(data, snake_key, camel_key):
+    snake_value = data.get(snake_key)
+    if snake_value not in [None, '']:
+        return snake_value
+
+    camel_value = data.get(camel_key)
+    if camel_value not in [None, '']:
+        return camel_value
+
+    if snake_key in data:
+        return snake_value
+    return camel_value
+
+
+def _create_school_group_entry_from_payload(school_user, payload, source='manual'):
+    group_id = str(payload.get('group_id') or '').strip().upper()
+    group_class = str(_read_compat_field(payload, 'group_class', 'groupClass') or '').strip().upper()
+    gender_category = str(_read_compat_field(payload, 'gender_category', 'genderCategory') or '').strip().upper()
+
+    participant_count_raw = _read_compat_field(payload, 'participant_count', 'participantCount')
+    try:
+        participant_count = int(participant_count_raw)
+    except (TypeError, ValueError):
+        raise ValueError('participant_count must be a valid number')
+
+    if participant_count < 1 or participant_count > 20:
+        raise ValueError('participant_count must be between 1 and 20')
+
+    if not group_id:
+        raise ValueError('group_id is required')
+    if group_class not in GROUP_CLASS_CHOICES:
+        raise ValueError('group_class must be one of LP, UP, HS, HSS')
+    if gender_category not in GROUP_GENDER_CHOICES:
+        raise ValueError('gender_category must be one of BOYS, GIRLS, MIXED')
+
+    if SchoolGroupEntry.objects.filter(school=school_user, group_id__iexact=group_id).exists():
+        raise ValueError(f'group_id already exists: {group_id}')
+
+    normalized_members = _normalize_member_payloads(payload.get('participants') or [])
+    if len(normalized_members) != participant_count:
+        raise ValueError('participant_count must match the number of participants provided')
+
+    leader_member = _resolve_leader_member(
+        normalized_members=normalized_members,
+        leader_index=_read_compat_field(payload, 'leader_index', 'leaderIndex'),
+        leader_name=_read_compat_field(payload, 'leader_name', 'leaderName'),
+    )
+    leader_full_name = _normalize_person_name(leader_member['first_name'], leader_member['last_name'])
+
+    valid_event_ids = _validate_group_event_ids(
+        _read_compat_field(payload, 'event_ids', 'eventIds'),
+        group_class=group_class,
+        gender_category=gender_category,
+    )
+
+    with transaction.atomic():
+        group_entry = SchoolGroupEntry.objects.create(
+            school=school_user,
+            group_id=group_id,
+            group_class=group_class,
+            gender_category=gender_category,
+            participant_count=participant_count,
+            leader_full_name=leader_full_name,
+            leader_user=_resolve_group_leader_user(
+                school_user,
+                leader_member['first_name'],
+                leader_member['last_name'],
+            ),
+            source=source,
+            status='pending',
+        )
+
+        for member in normalized_members:
+            SchoolGroupMember.objects.create(
+                group_entry=group_entry,
+                member_order=member['member_order'],
+                first_name=member['first_name'],
+                last_name=member['last_name'],
+                is_leader=(member['member_order'] == leader_member['member_order']),
+            )
+
+        if valid_event_ids:
+            group_entry.events.set(valid_event_ids)
+
+    return group_entry
+
+
+def _parse_group_members_from_import_names(raw_names):
+    text = str(raw_names or '').replace('\n', '|').replace(';', '|').strip()
+    if not text:
+        raise ValueError('participant names are required')
+
+    tokens = [token.strip() for token in text.split('|') if token.strip()]
+    participants = []
+    for token in tokens:
+        parts = token.split()
+        if len(parts) < 2:
+            raise ValueError(f'Invalid participant name "{token}". Use "FirstName LastName".')
+        participants.append({
+            'first_name': parts[0],
+            'last_name': ' '.join(parts[1:]),
+        })
+    return participants
+
+
+def _build_group_payload_from_import_row(row):
+    normalized_row = {}
+    for key, value in row.items():
+        normalized_key = re.sub(r'[^a-z0-9]+', '_', str(key or '').strip().lower()).strip('_')
+        normalized_row[normalized_key] = value
+
+    participants = _parse_group_members_from_import_names(
+        normalized_row.get('participant_names') or normalized_row.get('participants')
+    )
+
+    return {
+        'group_id': normalized_row.get('group_id'),
+        'group_class': normalized_row.get('group_class'),
+        'gender_category': normalized_row.get('gender') or normalized_row.get('gender_category'),
+        'participant_count': normalized_row.get('number_of_participants') or normalized_row.get('participant_count'),
+        'participants': participants,
+        'leader_name': normalized_row.get('leader_name'),
+        'event_ids': normalized_row.get('event_ids') or normalized_row.get('events'),
+    }
 
 
 # Admin: Create School Accounts
@@ -599,9 +946,14 @@ class SchoolSubmitParticipantsView(APIView):
             first_name = p_data.get('first_name')
             last_name = p_data.get('last_name')
             student_class = p_data.get('student_class')
+            gender = str(p_data.get('gender') or '').strip().upper()
             
-            if not all([participant_id, first_name, last_name, student_class]):
+            if not all([participant_id, first_name, last_name, student_class, gender]):
                 return Response({'error': f'Missing required fields for participant {p_data.get("participant_id", "unknown")}'},
+                              status=status.HTTP_400_BAD_REQUEST)
+
+            if gender not in ['BOYS', 'GIRLS']:
+                return Response({'error': f'Invalid gender for participant {participant_id}. Must be BOYS or GIRLS'},
                               status=status.HTTP_400_BAD_REQUEST)
             
             # Validate student_class is between 1 and 12
@@ -619,7 +971,8 @@ class SchoolSubmitParticipantsView(APIView):
                 participant_id=participant_id,
                 first_name=first_name,
                 last_name=last_name,
-                student_class=student_class_int
+                student_class=student_class_int,
+                gender=gender,
             )
             
             # Add events if provided
@@ -646,6 +999,198 @@ class SchoolSubmitParticipantsView(APIView):
         
         return Response({'participants': created, 'count': len(created)}, 
                        status=status.HTTP_201_CREATED)
+
+
+class SchoolSubmitGroupParticipantsView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        if getattr(request.user, 'role', None) != 'school':
+            return Response(
+                {'error': 'Only school accounts can submit group participants'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        groups_data = request.data.get('groups', [])
+        if not isinstance(groups_data, list) or not groups_data:
+            return Response({'error': 'groups must be a non-empty list'}, status=status.HTTP_400_BAD_REQUEST)
+
+        created = []
+        payload_group_ids = set()
+
+        for idx, group_payload in enumerate(groups_data, start=1):
+            if not isinstance(group_payload, dict):
+                return Response({'error': f'Invalid group payload format at index {idx}'}, status=status.HTTP_400_BAD_REQUEST)
+
+            candidate_group_id = str(group_payload.get('group_id') or '').strip().upper()
+            if candidate_group_id:
+                if candidate_group_id in payload_group_ids:
+                    return Response({'error': f'Duplicate group_id in request payload: {candidate_group_id}'}, status=status.HTTP_400_BAD_REQUEST)
+                payload_group_ids.add(candidate_group_id)
+
+            try:
+                group_entry = _create_school_group_entry_from_payload(
+                    school_user=request.user,
+                    payload=group_payload,
+                    source='manual',
+                )
+            except ValueError as exc:
+                return Response({'error': f'Group #{idx}: {exc}'}, status=status.HTTP_400_BAD_REQUEST)
+
+            created.append(SchoolGroupEntrySerializer(group_entry, context={'request': request}).data)
+
+        return Response({'groups': created, 'count': len(created)}, status=status.HTTP_201_CREATED)
+
+
+class SchoolViewOwnGroupParticipantsView(generics.ListAPIView):
+    serializer_class = SchoolGroupEntrySerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        if getattr(self.request.user, 'role', None) != 'school':
+            return SchoolGroupEntry.objects.none()
+
+        queryset = SchoolGroupEntry.objects.filter(school=self.request.user).select_related(
+            'leader_user',
+            'reviewed_by',
+        ).prefetch_related(
+            'members',
+            'events',
+        ).order_by('-submitted_at')
+
+        status_filter = (self.request.query_params.get('status') or '').strip().lower()
+        if status_filter in {'pending', 'approved', 'rejected'}:
+            queryset = queryset.filter(status=status_filter)
+
+        group_class = (self.request.query_params.get('group_class') or '').strip().upper()
+        if group_class in GROUP_CLASS_CHOICES:
+            queryset = queryset.filter(group_class=group_class)
+
+        return queryset
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def school_group_events(request):
+    if getattr(request.user, 'role', None) != 'school':
+        return Response({'error': 'Only school accounts can access this endpoint'}, status=status.HTTP_403_FORBIDDEN)
+
+    from events.serializers import EventSerializer
+    queryset = _group_events_queryset()
+
+    group_class = str(_read_compat_field(request.query_params, 'group_class', 'groupClass') or '').strip().upper()
+    gender_category = str(_read_compat_field(request.query_params, 'gender_category', 'genderCategory') or '').strip().upper()
+
+    if group_class or gender_category:
+        if not group_class:
+            return Response({'error': 'group_class must be one of LP, UP, HS, HSS'}, status=status.HTTP_400_BAD_REQUEST)
+        if not gender_category:
+            return Response({'error': 'gender_category must be one of BOYS, GIRLS, MIXED'}, status=status.HTTP_400_BAD_REQUEST)
+        if group_class not in GROUP_CLASS_CHOICES:
+            return Response({'error': 'group_class must be one of LP, UP, HS, HSS'}, status=status.HTTP_400_BAD_REQUEST)
+        if gender_category not in GROUP_GENDER_CHOICES:
+            return Response({'error': 'gender_category must be one of BOYS, GIRLS, MIXED'}, status=status.HTTP_400_BAD_REQUEST)
+
+        queryset = queryset.filter(status='published')
+        eligible_event_ids = _group_events_eligible_for_class_and_gender(
+            events_queryset=queryset,
+            group_class=group_class,
+            gender_category=gender_category,
+        )
+        queryset = queryset.filter(id__in=eligible_event_ids)
+
+    queryset = queryset.order_by('date', 'start_time')
+    return Response(EventSerializer(queryset, many=True).data)
+
+
+class SchoolBulkImportGroupParticipantsView(APIView):
+    permission_classes = [IsAuthenticated]
+    parser_classes = [MultiPartParser, FormParser]
+
+    def post(self, request):
+        if getattr(request.user, 'role', None) != 'school':
+            return Response(
+                {'error': 'Only school accounts can import group participants'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        upload = request.FILES.get('file')
+        if upload is None:
+            return Response({'error': 'file is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+        filename = (upload.name or '').strip().lower()
+        try:
+            if filename.endswith('.csv'):
+                rows = self._parse_csv(upload)
+            elif filename.endswith('.xlsx'):
+                rows = self._parse_xlsx(upload)
+            else:
+                return Response({'error': 'Unsupported file format. Use .csv or .xlsx'}, status=status.HTTP_400_BAD_REQUEST)
+        except ValueError as exc:
+            return Response({'error': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+
+        imported = []
+        errors = []
+        seen_group_ids = set()
+
+        for row_number, row_data in rows:
+            try:
+                payload = _build_group_payload_from_import_row(row_data)
+                candidate_group_id = str(payload.get('group_id') or '').strip().upper()
+                if candidate_group_id:
+                    if candidate_group_id in seen_group_ids:
+                        raise ValueError(f'Duplicate group_id in file: {candidate_group_id}')
+                    seen_group_ids.add(candidate_group_id)
+
+                group_entry = _create_school_group_entry_from_payload(
+                    school_user=request.user,
+                    payload=payload,
+                    source='bulk',
+                )
+                imported.append(SchoolGroupEntrySerializer(group_entry, context={'request': request}).data)
+            except ValueError as exc:
+                errors.append({'row': row_number, 'error': str(exc)})
+
+        status_code = status.HTTP_201_CREATED if imported else status.HTTP_400_BAD_REQUEST
+        return Response({
+            'imported_count': len(imported),
+            'error_count': len(errors),
+            'imported_groups': imported,
+            'errors': errors,
+        }, status=status_code)
+
+    def _parse_csv(self, upload):
+        decoded = upload.read().decode('utf-8-sig')
+        reader = csv.DictReader(io.StringIO(decoded))
+        if not reader.fieldnames:
+            raise ValueError('CSV header row is required')
+
+        rows = []
+        for index, row in enumerate(reader, start=2):
+            rows.append((index, row))
+        return rows
+
+    def _parse_xlsx(self, upload):
+        try:
+            from openpyxl import load_workbook
+        except ImportError:
+            raise ValueError('Excel import requires openpyxl package')
+
+        workbook = load_workbook(upload, read_only=True, data_only=True)
+        worksheet = workbook.active
+        iterator = worksheet.iter_rows(values_only=True)
+        headers = next(iterator, None)
+        if not headers:
+            raise ValueError('Excel header row is required')
+
+        normalized_headers = [str(header or '').strip() for header in headers]
+        rows = []
+        for index, values in enumerate(iterator, start=2):
+            row_data = {}
+            for col_idx, header in enumerate(normalized_headers):
+                row_data[header] = values[col_idx] if col_idx < len(values) else None
+            rows.append((index, row_data))
+        return rows
 
 
 # School: Generate Student IDs
@@ -994,6 +1539,111 @@ class AdminSchoolParticipantsListView(generics.ListAPIView):
         return queryset.order_by('-submitted_at')
 
 
+class AdminSchoolGroupParticipantsListView(generics.ListAPIView):
+    """
+    Admin endpoint to view submitted school group entries.
+    """
+    permission_classes = [IsAuthenticated, IsAdminRole]
+    serializer_class = SchoolGroupEntrySerializer
+
+    def get_queryset(self):
+        queryset = SchoolGroupEntry.objects.all().select_related(
+            'school',
+            'leader_user',
+            'reviewed_by',
+        ).prefetch_related(
+            'members',
+            'events',
+        )
+
+        status_filter = (self.request.query_params.get('status') or '').strip().lower()
+        if status_filter in {'pending', 'approved', 'rejected'}:
+            queryset = queryset.filter(status=status_filter)
+
+        group_class = (self.request.query_params.get('group_class') or '').strip().upper()
+        if group_class in GROUP_CLASS_CHOICES:
+            queryset = queryset.filter(group_class=group_class)
+
+        school_id = self.request.query_params.get('school')
+        if school_id:
+            queryset = queryset.filter(school_id=school_id)
+
+        event_id = self.request.query_params.get('event')
+        if event_id:
+            queryset = queryset.filter(events__id=event_id)
+
+        return queryset.order_by('-submitted_at').distinct()
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated, IsAdminRole])
+def admin_approve_school_group_participant(request, group_entry_id):
+    try:
+        group_entry = SchoolGroupEntry.objects.select_related(
+            'school',
+            'leader_user',
+        ).prefetch_related('members', 'events').get(pk=group_entry_id)
+    except SchoolGroupEntry.DoesNotExist:
+        return Response({'error': 'Group entry not found'}, status=status.HTTP_404_NOT_FOUND)
+
+    if group_entry.status == 'approved':
+        return Response({
+            'error': 'Group entry has already been approved',
+            'group': SchoolGroupEntrySerializer(group_entry, context={'request': request}).data,
+        }, status=status.HTTP_400_BAD_REQUEST)
+
+    leader_member = group_entry.members.filter(is_leader=True).order_by('member_order').first()
+    if leader_member and group_entry.leader_user is None:
+        group_entry.leader_user = _resolve_group_leader_user(
+            group_entry.school,
+            leader_member.first_name,
+            leader_member.last_name,
+        )
+
+    group_entry.status = 'approved'
+    group_entry.reviewed_at = timezone.now()
+    group_entry.reviewed_by = request.user
+    notes = (request.data.get('notes') or '').strip()
+    if notes:
+        group_entry.review_notes = notes
+    group_entry.save(update_fields=['status', 'reviewed_at', 'reviewed_by', 'review_notes', 'leader_user', 'updated_at'])
+
+    return Response({
+        'message': 'Group entry approved successfully',
+        'group': SchoolGroupEntrySerializer(group_entry, context={'request': request}).data,
+    }, status=status.HTTP_200_OK)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated, IsAdminRole])
+def admin_reject_school_group_participant(request, group_entry_id):
+    try:
+        group_entry = SchoolGroupEntry.objects.select_related('school').prefetch_related('members', 'events').get(pk=group_entry_id)
+    except SchoolGroupEntry.DoesNotExist:
+        return Response({'error': 'Group entry not found'}, status=status.HTTP_404_NOT_FOUND)
+
+    if group_entry.status == 'rejected':
+        return Response({
+            'error': 'Group entry has already been rejected',
+            'group': SchoolGroupEntrySerializer(group_entry, context={'request': request}).data,
+        }, status=status.HTTP_400_BAD_REQUEST)
+
+    review_notes = (request.data.get('notes') or request.data.get('reason') or '').strip()
+    if not review_notes:
+        return Response({'error': 'notes or reason is required to reject a group entry'}, status=status.HTTP_400_BAD_REQUEST)
+
+    group_entry.status = 'rejected'
+    group_entry.review_notes = review_notes
+    group_entry.reviewed_at = timezone.now()
+    group_entry.reviewed_by = request.user
+    group_entry.save(update_fields=['status', 'review_notes', 'reviewed_at', 'reviewed_by', 'updated_at'])
+
+    return Response({
+        'message': 'Group entry rejected successfully',
+        'group': SchoolGroupEntrySerializer(group_entry, context={'request': request}).data,
+    }, status=status.HTTP_200_OK)
+
+
 # Admin: Approve school participant and create user account
 @api_view(['POST'])
 @permission_classes([IsAuthenticated, IsAdminRole])
@@ -1083,6 +1733,7 @@ def admin_approve_school_participant(request, participant_id):
                 user.first_name = participant.first_name
                 user.last_name = participant.last_name
                 user.student_class = participant.student_class
+                user.gender = participant.gender
                 user.school_category_extra = section
                 user.is_active = True
                 user.approval_status = 'approved'
@@ -1111,6 +1762,7 @@ def admin_approve_school_participant(request, participant_id):
                             last_name=participant.last_name,
                             role='student',
                             student_class=participant.student_class,
+                            gender=participant.gender,
                             school_category_extra=section,  # Fixed: use school_category_extra instead of section
                             school=participant_school,
                             registration_id=school_registration_id,
@@ -1285,6 +1937,7 @@ def admin_bulk_approve_school_participants(request):
                     user.first_name = participant.first_name
                     user.last_name = participant.last_name
                     user.student_class = participant.student_class
+                    user.gender = participant.gender
                     user.school_category_extra = section
                     user.is_active = True
                     user.approval_status = 'approved'
@@ -1313,6 +1966,7 @@ def admin_bulk_approve_school_participants(request):
                                 last_name=participant.last_name,
                                 role='student',
                                 student_class=participant.student_class,
+                                gender=participant.gender,
                                 school_category_extra=section,  # Fixed: use school_category_extra instead of section
                                 school=participant_school,
                                 registration_id=school_registration_id,

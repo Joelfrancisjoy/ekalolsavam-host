@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import http from '../services/http-common';
+import { GENDER_OPTIONS, normalizeGenderValue } from '../constants/gender';
 
 const IDBasedRegistration = () => {
     const navigate = useNavigate();
@@ -14,7 +15,8 @@ const IDBasedRegistration = () => {
         password_confirm: '',
         first_name: '',
         last_name: '',
-        phone: ''
+        phone: '',
+        gender: ''
     });
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
@@ -78,15 +80,25 @@ const IDBasedRegistration = () => {
             return;
         }
 
+        if (idDetails?.role === 'student') {
+            const normalizedGender = normalizeGenderValue(formData.gender);
+            if (!normalizedGender) {
+                setError('Please select your gender');
+                setLoading(false);
+                return;
+            }
+        }
+
         try {
-            const response = await http.post('/api/auth/register/with-id/', {
+            await http.post('/api/auth/register/with-id/', {
                 id_code: idCode.trim().toUpperCase(),
                 username: formData.username,
                 password: formData.password,
                 email: formData.email,
                 first_name: formData.first_name,
                 last_name: formData.last_name,
-                phone: formData.phone
+                phone: formData.phone,
+                ...(idDetails?.role === 'student' ? { gender: normalizeGenderValue(formData.gender) } : {})
             });
 
             setSuccess(true);
@@ -315,6 +327,29 @@ const IDBasedRegistration = () => {
                                 disabled={loading}
                             />
                         </div>
+
+                        {idDetails.role === 'student' && (
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">
+                                    Gender *
+                                </label>
+                                <select
+                                    name="gender"
+                                    value={formData.gender}
+                                    onChange={handleInputChange}
+                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                                    required
+                                    disabled={loading}
+                                >
+                                    <option value="">Select gender</option>
+                                    {GENDER_OPTIONS.map((option) => (
+                                        <option key={option.value} value={option.value}>
+                                            {option.label}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+                        )}
 
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-1">

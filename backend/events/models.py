@@ -31,11 +31,26 @@ class Event(models.Model):
         ('theatre', 'Theatre'),
         ('literary', 'Literary'),
         ('visual_arts', 'Visual Arts'),
+        ('traditional_arts', 'Traditional Arts'),
     ]
 
     name = models.CharField(max_length=100)
     description = models.TextField()
     category = models.CharField(max_length=20, choices=CATEGORY_CHOICES)
+    event_definition = models.ForeignKey(
+        'catalog.EventDefinition',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='scheduled_events',
+    )
+    event_variant = models.ForeignKey(
+        'catalog.EventVariant',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='scheduled_events',
+    )
     date = models.DateField()
     start_time = models.TimeField()
     end_time = models.TimeField()
@@ -68,6 +83,15 @@ class Judge(models.Model):
 class EventRegistration(models.Model):
     event = models.ForeignKey(Event, on_delete=models.CASCADE)
     participant = models.ForeignKey(User, on_delete=models.CASCADE)
+    school_group_entry = models.ForeignKey(
+        'users.SchoolGroupEntry',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='event_registrations',
+    )
+    group_reference_id = models.CharField(max_length=100, blank=True, null=True, db_index=True)
+    group_leader_name = models.CharField(max_length=220, blank=True, null=True)
     registration_date = models.DateTimeField(auto_now_add=True)
     # pending, confirmed, cancelled
     status = models.CharField(max_length=20, default='pending')

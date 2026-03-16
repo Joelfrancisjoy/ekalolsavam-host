@@ -1,4 +1,7 @@
 import os
+import logging
+import traceback
+from django.conf import settings
 from django.db.models import Q
 from rest_framework import generics, status
 from rest_framework.response import Response
@@ -26,6 +29,9 @@ from users.services.auth_service import login_user
 from users.services.password_service import accept_pending_password as service_accept_pending_password, set_new_password as service_set_new_password
 from users.services.admin_user_service import delete_user_with_cleanup, would_remove_last_admin, toggle_user_active, set_user_role, set_user_approval
 from core.exceptions import DomainError
+
+
+logger = logging.getLogger(__name__)
 
 
 class RegisterView(generics.CreateAPIView):
@@ -89,7 +95,31 @@ class AdminUserListView(generics.ListAPIView):
     queryset = User.objects.all().order_by('-date_joined')
     serializer_class = UserSerializer
     permission_classes = [IsAuthenticated, IsAdminRole]
-    # Removed pagination to load all users for frontend filtering
+    pagination_class = AdminStandardResultsSetPagination
+
+    def paginate_queryset(self, queryset):
+        # Allow explicit opt-out for exports/legacy screens.
+        include_all = str(self.request.query_params.get('all', '')).lower() in ['1', 'true', 'yes']
+        if include_all:
+            return None
+        return super().paginate_queryset(queryset)
+
+    def list(self, request, *args, **kwargs):
+        try:
+            return super().list(request, *args, **kwargs)
+        except Exception as e:
+            logger.exception('AdminUserListView failed')
+            detail = str(e)
+            if getattr(request, 'user', None) and request.user.is_authenticated:
+                detail = f"{detail}"
+            return Response(
+                {
+                    'error': 'Failed to load users',
+                    'detail': detail,
+                    'trace': traceback.format_exc() if settings.DEBUG else None,
+                },
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
 
     def get_queryset(self):
         qs = super().get_queryset()

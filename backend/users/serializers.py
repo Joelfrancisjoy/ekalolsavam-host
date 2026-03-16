@@ -13,7 +13,7 @@ class UserSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ['id', 'username', 'email', 'first_name', 'last_name', 'role', 'phone', 'approval_status', 'must_reset_password', 'student_class', 'section', 'school', 'school_category_extra']
+        fields = ['id', 'username', 'email', 'first_name', 'last_name', 'role', 'phone', 'approval_status', 'must_reset_password', 'student_class', 'section', 'school', 'school_category_extra', 'gender']
         read_only_fields = ['id', 'section']
 
     def get_section(self, obj):
@@ -32,7 +32,7 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
             'username', 'email', 'password', 'password_confirm',
             'first_name', 'last_name', 'phone', 'role',
             'staff_id_photo', 'college_id_photo', 'school', 'school_category_extra', 'student_class',
-            'judge_id_photo'
+            'judge_id_photo', 'gender'
         ]
         extra_kwargs = {
             'username': {'required': False},
@@ -241,6 +241,10 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
                 if not (1 <= cls_int <= 12):
                     raise serializers.ValidationError({'student_class': 'Class must be between 1 and 12'})
 
+            gender = attrs.get('gender')
+            if gender not in ['BOYS', 'GIRLS']:
+                raise serializers.ValidationError({'gender': 'Gender is required for students and must be BOYS or GIRLS'})
+
             college_id = attrs.get('college_id_photo')
             if not college_id:
                 raise serializers.ValidationError({'college_id_photo': 'College ID photo is required for students'})
@@ -273,6 +277,7 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
             # Ensure no student-only requirements enforced
             attrs['college_id_photo'] = attrs.get('college_id_photo')  # allowed but not required
             # school and extra are optional for volunteers
+            attrs['gender'] = None
         elif role == 'judge':
             # Judge-specific: require JPEG judge ID photo; do not require username/password here
             judge_id = attrs.get('judge_id_photo')
@@ -290,9 +295,11 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
                     candidate = f"{base}{suffix}"
                     suffix += 1
                 attrs['username'] = candidate
+            attrs['gender'] = None
         else:
             # Other roles (future): pass
             attrs['college_id_photo'] = attrs.get('college_id_photo')
+            attrs['gender'] = None
 
         return attrs
 
@@ -385,4 +392,4 @@ class SchoolSerializer(serializers.ModelSerializer):
 class AdminUserUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ['role', 'phone', 'approval_status', 'student_class', 'school', 'school_category_extra']
+        fields = ['role', 'phone', 'approval_status', 'student_class', 'school', 'school_category_extra', 'gender']

@@ -4,7 +4,7 @@ import eventService from '../services/eventService';
 
 // Note: Backend exposes only read/list for published results.
 // This UI allows admins to view results per event, and export.
-// If later you add publish/unpublish endpoints, buttons can be wired easily.
+// If later you add publish/unpublish endpoints, buttons can be wired easily.http://localhost:3000/admin/events
 
 const ResultPublishing = () => {
     const [loading, setLoading] = useState(true);
