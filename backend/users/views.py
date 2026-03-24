@@ -21,7 +21,8 @@ from django.core import signing
 from .models import User, AllowedEmail, School
 from .serializers import (
     UserSerializer, UserRegistrationSerializer, AllowedEmailSerializer,
-    BulkAllowedEmailSerializer, AdminUserUpdateSerializer, SchoolSerializer
+    BulkAllowedEmailSerializer, AdminUserUpdateSerializer, SchoolSerializer,
+    StudentSelfProfileUpdateSerializer,
 )
 from .permissions import IsAdminRole
 from .pagination import AdminStandardResultsSetPagination
@@ -89,6 +90,20 @@ class CurrentUserView(generics.RetrieveAPIView):
 
     def get_object(self):
         return self.request.user
+
+
+@api_view(['PATCH'])
+@permission_classes([IsAuthenticated])
+def update_current_user_profile(request):
+    user = request.user
+    if getattr(user, 'role', None) != 'student':
+        return Response({'error': 'Only students can update this profile'}, status=status.HTTP_403_FORBIDDEN)
+
+    serializer = StudentSelfProfileUpdateSerializer(user, data=request.data, partial=True)
+    serializer.is_valid(raise_exception=True)
+    serializer.save()
+
+    return Response(UserSerializer(user).data, status=status.HTTP_200_OK)
 
 
 class AdminUserListView(generics.ListAPIView):

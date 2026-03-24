@@ -7,30 +7,31 @@ from .views import (
     AdminUserListView, AdminUserDetailView, SchoolListView,
     admin_toggle_user_active, admin_set_role, admin_set_approval,
     admin_bulk_activate, admin_bulk_set_approval,
-    check_email_exists, check_username_exists,
+    check_email_exists, check_username_exists, update_current_user_profile,
 )
 from .workflow_views import (
     AdminCreateSchoolView, AdminGenerateIDView, IDSignupView,
     IDSignupRequestListView, IDSignupRequestDetailView,
     SchoolSubmitParticipantsView, SchoolSubmitGroupParticipantsView,
     SchoolViewOwnGroupParticipantsView, SchoolBulkImportGroupParticipantsView,
-    school_group_events, SchoolGenerateStudentIDView,
+    school_group_events, school_individual_events, SchoolGenerateStudentIDView,
     VolunteerSchoolParticipantsView,
     VolunteerVerifyStudentView, AdminAssignVolunteerToSchoolView,
     SchoolStandingsView, AdminIssuedIDListView, AdminIssuedIDDetailView,
     SchoolViewOwnParticipantsView, check_id_validity,
     AdminSchoolParticipantsListView, admin_approve_school_participant,
     AdminSchoolGroupParticipantsListView, admin_approve_school_group_participant,
-    admin_reject_school_group_participant,
+    admin_reject_school_group_participant, admin_update_school_group_participant,
     admin_bulk_approve_school_participants,
     student_allowed_events,
-    admin_link_school_user_to_school_profile
+    admin_link_school_user_to_school_profile, student_group_profile, school_update_group_participant,
 )
 
 urlpatterns = [
     path('register/', RegisterView.as_view(), name='register'),
     path('login/', login_view, name='login'),
     path('current/', CurrentUserView.as_view(), name='current-user'),
+    path('profile/', update_current_user_profile, name='current-user-profile-update'),
     path('google/', google_auth, name="google_auth"),
 
     # Schools
@@ -82,7 +83,9 @@ urlpatterns = [
     path('schools/participants/', SchoolViewOwnParticipantsView.as_view(), name='school-view-own-participants'),
     path('schools/group-participants/submit/', SchoolSubmitGroupParticipantsView.as_view(), name='school-submit-group-participants'),
     path('schools/group-participants/', SchoolViewOwnGroupParticipantsView.as_view(), name='school-view-own-group-participants'),
+    path('schools/group-participants/<int:group_entry_id>/', school_update_group_participant, name='school-update-group-participant'),
     path('schools/group-participants/import/', SchoolBulkImportGroupParticipantsView.as_view(), name='school-import-group-participants'),
+    path('schools/individual-events/', school_individual_events, name='school-individual-events'),
     path('schools/group-events/', school_group_events, name='school-group-events'),
     path('schools/students/generate-ids/', SchoolGenerateStudentIDView.as_view(), name='school-generate-student-ids'),
     
@@ -91,6 +94,7 @@ urlpatterns = [
     path('volunteer/verify-student/', VolunteerVerifyStudentView.as_view(), name='volunteer-verify-student'),
 
     path('students/allowed-events/', student_allowed_events, name='student-allowed-events'),
+    path('students/group-profiles/<int:group_entry_id>/', student_group_profile, name='student-group-profile'),
     
     # Admin: Assign volunteers to schools
     path('admin/assign-volunteer/', AdminAssignVolunteerToSchoolView.as_view(), name='admin-assign-volunteer'),
@@ -100,6 +104,7 @@ urlpatterns = [
     path('admin/school-participants/<int:participant_id>/approve/', admin_approve_school_participant, name='admin-approve-school-participant'),
     path('admin/school-participants/bulk-approve/', admin_bulk_approve_school_participants, name='admin-bulk-approve-school-participants'),
     path('admin/school-group-participants/', AdminSchoolGroupParticipantsListView.as_view(), name='admin-school-group-participants-list'),
+    path('admin/school-group-participants/<int:group_entry_id>/', admin_update_school_group_participant, name='admin-update-school-group-participant'),
     path('admin/school-group-participants/<int:group_entry_id>/approve/', admin_approve_school_group_participant, name='admin-approve-school-group-participant'),
     path('admin/school-group-participants/<int:group_entry_id>/reject/', admin_reject_school_group_participant, name='admin-reject-school-group-participant'),
 

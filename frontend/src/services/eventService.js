@@ -45,6 +45,10 @@ const eventService = {
         const res = await http.post(`/api/events/${id}/assign-volunteers/`, { volunteer_ids: volunteerIds });
         return res.data;
     },
+    recommendTimeslots: async (id, payload) => {
+        const res = await http.post(`/api/events/${id}/recommend-timeslots/`, payload);
+        return res.data;
+    },
     publishEvent: async (id, isPublished) => {
         const current = await http.get(`/api/events/${id}/`);
         const status = current.data?.status;

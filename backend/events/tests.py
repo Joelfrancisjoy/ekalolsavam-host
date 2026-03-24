@@ -19,6 +19,8 @@ from events.management.commands.provision_group_events import (
     DEFAULT_FALLBACK_MAX_PARTICIPANTS,
     DEFAULT_VENUE_NAME,
     TARGET_GROUP_EVENT_NAMES,
+    TARGET_INDIVIDUAL_EVENT_NAMES,
+    TARGET_MATRIX_EVENT_NAMES,
 )
 from events.services.catalog_sync import (
     build_canonical_event_name_from_models,
@@ -783,6 +785,36 @@ class EventRegistrationGenderEligibilityTestCase(TestCase):
             EventRegistration.objects.filter(event=variant_event, participant=student).exists()
         )
 
+    def test_non_variant_event_falls_back_to_variant_rules_when_default_missing(self):
+        self.gender_rule.delete()
+        variant = EventVariant.objects.create(event=self.event_definition, variant_name="Malayalam")
+        EventRule.objects.create(
+            event=self.event_definition,
+            variant=variant,
+            level=self.level_hs,
+            gender_eligibility="MIXED",
+        )
+
+        student = self._create_school_mapped_student(
+            username="variant_pool_girl",
+            first_name="VARIANT",
+            last_name="POOL",
+            event=self.catalog_event,
+            gender="GIRLS",
+        )
+
+        self.client.force_authenticate(user=student)
+        response = self.client.post(
+            reverse("event-registration"),
+            self._registration_payload(student, self.catalog_event),
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+        self.assertTrue(
+            EventRegistration.objects.filter(event=self.catalog_event, participant=student).exists()
+        )
+
 
 class EventCatalogAlignmentTestCase(TestCase):
     def setUp(self):
@@ -1204,3 +1236,312 @@ class GroupEventsProvisionCommandTestCase(TestCase):
                 "--dry-run",
                 verbosity=0,
             )
+
+
+class MatrixEventsProvisionCommandTestCase(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        call_command("load_catalog_seed", verbosity=0)
+        cls.primary_admin = User.objects.create_user(
+            username="matrix_admin_primary",
+            email="matrix_admin_primary@test.com",
+            password="testpass123",
+            role="admin",
+        )
+        cls.secondary_admin = User.objects.create_user(
+            username="matrix_admin_secondary",
+            email="matrix_admin_secondary@test.com",
+            password="testpass123",
+            role="admin",
+        )
+
+    def _auto_events(self):
+        return (
+            Event.objects.filter(description__startswith=AUTO_PROVISION_DESCRIPTION_PREFIX)
+            .select_related("event_definition", "venue", "created_by")
+            .order_by("date", "start_time", "id")
+        )
+
+    def _expected_max_participants(self, event_definition):
+        base_max_values = [
+            value
+            for value in event_definition.rules.filter(variant__isnull=True).values_list(
+                "max_participants",
+                flat=True,
+            )
+            if value is not None
+        ]
+        if base_max_values:
+            return max(base_max_values)
+
+        fallback_values = [
+            value
+            for value in event_definition.rules.values_list("max_participants", flat=True)
+            if value is not None
+        ]
+        if fallback_values:
+            return max(fallback_values)
+
+        return DEFAULT_FALLBACK_MAX_PARTICIPANTS
+
+    def test_provision_matrix_events_creates_group_and_individual_rows(self):
+        call_command(
+            "provision_matrix_events",
+            "--skip-catalog-seed",
+            "--admin-username",
+            self.primary_admin.username,
+            "--start-date",
+            "2025-01-10",
+            "--start-time",
+            "09:00",
+            "--slot-minutes",
+            "120",
+            verbosity=0,
+        )
+
+        auto_events = list(self._auto_events())
+        names_found = {event.event_definition.event_name for event in auto_events}
+
+        self.assertEqual(len(auto_events), len(TARGET_MATRIX_EVENT_NAMES))
+        self.assertEqual(names_found, set(TARGET_MATRIX_EVENT_NAMES))
+        self.assertTrue(set(TARGET_GROUP_EVENT_NAMES).issubset(names_found))
+        self.assertTrue(set(TARGET_INDIVIDUAL_EVENT_NAMES).issubset(names_found))
+        self.assertIn("Western Music Group / Jazz / Triple", names_found)
+        self.assertIn("Western Dance", names_found)
+        self.assertNotIn("Western Band / Jazz / Triple", names_found)
+
+        for event in auto_events:
+            event_definition = event.event_definition
+            self.assertIsNotNone(event_definition)
+            self.assertIsNone(event.event_variant)
+            self.assertEqual(event.status, "published")
+            self.assertEqual(event.created_by_id, self.primary_admin.id)
+            self.assertEqual(event.venue.name, DEFAULT_VENUE_NAME)
+            self.assertEqual(
+                event.name,
+                build_canonical_event_name_from_models(event_definition, event_variant=None),
+            )
+            self.assertEqual(
+                event.category,
+                map_event_definition_category_to_event_category(event_definition, strict=True),
+            )
+            self.assertEqual(
+                event.max_participants,
+                self._expected_max_participants(event_definition),
+            )
+
+        for previous_event, current_event in zip(auto_events, auto_events[1:]):
+            previous_end = datetime.combine(previous_event.date, previous_event.end_time)
+            current_start = datetime.combine(current_event.date, current_event.start_time)
+            self.assertGreaterEqual(current_start, previous_end)
+
+        venue = Venue.objects.get(name=DEFAULT_VENUE_NAME)
+        self.assertGreaterEqual(venue.capacity, len(TARGET_MATRIX_EVENT_NAMES))
+        self.assertGreaterEqual(venue.event_limit, len(TARGET_MATRIX_EVENT_NAMES))
+
+    def test_provision_matrix_events_is_idempotent_and_updates_existing_rows(self):
+        call_command(
+            "provision_matrix_events",
+            "--skip-catalog-seed",
+            "--admin-username",
+            self.primary_admin.username,
+            "--start-date",
+            "2025-01-10",
+            "--start-time",
+            "09:00",
+            "--slot-minutes",
+            "120",
+            verbosity=0,
+        )
+
+        first_pass_events = {
+            event.event_definition.event_name: event
+            for event in self._auto_events()
+        }
+
+        call_command(
+            "provision_matrix_events",
+            "--skip-catalog-seed",
+            "--admin-username",
+            self.secondary_admin.username,
+            "--start-date",
+            "2025-01-12",
+            "--start-time",
+            "10:30",
+            "--slot-minutes",
+            "90",
+            verbosity=0,
+        )
+
+        second_pass_events = {
+            event.event_definition.event_name: event
+            for event in self._auto_events()
+        }
+
+        self.assertEqual(
+            Event.objects.filter(description__startswith=AUTO_PROVISION_DESCRIPTION_PREFIX).count(),
+            len(TARGET_MATRIX_EVENT_NAMES),
+        )
+
+        for event_name in TARGET_MATRIX_EVENT_NAMES:
+            self.assertIn(event_name, first_pass_events)
+            self.assertIn(event_name, second_pass_events)
+            self.assertEqual(first_pass_events[event_name].id, second_pass_events[event_name].id)
+            self.assertEqual(second_pass_events[event_name].created_by_id, self.secondary_admin.id)
+
+        first_event = second_pass_events[TARGET_MATRIX_EVENT_NAMES[0]]
+        self.assertEqual(str(first_event.date), "2025-01-12")
+        self.assertEqual(first_event.start_time, time(10, 30))
+
+    def test_provision_matrix_events_supports_dry_run_without_writes(self):
+        output = StringIO()
+
+        call_command(
+            "provision_matrix_events",
+            "--skip-catalog-seed",
+            "--dry-run",
+            stdout=output,
+            verbosity=0,
+        )
+
+        command_output = output.getvalue()
+        self.assertIn("DRY RUN", command_output)
+        self.assertIn("Target set: matrix", command_output)
+        self.assertIn(f"Events targeted: {len(TARGET_MATRIX_EVENT_NAMES)}", command_output)
+        self.assertFalse(Venue.objects.filter(name=DEFAULT_VENUE_NAME).exists())
+        self.assertEqual(
+            Event.objects.filter(description__startswith=AUTO_PROVISION_DESCRIPTION_PREFIX).count(),
+            0,
+        )
+
+
+class EventSchedulingRecommendationTestCase(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+
+        self.admin = User.objects.create_user(
+            username="schedule_admin",
+            email="schedule_admin@test.com",
+            password="testpass123",
+            role="admin",
+        )
+        self.student = User.objects.create_user(
+            username="schedule_student",
+            email="schedule_student@test.com",
+            password="testpass123",
+            role="student",
+        )
+        self.judge = User.objects.create_user(
+            username="schedule_judge",
+            email="schedule_judge@test.com",
+            password="testpass123",
+            role="judge",
+        )
+        self.volunteer = User.objects.create_user(
+            username="schedule_volunteer",
+            email="schedule_volunteer@test.com",
+            password="testpass123",
+            role="volunteer",
+        )
+
+        self.venue = Venue.objects.create(
+            name="Schedule Venue",
+            location="Schedule Location",
+            capacity=300,
+            event_limit=20,
+        )
+
+        self.target_event = Event.objects.create(
+            name="Scheduling Target Event",
+            description="Target event for recommendation tests",
+            category="dance",
+            date=date.today(),
+            start_time=time(10, 0),
+            end_time=time(12, 0),
+            venue=self.venue,
+            max_participants=50,
+            created_by=self.admin,
+            status="draft",
+        )
+        self.target_event.judges.add(self.judge)
+        self.target_event.volunteers.add(self.volunteer)
+
+        # Existing overlapping event at the same venue and with same judge/volunteer.
+        self.conflicting_event = Event.objects.create(
+            name="Scheduling Conflicting Event",
+            description="Creates overlap penalty for early slot",
+            category="music",
+            date=date.today(),
+            start_time=time(9, 0),
+            end_time=time(11, 0),
+            venue=self.venue,
+            max_participants=40,
+            created_by=self.admin,
+            status="published",
+        )
+        self.conflicting_event.judges.add(self.judge)
+        self.conflicting_event.volunteers.add(self.volunteer)
+
+    def test_recommend_timeslots_requires_admin(self):
+        self.client.force_authenticate(user=self.student)
+        response = self.client.post(
+            reverse("recommend-event-timeslots", args=[self.target_event.id]),
+            {
+                "from_date": str(date.today()),
+                "to_date": str(date.today()),
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_recommend_timeslots_returns_ranked_candidates(self):
+        self.client.force_authenticate(user=self.admin)
+        response = self.client.post(
+            reverse("recommend-event-timeslots", args=[self.target_event.id]),
+            {
+                "from_date": str(date.today()),
+                "to_date": str(date.today()),
+                "venue_id": self.venue.id,
+                "top_k": 3,
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        self.assertEqual(response.data["recommendation_goal"], "conflict_avoidance")
+        self.assertEqual(response.data["count"], 3)
+        self.assertEqual(len(response.data["recommendations"]), 3)
+
+        first = response.data["recommendations"][0]
+        self.assertEqual(first["venue_id"], self.venue.id)
+        self.assertEqual(first["conflict_breakdown"]["total_overlap"], 0)
+        self.assertIn(first["method"], {"rule_based", "ml", "rule_based_fallback"})
+
+        # The fully overlapping early slot should have a higher penalty than the best recommendation.
+        penalties = [item["predicted_conflict_penalty"] for item in response.data["recommendations"]]
+        self.assertEqual(penalties, sorted(penalties))
+
+    def test_recommend_timeslots_rejects_invalid_date_format(self):
+        self.client.force_authenticate(user=self.admin)
+        response = self.client.post(
+            reverse("recommend-event-timeslots", args=[self.target_event.id]),
+            {
+                "from_date": "2026/01/01",
+                "to_date": str(date.today()),
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("Invalid date format", str(response.data))
+
+    def test_train_schedule_model_summary_only_command_runs(self):
+        output = StringIO()
+        call_command(
+            "train_schedule_model",
+            "--summary-only",
+            "--lookback-days",
+            "30",
+            stdout=output,
+            verbosity=0,
+        )
+        command_output = output.getvalue()
+        self.assertIn("Scheduling Dataset Summary", command_output)

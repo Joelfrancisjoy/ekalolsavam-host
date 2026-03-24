@@ -62,6 +62,51 @@ const mockEventService = {
     throw new Error('Event not found');
   },
 
+  recommendTimeslots: async (id, payload = {}) => {
+    await delay();
+    const event = mockEvents.find(e => e.id === parseInt(id));
+    if (!event) {
+      throw new Error('Event not found');
+    }
+
+    const fromDate = payload.from_date || event.date;
+    const toDate = payload.to_date || event.date;
+    const topK = Number(payload.top_k || 5);
+    const venueId = payload.venue_id || event.venue || mockVenues[0]?.id;
+    const venue = mockVenues.find((v) => v.id === Number(venueId)) || mockVenues[0];
+
+    const recommendations = Array.from({ length: Math.max(1, topK) }).map((_, idx) => ({
+      date: fromDate,
+      start_time: `0${9 + idx}:00:00`.slice(-8),
+      end_time: `0${10 + idx}:00:00`.slice(-8),
+      venue_id: venue?.id || null,
+      venue_name: venue?.name || 'Venue',
+      predicted_conflict_penalty: Number((idx * 0.2).toFixed(2)),
+      conflict_breakdown: {
+        venue_overlap: idx === 0 ? 0 : 1,
+        judge_overlap: 0,
+        volunteer_overlap: 0,
+        total_overlap: idx === 0 ? 0 : 1,
+      },
+      method: 'rule_based_fallback',
+    }));
+
+    return {
+      event: {
+        id: event.id,
+        name: event.name,
+        category: event.category,
+      },
+      recommendation_goal: 'conflict_avoidance',
+      window: {
+        from_date: fromDate,
+        to_date: toDate,
+      },
+      count: recommendations.length,
+      recommendations,
+    };
+  },
+
   publishEvent: async (id, isPublished) => {
     await delay();
     const event = mockEvents.find(e => e.id === parseInt(id));

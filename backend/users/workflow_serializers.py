@@ -158,16 +158,109 @@ class SchoolGroupMemberSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = SchoolGroupMember
-        fields = ['id', 'member_order', 'first_name', 'last_name', 'full_name', 'is_leader']
+        fields = ['id', 'member_order', 'first_name', 'last_name', 'full_name', 'gender', 'student_class', 'phone', 'is_leader']
 
     def get_full_name(self, obj):
         return f"{obj.first_name} {obj.last_name}".strip()
+
+
+class StudentGroupMemberUpdateSerializer(serializers.Serializer):
+    id = serializers.IntegerField(required=False)
+    member_order = serializers.IntegerField(required=False, min_value=1)
+    first_name = serializers.CharField(max_length=100)
+    last_name = serializers.CharField(max_length=100)
+    gender = serializers.ChoiceField(choices=['BOYS', 'GIRLS'], required=False, allow_null=True)
+    student_class = serializers.IntegerField(required=False, min_value=1, max_value=12, allow_null=True)
+    phone = serializers.CharField(max_length=15, required=False, allow_blank=True)
+
+    def validate_first_name(self, value: str) -> str:
+        name = str(value or '').strip()
+        if not name:
+            raise serializers.ValidationError('First name is required.')
+        if not all(ch.isalpha() or ch in " -'" for ch in name):
+            raise serializers.ValidationError('First name can only contain letters, spaces, hyphens, and apostrophes.')
+        return name
+
+    def validate_last_name(self, value: str) -> str:
+        name = str(value or '').strip()
+        if not name:
+            raise serializers.ValidationError('Last name is required.')
+        if not all(ch.isalpha() or ch in " -'" for ch in name):
+            raise serializers.ValidationError('Last name can only contain letters, spaces, hyphens, and apostrophes.')
+        return name
+
+    def validate(self, attrs):
+        if attrs.get('id') in [None, ''] and attrs.get('member_order') in [None, '']:
+            raise serializers.ValidationError('Each participant must include either id or member_order.')
+        return attrs
+
+    def validate_phone(self, value: str) -> str:
+        if value in [None, '']:
+            return ''
+        digits = ''.join(ch for ch in str(value) if ch.isdigit())
+        if len(digits) != 10:
+            raise serializers.ValidationError('Phone number must be exactly 10 digits')
+        if digits[0] not in {'7', '8', '9'}:
+            raise serializers.ValidationError('Phone number must start with 7, 8, or 9')
+        if digits == '0000000000':
+            raise serializers.ValidationError('Phone number cannot be all zeros')
+        return digits
+
+
+class StudentGroupProfileUpdateSerializer(serializers.Serializer):
+    gender_category = serializers.ChoiceField(
+        choices=['BOYS', 'GIRLS', 'MIXED'],
+        required=False,
+    )
+    notes = serializers.CharField(required=False, allow_blank=True)
+    participants = StudentGroupMemberUpdateSerializer(many=True, required=False)
+
+    def validate(self, attrs):
+        if 'gender_category' not in attrs and 'participants' not in attrs:
+            raise serializers.ValidationError(
+                'Provide at least one field to update: gender_category or participants.'
+            )
+        return attrs
+
+
+class StudentAllowedGroupEntrySerializer(serializers.Serializer):
+    group_entry_id = serializers.IntegerField()
+    group_id = serializers.CharField()
+    leader_full_name = serializers.CharField()
+    leader_user_id = serializers.IntegerField(allow_null=True)
+    event_ids = serializers.ListField(child=serializers.IntegerField())
+    status = serializers.CharField()
+
+
+class StudentAllowedEventsResponseSerializer(serializers.Serializer):
+    event_ids = serializers.ListField(child=serializers.IntegerField())
+    participant_id = serializers.IntegerField(allow_null=True)
+    school_id = serializers.IntegerField(allow_null=True)
+    group_event_ids = serializers.ListField(child=serializers.IntegerField())
+    group_entries = StudentAllowedGroupEntrySerializer(many=True)
+
+
+class SchoolIndividualEventsQuerySerializer(serializers.Serializer):
+    student_class = serializers.IntegerField(required=False, min_value=1, max_value=12)
+    studentClass = serializers.IntegerField(required=False, min_value=1, max_value=12)
+    level_code = serializers.ChoiceField(choices=['LP', 'UP', 'HS', 'HSS'], required=False)
+    levelCode = serializers.ChoiceField(choices=['LP', 'UP', 'HS', 'HSS'], required=False)
+    gender_category = serializers.ChoiceField(choices=['BOYS', 'GIRLS', 'MIXED'], required=False)
+    genderCategory = serializers.ChoiceField(choices=['BOYS', 'GIRLS', 'MIXED'], required=False)
+
+
+class SchoolGroupEventsQuerySerializer(serializers.Serializer):
+    group_class = serializers.ChoiceField(choices=['LP', 'UP', 'HS', 'HSS'], required=False)
+    groupClass = serializers.ChoiceField(choices=['LP', 'UP', 'HS', 'HSS'], required=False)
+    gender_category = serializers.ChoiceField(choices=['BOYS', 'GIRLS', 'MIXED'], required=False)
+    genderCategory = serializers.ChoiceField(choices=['BOYS', 'GIRLS', 'MIXED'], required=False)
 
 
 class SchoolGroupEntrySerializer(serializers.ModelSerializer):
     school_name = serializers.CharField(source='school.username', read_only=True)
     events_display = serializers.SerializerMethodField()
     members = SchoolGroupMemberSerializer(many=True, read_only=True)
+    participants = SchoolGroupMemberSerializer(source='members', many=True, read_only=True)
     leader_user_details = serializers.SerializerMethodField()
     reviewed_by_username = serializers.CharField(source='reviewed_by.username', read_only=True, allow_null=True)
 
@@ -176,7 +269,7 @@ class SchoolGroupEntrySerializer(serializers.ModelSerializer):
         fields = [
             'id', 'school', 'school_name', 'group_id', 'group_class', 'gender_category',
             'participant_count', 'leader_full_name', 'leader_user', 'leader_user_details',
-            'events', 'events_display', 'members', 'status', 'review_notes',
+            'events', 'events_display', 'members', 'participants', 'status', 'review_notes',
             'reviewed_at', 'reviewed_by', 'reviewed_by_username',
             'source', 'submitted_at', 'updated_at',
         ]
@@ -189,6 +282,22 @@ class SchoolGroupEntrySerializer(serializers.ModelSerializer):
         leader = getattr(obj, 'leader_user', None)
         if leader is None:
             return None
+        temporary_password = None
+        try:
+            request = self.context.get('request')
+            requester = getattr(request, 'user', None) if request is not None else None
+            if (
+                requester is not None
+                and getattr(requester, 'is_authenticated', False)
+                and getattr(requester, 'role', None) == 'school'
+                and requester.id == obj.school_id
+                and leader.must_reset_password
+                and leader.temporary_password_encrypted
+            ):
+                payload = signing.loads(leader.temporary_password_encrypted)
+                temporary_password = payload.get('p')
+        except Exception:
+            temporary_password = None
         return {
             'id': leader.id,
             'username': leader.username,
@@ -196,7 +305,35 @@ class SchoolGroupEntrySerializer(serializers.ModelSerializer):
             'last_name': leader.last_name,
             'registration_id': leader.registration_id,
             'approval_status': leader.approval_status,
+            'temporary_password': temporary_password,
         }
+
+
+class AdminSchoolGroupApproveRequestSerializer(serializers.Serializer):
+    notes = serializers.CharField(required=False, allow_blank=True)
+
+
+class AdminSchoolGroupRejectRequestSerializer(serializers.Serializer):
+    notes = serializers.CharField(required=False, allow_blank=True)
+    reason = serializers.CharField(required=False, allow_blank=True)
+
+
+class SchoolGroupLeaderCredentialsSerializer(serializers.Serializer):
+    username = serializers.CharField()
+    password = serializers.CharField()
+    section = serializers.CharField(allow_blank=True, allow_null=True)
+    user_id = serializers.IntegerField()
+
+
+class AdminSchoolGroupApproveResponseSerializer(serializers.Serializer):
+    message = serializers.CharField()
+    group = SchoolGroupEntrySerializer()
+    user_credentials = SchoolGroupLeaderCredentialsSerializer()
+
+
+class AdminSchoolGroupRejectResponseSerializer(serializers.Serializer):
+    message = serializers.CharField()
+    group = SchoolGroupEntrySerializer()
 
 
 class SchoolVolunteerAssignmentSerializer(serializers.ModelSerializer):

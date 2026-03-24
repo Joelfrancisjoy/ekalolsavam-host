@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { userServiceAdapter as userService, eventServiceAdapter as eventService } from '../services/serviceAdapter';
 import volunteerService from '../services/volunteerService';
 import http from '../services/http-common';
+import { API_ROUTES } from '../services/apiRoutes';
 
 const VolunteerDashboard = () => {
   const [showPasswordChoice, setShowPasswordChoice] = useState(false);
@@ -135,7 +136,7 @@ const VolunteerDashboard = () => {
         severity: triageForm.severity,
         status: 'resolved',
       };
-      const res = await http.patch(`/api/emergencies/${selectedEmergencyId}/volunteer-complete/`, payload);
+      const res = await http.patch(API_ROUTES.emergencies.volunteerComplete(selectedEmergencyId), payload);
 
       setEmergencies((prev) => {
         const next = (prev || []).map((em) => (em.id === res.data.id ? { ...em, ...res.data } : em));

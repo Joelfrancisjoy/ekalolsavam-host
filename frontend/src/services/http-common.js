@@ -1,5 +1,6 @@
 import axios from 'axios';
 import authManager from '../utils/authManager';
+import { API_ROUTES } from './apiRoutes';
 
 const rawApiUrl = process.env.REACT_APP_API_URL;
 const normalizeApiUrl = (value) => {
@@ -140,7 +141,7 @@ http.interceptors.response.use(
                 try {
                     console.log('Attempting token refresh for URL:', url);
                     safeLogTokenRefresh(false, 'attempting');
-                    const res = await axios.post(`${API_URL}/api/token/refresh/`, { refresh: tokens.refresh });
+                    const res = await axios.post(`${API_URL}${API_ROUTES.auth.tokenRefresh}`, { refresh: tokens.refresh });
                     const newAccess = res.data?.access;
 
                     if (newAccess) {

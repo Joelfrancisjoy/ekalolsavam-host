@@ -13,13 +13,18 @@ from events.services.catalog_sync import (
 )
 from users.models import User
 
+TARGET_SET_GROUP = "group"
+TARGET_SET_MATRIX = "matrix"
+DEFAULT_TARGET_SET = TARGET_SET_GROUP
+
 TARGET_GROUP_EVENT_NAMES = [
     "Group Song",
     "Vanchippattu",
     "Panchavadyam",
     "Band",
-    "Western Band / Jazz / Triple",
+    "Western Music Group / Jazz / Triple",
     "Group Dance",
+    "Western Dance",
     "Folk Dance",
     "Oppana",
     "Kolkali",
@@ -34,22 +39,59 @@ TARGET_GROUP_EVENT_NAMES = [
     "Yakshagana",
 ]
 
+TARGET_INDIVIDUAL_EVENT_NAMES = [
+    "Speech",
+    "Poetry Recitation",
+    "Essay Writing",
+    "Classical Music",
+    "Light Music",
+    "Bharatanatyam",
+    "Mohiniyattam",
+    "Kuchipudi",
+    "Mono Act",
+    "Mime",
+    "Oil Painting",
+    "Painting - Water Colour",
+    "Story Writing",
+    "Poetry Writing",
+    "Mappila Song",
+    "Ghazal",
+    "Pencil Drawing",
+    "Cartoon",
+    "Collage",
+    "Colouring",
+    "Mimicry",
+    "Violin (Eastern)",
+    "Instrumental Music",
+]
+
+TARGET_MATRIX_EVENT_NAMES = TARGET_GROUP_EVENT_NAMES + TARGET_INDIVIDUAL_EVENT_NAMES
+TARGET_EVENT_NAME_ALIASES = {
+    "Western Music Group / Jazz / Triple": ["Western Band / Jazz / Triple"],
+}
+
 AUTO_PROVISION_DESCRIPTION_PREFIX = "[AUTO-PROVISIONED GROUP EVENT]"
 DEFAULT_VENUE_NAME = "Group Events Main Venue"
 DEFAULT_VENUE_LOCATION = "Main Kalolsavam Venue"
 DEFAULT_SLOT_MINUTES = 120
 DEFAULT_FALLBACK_MAX_PARTICIPANTS = 30
 DAY_END_TIME = time(20, 0)
-REQUIRED_EVENT_COUNT = len(TARGET_GROUP_EVENT_NAMES)
 
 
 class Command(BaseCommand):
     help = (
-        "Create/publish scheduled group events for the configured group definitions "
-        "with deterministic auto-slot scheduling."
+        "Create/publish scheduled events for the configured matrix targets with "
+        "deterministic auto-slot scheduling. Defaults to GROUP targets for backward "
+        "compatibility; use --target-set matrix for GROUP+INDIVIDUAL provisioning."
     )
 
     def add_arguments(self, parser):
+        parser.add_argument(
+            "--target-set",
+            choices=[TARGET_SET_GROUP, TARGET_SET_MATRIX],
+            default=DEFAULT_TARGET_SET,
+            help="Target set to provision: group (default) or matrix (group + individual).",
+        )
         parser.add_argument(
             "--admin-username",
             help="Preferred active admin username to use as created_by.",
@@ -87,6 +129,12 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
+        target_set = options["target_set"]
+        target_event_names, required_participation_types, target_label = self._resolve_target_set(
+            target_set
+        )
+        required_event_count = len(target_event_names)
+
         dry_run = options["dry_run"]
         start_date = self._parse_start_date(options.get("start_date"))
         start_time = self._parse_time_value(options.get("start_time"), label="start-time")
@@ -109,24 +157,32 @@ class Command(BaseCommand):
             dry_run=dry_run,
         )
         creator, used_fallback_admin = self._resolve_creator_admin(options.get("admin_username"))
-        venue, venue_action = self._ensure_default_venue(dry_run=dry_run)
+        venue, venue_action = self._ensure_default_venue(
+            dry_run=dry_run,
+            required_event_count=required_event_count,
+        )
 
-        definitions_by_name = self._load_group_event_definitions()
+        target_definitions, alias_resolutions = self._load_target_event_definitions(
+            target_names=target_event_names,
+            required_participation_types=required_participation_types,
+        )
         schedule = self._build_schedule(
             start_date=start_date,
             start_time=start_time,
             slot_minutes=slot_minutes,
-            count=REQUIRED_EVENT_COUNT,
+            count=required_event_count,
         )
-        auto_events_by_definition, duplicate_auto_events = self._load_existing_auto_events()
+        target_definition_ids = [definition.id for _, definition in target_definitions]
+        auto_events_by_definition, duplicate_auto_events = self._load_existing_auto_events(
+            target_definition_ids=target_definition_ids
+        )
 
         created_count = 0
         updated_count = 0
         unchanged_count = 0
         schedule_actions = []
 
-        for index, definition_name in enumerate(TARGET_GROUP_EVENT_NAMES):
-            definition = definitions_by_name[definition_name]
+        for index, (target_name, definition) in enumerate(target_definitions):
             slot_date, slot_start, slot_end = schedule[index]
             target_fields = self._build_target_fields(
                 event_definition=definition,
@@ -157,7 +213,7 @@ class Command(BaseCommand):
 
             schedule_actions.append(
                 (
-                    definition_name,
+                    target_name,
                     action,
                     slot_date.isoformat(),
                     slot_start.strftime("%H:%M"),
@@ -166,8 +222,12 @@ class Command(BaseCommand):
             )
 
         mode = "DRY RUN" if dry_run else "APPLY"
-        self.stdout.write(self.style.SUCCESS(f"Group event provisioning complete ({mode})."))
+        self.stdout.write(self.style.SUCCESS(f"{target_label} event provisioning complete ({mode})."))
         self.stdout.write(f"Catalog seed: {catalog_status}")
+        self.stdout.write(
+            f"Target set: {target_set} "
+            f"(participation types: {', '.join(sorted(required_participation_types))})"
+        )
         self.stdout.write(
             f"Admin user: {creator.username}"
             + (" (fallback)" if used_fallback_admin else "")
@@ -176,13 +236,20 @@ class Command(BaseCommand):
             f"Default venue: {DEFAULT_VENUE_NAME} "
             f"(action: {venue_action}, capacity={venue.capacity}, event_limit={venue.event_limit})"
         )
+        if alias_resolutions:
+            for canonical_name, resolved_name in alias_resolutions:
+                self.stdout.write(
+                    self.style.WARNING(
+                        f"Using alias definition '{resolved_name}' for target '{canonical_name}'."
+                    )
+                )
         if duplicate_auto_events:
             self.stdout.write(
                 self.style.WARNING(
                     f"Found {duplicate_auto_events} extra auto-provisioned duplicate event rows."
                 )
             )
-        self.stdout.write(f"Events targeted: {REQUIRED_EVENT_COUNT}")
+        self.stdout.write(f"Events targeted: {required_event_count}")
         self.stdout.write(f" - create: {created_count}")
         self.stdout.write(f" - update: {updated_count}")
         self.stdout.write(f" - unchanged: {unchanged_count}")
@@ -191,6 +258,17 @@ class Command(BaseCommand):
             self.stdout.write(
                 f"[{action}] {definition_name}: {date_value} {start_value}-{end_value}"
             )
+
+    def _resolve_target_set(self, target_set):
+        normalized_target_set = (target_set or DEFAULT_TARGET_SET).lower()
+        if normalized_target_set == TARGET_SET_GROUP:
+            return TARGET_GROUP_EVENT_NAMES, {"GROUP"}, "Group"
+        if normalized_target_set == TARGET_SET_MATRIX:
+            return TARGET_MATRIX_EVENT_NAMES, {"GROUP", "INDIVIDUAL"}, "Matrix"
+        raise CommandError(
+            f"Unsupported --target-set '{target_set}'. Expected one of: "
+            f"{TARGET_SET_GROUP}, {TARGET_SET_MATRIX}."
+        )
 
     def _ensure_catalog_seed(self, skip_seed, dry_run):
         if skip_seed:
@@ -221,9 +299,9 @@ class Command(BaseCommand):
         used_fallback_admin = bool(preferred_username)
         return fallback_admin, used_fallback_admin
 
-    def _ensure_default_venue(self, dry_run):
-        required_capacity = max(1000, REQUIRED_EVENT_COUNT)
-        required_event_limit = REQUIRED_EVENT_COUNT
+    def _ensure_default_venue(self, dry_run, required_event_count):
+        required_capacity = max(1000, required_event_count)
+        required_event_limit = required_event_count
 
         venue = Venue.objects.filter(name=DEFAULT_VENUE_NAME).first()
         if venue is None:
@@ -265,26 +343,55 @@ class Command(BaseCommand):
         venue.save(update_fields=update_fields)
         return venue, "updated"
 
-    def _load_group_event_definitions(self):
+    def _load_target_event_definitions(self, target_names, required_participation_types):
+        candidate_names = set(target_names)
+        for aliases in TARGET_EVENT_NAME_ALIASES.values():
+            candidate_names.update(aliases)
+
         definitions_qs = (
             EventDefinition.objects.select_related("category", "participation_type")
             .prefetch_related("rules")
             .filter(
-                event_name__in=TARGET_GROUP_EVENT_NAMES,
-                participation_type__type_name="GROUP",
+                event_name__in=candidate_names,
+                participation_type__type_name__in=required_participation_types,
             )
         )
         definitions_by_name = {definition.event_name: definition for definition in definitions_qs}
-        missing_names = [
-            event_name
-            for event_name in TARGET_GROUP_EVENT_NAMES
-            if event_name not in definitions_by_name
-        ]
+
+        target_definitions = []
+        missing_names = []
+        alias_resolutions = []
+        resolved_definition_ids = set()
+
+        for target_name in target_names:
+            definition = definitions_by_name.get(target_name)
+            if definition is None:
+                for alias_name in TARGET_EVENT_NAME_ALIASES.get(target_name, []):
+                    definition = definitions_by_name.get(alias_name)
+                    if definition is not None:
+                        alias_resolutions.append((target_name, alias_name))
+                        break
+
+            if definition is None:
+                missing_names.append(target_name)
+                continue
+
+            if definition.id in resolved_definition_ids:
+                raise CommandError(
+                    f"Multiple target names resolved to the same catalog definition: "
+                    f"'{target_name}' ({definition.event_name})."
+                )
+
+            resolved_definition_ids.add(definition.id)
+            target_definitions.append((target_name, definition))
+
         if missing_names:
+            types_label = ", ".join(sorted(required_participation_types))
             raise CommandError(
-                "Missing GROUP event definitions for: " + ", ".join(sorted(missing_names))
+                f"Missing {types_label} event definitions for: " + ", ".join(sorted(missing_names))
             )
-        return definitions_by_name
+
+        return target_definitions, alias_resolutions
 
     def _build_schedule(self, start_date, start_time, slot_minutes, count):
         slot_delta = timedelta(minutes=slot_minutes)
@@ -307,10 +414,10 @@ class Command(BaseCommand):
 
         return schedule
 
-    def _load_existing_auto_events(self):
+    def _load_existing_auto_events(self, target_definition_ids):
         existing_auto_events = (
             Event.objects.filter(
-                event_definition__event_name__in=TARGET_GROUP_EVENT_NAMES,
+                event_definition_id__in=target_definition_ids,
                 event_variant__isnull=True,
                 description__startswith=AUTO_PROVISION_DESCRIPTION_PREFIX,
             )
@@ -400,7 +507,6 @@ class Command(BaseCommand):
                 current_value = getattr(event, f"{field_name}_id", None)
                 target_id = getattr(target_value, "id", None)
                 if target_id is None:
-                    # dry-run path when target venue is unsaved
                     if field_name == "venue":
                         current_name = getattr(getattr(event, "venue", None), "name", None)
                         target_name = getattr(target_value, "name", None)

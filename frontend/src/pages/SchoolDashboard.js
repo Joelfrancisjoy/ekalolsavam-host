@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import http from '../services/http-common';
 import UserInfoHeader from '../components/UserInfoHeader';
@@ -15,6 +15,19 @@ const EMPTY_PARTICIPANT_FORM = {
   event_ids: []
 };
 
+const isValidStudentClass = (value) => Number.isInteger(value) && value >= 1 && value <= 12;
+
+const buildEligibilityKey = (studentClass, gender) => `${studentClass}|${gender}`;
+
+const toEligibleEventIdSet = (payload) => {
+  const events = Array.isArray(payload) ? payload : [];
+  return new Set(
+    events
+      .map((event) => Number(event?.id))
+      .filter((id) => Number.isInteger(id) && id > 0)
+  );
+};
+
 const SchoolDashboard = () => {
   const navigate = useNavigate();
   const [activeSection, setActiveSection] = useState('participants');
@@ -29,9 +42,14 @@ const SchoolDashboard = () => {
   const [bulkRows, setBulkRows] = useState([]);
   const [bulkErrors, setBulkErrors] = useState([]);
   const [bulkSubmitting, setBulkSubmitting] = useState(false);
+  const [bulkPreviewLoading, setBulkPreviewLoading] = useState(false);
+  const latestEventsRequestRef = useRef(0);
 
   // Form state for participant entry
   const [formData, setFormData] = useState({ ...EMPTY_PARTICIPANT_FORM });
+  const studentClassInt = parseInt(formData.student_class, 10);
+  const normalizedFormGender = normalizeGenderValue(formData.gender);
+  const hasCompleteParticipantEligibilityInputs = isValidStudentClass(studentClassInt) && Boolean(normalizedFormGender);
 
   // Fetch participants for the current school user
   const fetchParticipants = async () => {
@@ -59,17 +77,55 @@ const SchoolDashboard = () => {
       }
     };
     fetchUser();
-    loadEvents();
   }, []);
 
-  const loadEvents = async () => {
+  const fetchEligibleIndividualEvents = async (studentClass, genderCategory) => {
+    const params = {};
+    if (studentClass) params.student_class = studentClass;
+    if (genderCategory) params.gender_category = genderCategory;
+    const response = await http.get('/api/auth/schools/individual-events/', { params });
+    return Array.isArray(response.data) ? response.data : [];
+  };
+
+  const loadEvents = async (options = {}) => {
+    const requestId = latestEventsRequestRef.current + 1;
+    latestEventsRequestRef.current = requestId;
+
     try {
-      const response = await http.get('/api/events/');
-      setEvents(response.data);
+      const eventList = await fetchEligibleIndividualEvents(options?.student_class, options?.gender_category);
+      if (latestEventsRequestRef.current !== requestId) return [];
+      setEvents(eventList);
+      return eventList;
     } catch (err) {
+      if (latestEventsRequestRef.current !== requestId) return [];
       console.error('Failed to load events:', err);
+      setEvents([]);
+      return [];
     }
   };
+
+  useEffect(() => {
+    const eligibleIds = new Set((events || []).map((event) => event?.id).filter((id) => id !== null && id !== undefined));
+    setFormData((prev) => {
+      if (!Array.isArray(prev.event_ids) || prev.event_ids.length === 0) return prev;
+      const filtered = prev.event_ids.filter((id) => eligibleIds.has(id));
+      if (filtered.length === prev.event_ids.length) return prev;
+      return {
+        ...prev,
+        event_ids: filtered,
+      };
+    });
+  }, [events]);
+
+  useEffect(() => {
+    if (!hasCompleteParticipantEligibilityInputs) {
+      latestEventsRequestRef.current += 1;
+      setEvents([]);
+      return;
+    }
+
+    loadEvents({ student_class: studentClassInt, gender_category: normalizedFormGender });
+  }, [hasCompleteParticipantEligibilityInputs, studentClassInt, normalizedFormGender]);
 
   const showToast = (message, type = 'success') => {
     setToast({ message, type });
@@ -135,10 +191,23 @@ const SchoolDashboard = () => {
         return;
       }
 
-      const studentClassInt = parseInt(formData.student_class);
-      if (isNaN(studentClassInt) || studentClassInt < 1 || studentClassInt > 12) {
+      const submitStudentClassInt = parseInt(formData.student_class, 10);
+      if (!isValidStudentClass(submitStudentClassInt)) {
         setError('Student class must be between 1 and 12');
         showToast('Student class must be between 1 and 12', 'error');
+        setLoading(false);
+        return;
+      }
+
+      const eligibleEventIds = new Set((events || []).map((event) => event?.id).filter((id) => id !== null && id !== undefined));
+      const ineligibleSelected = (formData.event_ids || []).filter((id) => !eligibleEventIds.has(id));
+      if (ineligibleSelected.length > 0) {
+        setError('Selected events are not eligible for the chosen class/gender. Please reselect events.');
+        showToast('Selected events are not eligible for the chosen class/gender. Please reselect events.', 'error');
+        setFormData((prev) => ({
+          ...prev,
+          event_ids: (prev.event_ids || []).filter((id) => eligibleEventIds.has(id)),
+        }));
         setLoading(false);
         return;
       }
@@ -148,7 +217,7 @@ const SchoolDashboard = () => {
           participant_id: formData.participant_id,
           first_name: formData.first_name,
           last_name: formData.last_name,
-          student_class: studentClassInt,
+          student_class: submitStudentClassInt,
           gender: normalizedGender,
           event_ids: formData.event_ids
         }]
@@ -159,7 +228,9 @@ const SchoolDashboard = () => {
       resetParticipantForm();
       showToast(editingParticipantId ? 'Participant updated successfully! ✅' : 'Participant submitted successfully! 🎉', 'success');
     } catch (err) {
-      setError(err.response?.data?.error || 'Failed to submit participant data');
+      const errorPayload = err.response?.data;
+      const errorMessage = errorPayload?.error || errorPayload?.detail || (errorPayload ? JSON.stringify(errorPayload) : null);
+      setError(errorMessage || 'Failed to submit participant data');
       showToast('Failed to submit participant data', 'error');
     } finally {
       setLoading(false);
@@ -273,15 +344,59 @@ const SchoolDashboard = () => {
     return { rows, errors };
   };
 
-  const handleParseBulk = () => {
-    const { rows, errors } = parseBulkCsv(bulkCsvText);
-    setBulkRows(rows);
-    setBulkErrors(errors);
-    if (errors.length > 0) {
-      showToast('Bulk import has validation errors', 'error');
-      return;
+  const validateBulkRowsEventEligibility = async (rows) => {
+    const eligibilityCache = new Map();
+    const errors = [];
+
+    for (let rowIndex = 0; rowIndex < rows.length; rowIndex += 1) {
+      const row = rows[rowIndex];
+      const eventIds = Array.isArray(row?.event_ids) ? row.event_ids : [];
+      if (eventIds.length === 0) continue;
+
+      const studentClass = Number(row?.student_class);
+      const gender = normalizeGenderValue(row?.gender);
+      if (!isValidStudentClass(studentClass) || !gender) continue;
+
+      const cacheKey = buildEligibilityKey(studentClass, gender);
+      let eligibleEventIds = eligibilityCache.get(cacheKey);
+
+      if (!eligibleEventIds) {
+        try {
+          const eligibleEvents = await fetchEligibleIndividualEvents(studentClass, gender);
+          eligibleEventIds = toEligibleEventIdSet(eligibleEvents);
+          eligibilityCache.set(cacheKey, eligibleEventIds);
+        } catch (err) {
+          console.error('Failed to validate bulk eligibility row', err);
+          errors.push(`Row ${rowIndex + 2}: failed to verify event eligibility for class/gender.`);
+          continue;
+        }
+      }
+
+      const ineligibleEventIds = eventIds.filter((id) => !eligibleEventIds.has(Number(id)));
+      if (ineligibleEventIds.length > 0) {
+        errors.push(`Row ${rowIndex + 2}: event_ids contain ineligible event(s) for selected class/gender (${ineligibleEventIds.join(', ')}).`);
+      }
     }
-    showToast(`Ready to import ${rows.length} participant(s)`, 'success');
+
+    return errors;
+  };
+
+  const handleParseBulk = async () => {
+    setBulkPreviewLoading(true);
+    try {
+      const { rows, errors: csvErrors } = parseBulkCsv(bulkCsvText);
+      const compatibilityErrors = await validateBulkRowsEventEligibility(rows);
+      const errors = [...csvErrors, ...compatibilityErrors];
+      setBulkRows(rows);
+      setBulkErrors(errors);
+      if (errors.length > 0) {
+        showToast('Bulk import has validation errors', 'error');
+        return;
+      }
+      showToast(`Ready to import ${rows.length} participant(s)`, 'success');
+    } finally {
+      setBulkPreviewLoading(false);
+    }
   };
 
   const handleBulkFileUpload = (e) => {
@@ -445,7 +560,7 @@ const SchoolDashboard = () => {
                         type="text"
                         required
                         value={formData.participant_id}
-                        onChange={(e) => setFormData({ ...formData, participant_id: e.target.value })}
+                        onChange={(e) => setFormData((prev) => ({ ...prev, participant_id: e.target.value }))}
                         className="w-full px-5 py-4 text-lg border-2 border-gray-300 rounded-xl focus:ring-4 focus:ring-indigo-300 focus:border-indigo-500 transition-all duration-200 bg-gray-50 hover:bg-white"
                         placeholder="Enter Participant ID (e.g., P001)"
                       />
@@ -463,7 +578,7 @@ const SchoolDashboard = () => {
                         min="1"
                         max="12"
                         value={formData.student_class}
-                        onChange={(e) => setFormData({ ...formData, student_class: e.target.value })}
+                        onChange={(e) => setFormData((prev) => ({ ...prev, student_class: e.target.value }))}
                         className="w-full px-5 py-4 text-lg border-2 border-gray-300 rounded-xl focus:ring-4 focus:ring-indigo-300 focus:border-indigo-500 transition-all duration-200 bg-gray-50 hover:bg-white"
                         placeholder="Enter Class"
                       />
@@ -477,7 +592,7 @@ const SchoolDashboard = () => {
                       <select
                         required
                         value={formData.gender}
-                        onChange={(e) => setFormData({ ...formData, gender: e.target.value })}
+                        onChange={(e) => setFormData((prev) => ({ ...prev, gender: e.target.value }))}
                         className="w-full px-5 py-4 text-lg border-2 border-gray-300 rounded-xl focus:ring-4 focus:ring-indigo-300 focus:border-indigo-500 transition-all duration-200 bg-gray-50 hover:bg-white"
                       >
                         <option value="">Select Gender</option>
@@ -498,7 +613,7 @@ const SchoolDashboard = () => {
                         type="text"
                         required
                         value={formData.first_name}
-                        onChange={(e) => setFormData({ ...formData, first_name: e.target.value })}
+                        onChange={(e) => setFormData((prev) => ({ ...prev, first_name: e.target.value }))}
                         className="w-full px-5 py-4 text-lg border-2 border-gray-300 rounded-xl focus:ring-4 focus:ring-indigo-300 focus:border-indigo-500 transition-all duration-200 bg-gray-50 hover:bg-white"
                         placeholder="Enter First Name"
                       />
@@ -513,7 +628,7 @@ const SchoolDashboard = () => {
                         type="text"
                         required
                         value={formData.last_name}
-                        onChange={(e) => setFormData({ ...formData, last_name: e.target.value })}
+                        onChange={(e) => setFormData((prev) => ({ ...prev, last_name: e.target.value }))}
                         className="w-full px-5 py-4 text-lg border-2 border-gray-300 rounded-xl focus:ring-4 focus:ring-indigo-300 focus:border-indigo-500 transition-all duration-200 bg-gray-50 hover:bg-white"
                         placeholder="Enter Last Name"
                       />
@@ -533,6 +648,7 @@ const SchoolDashboard = () => {
                             <input
                               type="checkbox"
                               checked={formData.event_ids.includes(event.id)}
+                              disabled={!hasCompleteParticipantEligibilityInputs}
                               onChange={() => handleEventChange(event.id)}
                               className="w-5 h-5 rounded border-2 border-gray-300 text-indigo-600 focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 cursor-pointer"
                             />
@@ -541,8 +657,17 @@ const SchoolDashboard = () => {
                         ))}
                       </div>
                     </div>
+                    {!hasCompleteParticipantEligibilityInputs && (
+                      <p className="text-sm text-indigo-700">
+                        Select student class and gender to view eligible events.
+                      </p>
+                    )}
                     {events.length === 0 && (
-                      <p className="text-lg text-gray-500 text-center py-8">No events available at the moment</p>
+                      <p className="text-lg text-gray-500 text-center py-8">
+                        {hasCompleteParticipantEligibilityInputs
+                          ? 'No eligible events are available for the selected class and gender.'
+                          : 'Select class and gender to load eligible events.'}
+                      </p>
                     )}
                   </div>
 
@@ -828,14 +953,15 @@ const SchoolDashboard = () => {
                       <button
                         type="button"
                         onClick={handleParseBulk}
+                        disabled={bulkPreviewLoading}
                         className="px-5 py-2.5 rounded-lg bg-indigo-600 text-white font-semibold hover:bg-indigo-700 transition-colors"
                       >
-                        Preview Import
+                        {bulkPreviewLoading ? 'Validating...' : 'Preview Import'}
                       </button>
                       <button
                         type="button"
                         onClick={submitBulkImport}
-                        disabled={bulkSubmitting || bulkRows.length === 0 || bulkErrors.length > 0}
+                        disabled={bulkSubmitting || bulkPreviewLoading || bulkRows.length === 0 || bulkErrors.length > 0}
                         className="px-5 py-2.5 rounded-lg bg-emerald-600 text-white font-semibold hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                       >
                         {bulkSubmitting ? 'Importing...' : `Import ${bulkRows.length || ''} Participant(s)`}
@@ -844,6 +970,9 @@ const SchoolDashboard = () => {
                   </div>
 
                   <div className="space-y-4">
+                    {bulkPreviewLoading && (
+                      <p className="text-sm text-indigo-700">Checking class/gender event compatibility...</p>
+                    )}
                     <div className="bg-white border border-gray-200 rounded-xl p-4">
                       <h3 className="text-lg font-semibold text-gray-900 mb-2">Validation Summary</h3>
                       {bulkErrors.length === 0 ? (

@@ -1,8 +1,13 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import http from '../services/http-common';
+import {
+  GROUP_CLASS_OPTIONS,
+  GENDER_CATEGORY_OPTIONS,
+  getSchoolStatusLabel,
+  getStatusBadgeClass,
+  normalizeSchoolStatus
+} from '../utils/groupParticipants';
 
-const GROUP_CLASS_OPTIONS = ['LP', 'UP', 'HS', 'HSS'];
-const GENDER_CATEGORY_OPTIONS = ['BOYS', 'GIRLS', 'MIXED'];
 const STATUS_FILTER_OPTIONS = ['pending', 'approved', 'rejected'];
 
 const createEmptyParticipant = () => ({ first_name: '', last_name: '' });
@@ -116,6 +121,9 @@ const normalizeSubmittedGroups = (payload) => {
     const participants = Array.isArray(entry?.participants) ? entry.participants : [];
     const participantCount = toInt(entry?.participant_count) || participants.length || 0;
     const id = entry?.id ?? entry?.group_entry_id ?? `${entry?.group_id || 'GROUP'}-${index}`;
+    const leaderUserDetails = entry?.leader_user_details && typeof entry.leader_user_details === 'object'
+      ? entry.leader_user_details
+      : {};
     return {
       ...entry,
       id,
@@ -126,19 +134,16 @@ const normalizeSubmittedGroups = (payload) => {
       leader_full_name: getLeaderFullName(entry),
       events_display: normalizeEventsDisplay(entry),
       event_ids: normalizeEventIds(entry),
-      status: String(entry?.status || 'pending').toLowerCase(),
+      status: normalizeSchoolStatus(entry?.status),
       source: entry?.source || '-',
       submitted_at: entry?.submitted_at || entry?.created_at || null,
+      reviewed_at: entry?.reviewed_at || null,
       review_notes: entry?.review_notes || '',
+      leader_username: leaderUserDetails?.username ? String(leaderUserDetails.username) : '',
+      leader_temporary_password: leaderUserDetails?.temporary_password ? String(leaderUserDetails.temporary_password) : '',
       participants
     };
   });
-};
-
-const statusChipClass = (status) => {
-  if (status === 'approved') return 'bg-green-100 text-green-800 border-green-200';
-  if (status === 'rejected') return 'bg-red-100 text-red-800 border-red-200';
-  return 'bg-amber-100 text-amber-800 border-amber-200';
 };
 
 const formatDateTime = (value) => {
@@ -265,6 +270,7 @@ const SchoolGroupParticipantsSection = ({ showToast }) => {
   const [submittedFilters, setSubmittedFilters] = useState({ status: '', group_class: '' });
   const [submittedLoading, setSubmittedLoading] = useState(false);
   const [submittedError, setSubmittedError] = useState('');
+  const hasCompleteGroupEligibilityInputs = Boolean(String(groupForm.group_class || '').trim() && String(groupForm.gender_category || '').trim());
 
   const eventNameById = useMemo(() => {
     const map = {};
@@ -274,11 +280,21 @@ const SchoolGroupParticipantsSection = ({ showToast }) => {
     return map;
   }, [groupEvents]);
 
-  const loadGroupEvents = useCallback(async () => {
+  const loadGroupEvents = useCallback(async (filters = {}) => {
+    const groupClass = String(filters?.group_class || '').trim();
+    const genderCategory = String(filters?.gender_category || '').trim();
+    if (!groupClass || !genderCategory) {
+      setGroupEvents([]);
+      return;
+    }
+
     try {
       setGroupEventsLoading(true);
       setGroupEventsError('');
-      const response = await http.get('/api/auth/schools/group-events/');
+      const params = {};
+      params.group_class = groupClass;
+      params.gender_category = genderCategory;
+      const response = await http.get('/api/auth/schools/group-events/', { params });
       setGroupEvents(normalizeGroupEvents(response.data));
     } catch (error) {
       console.error('Failed to load group events', error);
@@ -308,15 +324,35 @@ const SchoolGroupParticipantsSection = ({ showToast }) => {
   }, []);
 
   useEffect(() => {
-    loadGroupEvents();
     loadSubmittedGroups({ status: '', group_class: '' });
-  }, [loadGroupEvents, loadSubmittedGroups]);
+  }, [loadSubmittedGroups]);
 
   useEffect(() => {
     if (groupTab === 'submitted') {
       loadSubmittedGroups(submittedFilters);
     }
   }, [groupTab, loadSubmittedGroups, submittedFilters]);
+
+  useEffect(() => {
+    if (!hasCompleteGroupEligibilityInputs) {
+      setGroupEvents([]);
+      return;
+    }
+    loadGroupEvents({
+      group_class: String(groupForm.group_class || '').trim(),
+      gender_category: String(groupForm.gender_category || '').trim(),
+    });
+  }, [groupForm.group_class, groupForm.gender_category, hasCompleteGroupEligibilityInputs, loadGroupEvents]);
+
+  useEffect(() => {
+    const eligibleIds = new Set(groupEvents.map((event) => event.id));
+    setGroupForm((prev) => {
+      const currentIds = Array.isArray(prev.event_ids) ? prev.event_ids : [];
+      const filteredIds = currentIds.filter((id) => eligibleIds.has(id));
+      if (filteredIds.length === currentIds.length) return prev;
+      return { ...prev, event_ids: filteredIds };
+    });
+  }, [groupEvents]);
 
   useEffect(() => {
     const count = Math.min(20, Math.max(1, toInt(groupForm.participant_count) || 1));
@@ -554,6 +590,27 @@ const SchoolGroupParticipantsSection = ({ showToast }) => {
     return importResponse.imported_groups;
   }, [importResponse]);
 
+  const copyCredential = async (label, value) => {
+    const sanitizedValue = String(value || '').trim();
+    if (!sanitizedValue) {
+      showToast?.(`${label} is unavailable for this group.`, 'info');
+      return;
+    }
+
+    if (!navigator?.clipboard?.writeText) {
+      showToast?.('Clipboard access is not available in this browser.', 'error');
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(sanitizedValue);
+      showToast?.(`${label} copied to clipboard.`, 'success');
+    } catch (error) {
+      console.error(`Failed to copy ${label.toLowerCase()}`, error);
+      showToast?.(`Failed to copy ${label.toLowerCase()}.`, 'error');
+    }
+  };
+
   const getParticipantError = (index, field) => {
     const row = groupFormErrors?.participants?.[index];
     if (!row) return [];
@@ -576,8 +633,8 @@ const SchoolGroupParticipantsSection = ({ showToast }) => {
         <div className="flex items-center space-x-3">
           <div className="w-2 h-12 bg-gradient-to-b from-indigo-500 to-purple-500 rounded-full"></div>
           <div>
-            <h2 className="text-3xl font-bold text-gray-800">Group Participants</h2>
-            <p className="text-gray-600">Manage group entries, imports, and submission review status.</p>
+            <h2 className="text-[30px] md:text-[32px] font-bold text-gray-800">Group Participants</h2>
+            <p className="text-[15px] md:text-base text-gray-600">Manage group entries, imports, and submission review status.</p>
           </div>
         </div>
       </div>
@@ -785,16 +842,19 @@ const SchoolGroupParticipantsSection = ({ showToast }) => {
                 <span className="text-sm text-gray-600">Only group events are shown</span>
               </div>
 
-              {groupEventsLoading ? (
+              {!hasCompleteGroupEligibilityInputs ? (
+                <div className="py-6 text-center text-gray-500">Select group class and gender category to view eligible events.</div>
+              ) : groupEventsLoading ? (
                 <div className="py-6 text-center text-gray-500">Loading group events...</div>
               ) : groupEvents.length === 0 ? (
-                <div className="py-6 text-center text-gray-500">No group events available right now.</div>
+                <div className="py-6 text-center text-gray-500">No eligible group events are available for the selected class and gender.</div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-72 overflow-y-auto pr-1">
                   {groupEvents.map((event) => (
                     <label key={event.id} className="flex items-start gap-3 p-3 border border-gray-200 rounded-lg hover:bg-indigo-50 transition-colors">
                       <input
                         type="checkbox"
+                        disabled={!hasCompleteGroupEligibilityInputs}
                         checked={(groupForm.event_ids || []).includes(event.id)}
                         onChange={() => toggleEventId(event.id)}
                         className="mt-1 h-4 w-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
@@ -945,14 +1005,16 @@ const SchoolGroupParticipantsSection = ({ showToast }) => {
 
       {groupTab === 'submitted' && (
         <div className="space-y-5">
-          <div className="bg-white border border-gray-200 rounded-2xl p-4">
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+          <div className="bg-white border border-gray-200 rounded-2xl p-5">
+            <h3 className="text-[22px] font-semibold text-gray-900">Submitted Groups</h3>
+            <p className="mt-1 text-[14px] text-gray-600">Filter and review submitted group entries.</p>
+            <div className="mt-4 grid grid-cols-1 md:grid-cols-4 gap-3">
               <div>
-                <label className="block text-xs font-semibold text-gray-600 uppercase mb-1">Status</label>
+                <label className="block text-[14px] font-semibold text-gray-700 mb-1.5">Status</label>
                 <select
                   value={submittedFilters.status}
                   onChange={(e) => setSubmittedFilters((prev) => ({ ...prev, status: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                  className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-[15px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
                 >
                   <option value="">All</option>
                   {STATUS_FILTER_OPTIONS.map((option) => (
@@ -961,11 +1023,11 @@ const SchoolGroupParticipantsSection = ({ showToast }) => {
                 </select>
               </div>
               <div>
-                <label className="block text-xs font-semibold text-gray-600 uppercase mb-1">Group Class</label>
+                <label className="block text-[14px] font-semibold text-gray-700 mb-1.5">Group Class</label>
                 <select
                   value={submittedFilters.group_class}
                   onChange={(e) => setSubmittedFilters((prev) => ({ ...prev, group_class: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                  className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-[15px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
                 >
                   <option value="">All</option>
                   {GROUP_CLASS_OPTIONS.map((option) => (
@@ -977,14 +1039,14 @@ const SchoolGroupParticipantsSection = ({ showToast }) => {
                 <button
                   type="button"
                   onClick={clearSubmittedFilters}
-                  className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 text-sm font-semibold hover:bg-gray-50"
+                  className="px-4 py-2.5 rounded-xl border border-gray-300 text-gray-700 text-[15px] font-semibold hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
                 >
                   Clear
                 </button>
                 <button
                   type="button"
                   onClick={applySubmittedFilters}
-                  className="px-4 py-2 rounded-lg bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700"
+                  className="px-4 py-2.5 rounded-xl bg-indigo-600 text-white text-[15px] font-semibold hover:bg-indigo-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
                 >
                   Apply Filters
                 </button>
@@ -993,64 +1055,132 @@ const SchoolGroupParticipantsSection = ({ showToast }) => {
           </div>
 
           {submittedError && (
-            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl">
+            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-[15px]">
               {submittedError}
             </div>
           )}
 
           {submittedLoading ? (
-            <div className="bg-white border border-gray-200 rounded-2xl p-10 text-center text-gray-600">
+            <div className="bg-white border border-gray-200 rounded-2xl p-10 text-center text-[16px] text-gray-600">
               Loading submitted groups...
             </div>
           ) : submittedGroups.length === 0 ? (
-            <div className="bg-white border border-gray-200 rounded-2xl p-10 text-center text-gray-600">
-              No group submissions found for the selected filters.
+            <div className="bg-white border border-gray-200 rounded-2xl p-10 text-center">
+              <p className="text-[18px] font-semibold text-gray-800">No group submissions found</p>
+              <p className="mt-2 text-[15px] text-gray-600">Try changing filters to find submitted entries.</p>
             </div>
           ) : (
-            <div className="bg-white border border-gray-200 rounded-2xl overflow-x-auto">
-              <table className="min-w-full text-sm">
-                <thead className="bg-gray-50">
-                  <tr className="text-left text-gray-600 uppercase tracking-wide text-xs">
-                    <th className="px-4 py-3">Group ID</th>
-                    <th className="px-4 py-3">Class</th>
-                    <th className="px-4 py-3">Gender</th>
-                    <th className="px-4 py-3">Participants</th>
-                    <th className="px-4 py-3">Leader</th>
-                    <th className="px-4 py-3">Events</th>
-                    <th className="px-4 py-3">Status</th>
-                    <th className="px-4 py-3">Source</th>
-                    <th className="px-4 py-3">Submitted</th>
-                    <th className="px-4 py-3">Review Notes</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {submittedGroups.map((group) => {
-                    const eventLabels = (group.events_display || []).length > 0
-                      ? group.events_display
-                      : (group.event_ids || []).map((id) => eventNameById[String(id)] || `Event #${id}`);
-                    return (
-                      <tr key={String(group.id)} className="hover:bg-gray-50">
-                        <td className="px-4 py-3 font-semibold text-gray-900">{group.group_id || '-'}</td>
-                        <td className="px-4 py-3 text-gray-700">{group.group_class || '-'}</td>
-                        <td className="px-4 py-3 text-gray-700">{group.gender_category || '-'}</td>
-                        <td className="px-4 py-3 text-gray-700">{group.participant_count || '-'}</td>
-                        <td className="px-4 py-3 text-gray-700">{group.leader_full_name || '-'}</td>
-                        <td className="px-4 py-3 text-gray-700">
-                          {eventLabels.length > 0 ? eventLabels.join(', ') : '-'}
-                        </td>
-                        <td className="px-4 py-3">
-                          <span className={`inline-flex items-center px-2.5 py-1 rounded-full border text-xs font-semibold ${statusChipClass(group.status)}`}>
-                            {group.status}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 text-gray-700">{group.source || '-'}</td>
-                        <td className="px-4 py-3 text-gray-700">{formatDateTime(group.submitted_at)}</td>
-                        <td className="px-4 py-3 text-gray-700">{group.review_notes || '-'}</td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+            <div className="space-y-4">
+              <div className="bg-white border border-gray-200 rounded-2xl overflow-x-auto">
+                <table className="min-w-full text-[15px]">
+                  <thead className="bg-gray-50">
+                    <tr className="text-left text-gray-600 uppercase tracking-wide text-[13px]">
+                      <th className="px-4 py-3">Group ID</th>
+                      <th className="px-4 py-3">Class</th>
+                      <th className="px-4 py-3">Gender</th>
+                      <th className="px-4 py-3">Participants</th>
+                      <th className="px-4 py-3">Leader</th>
+                      <th className="px-4 py-3">Events</th>
+                      <th className="px-4 py-3">Status</th>
+                      <th className="px-4 py-3">Source</th>
+                      <th className="px-4 py-3">Submitted</th>
+                      <th className="px-4 py-3">Review Notes</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {submittedGroups.map((group) => {
+                      const eventLabels = (group.events_display || []).length > 0
+                        ? group.events_display
+                        : (group.event_ids || []).map((id) => eventNameById[String(id)] || `Event #${id}`);
+                      return (
+                        <tr key={String(group.id)} className="hover:bg-gray-50">
+                          <td className="px-4 py-3 font-semibold text-[16px] text-gray-900">{group.group_id || '-'}</td>
+                          <td className="px-4 py-3 text-gray-700">{group.group_class || '-'}</td>
+                          <td className="px-4 py-3 text-gray-700">{group.gender_category || '-'}</td>
+                          <td className="px-4 py-3 text-gray-700">{group.participant_count || '-'}</td>
+                          <td className="px-4 py-3 text-gray-700">{group.leader_full_name || '-'}</td>
+                          <td className="px-4 py-3 text-gray-700">
+                            {eventLabels.length > 0 ? eventLabels.join(', ') : '-'}
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className={`inline-flex items-center px-2.5 py-1 rounded-full border text-[13px] font-semibold ${getStatusBadgeClass(group.status)}`}>
+                              {getSchoolStatusLabel(group.status)}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-gray-700">{group.source || '-'}</td>
+                          <td className="px-4 py-3 text-gray-700">{formatDateTime(group.submitted_at)}</td>
+                          <td className="px-4 py-3 text-gray-700">{group.review_notes || '-'}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="space-y-3">
+                {submittedGroups.map((group) => {
+                  const hasUsername = Boolean(group.leader_username);
+                  const hasPassword = Boolean(group.leader_temporary_password);
+                  if (!hasUsername && !hasPassword) return null;
+
+                  return (
+                    <div key={`credentials-${group.id}`} className="bg-indigo-50 border border-indigo-200 rounded-2xl p-4">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div>
+                          <h4 className="text-[18px] font-semibold text-indigo-900">
+                            Leader Credentials · {group.group_id || 'Group'}
+                          </h4>
+                          <p className="text-[14px] text-indigo-800 mt-1">Share credentials only with approved group leader.</p>
+                        </div>
+                        <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[13px] font-semibold ${getStatusBadgeClass(group.status)}`}>
+                          {getSchoolStatusLabel(group.status)}
+                        </span>
+                      </div>
+
+                      <div className={`mt-3 grid gap-3 ${hasPassword ? 'grid-cols-1 md:grid-cols-2' : 'grid-cols-1'}`}>
+                        <div className="rounded-xl border border-indigo-200 bg-white p-3">
+                          <div className="text-[13px] font-semibold uppercase tracking-wide text-indigo-700">Username</div>
+                          <div className="mt-1 text-[16px] font-semibold text-gray-900 break-all">
+                            {group.leader_username || '-'}
+                          </div>
+                          <button
+                            type="button"
+                            aria-label={`Copy leader username for ${group.group_id || 'group'}`}
+                            onClick={() => copyCredential('Username', group.leader_username)}
+                            disabled={!group.leader_username}
+                            className="mt-2 px-3 py-1.5 rounded-lg border border-indigo-300 text-indigo-700 text-[14px] font-semibold hover:bg-indigo-50 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
+                          >
+                            Copy Username
+                          </button>
+                        </div>
+
+                        {hasPassword ? (
+                          <div className="rounded-xl border border-indigo-200 bg-white p-3">
+                            <div className="text-[13px] font-semibold uppercase tracking-wide text-indigo-700">Temporary Password</div>
+                            <div className="mt-1 text-[16px] font-semibold text-gray-900 break-all">
+                              {group.leader_temporary_password}
+                            </div>
+                            <button
+                              type="button"
+                              aria-label={`Copy temporary password for ${group.group_id || 'group'}`}
+                              onClick={() => copyCredential('Password', group.leader_temporary_password)}
+                              className="mt-2 px-3 py-1.5 rounded-lg border border-indigo-300 text-indigo-700 text-[14px] font-semibold hover:bg-indigo-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
+                            >
+                              Copy Password
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="rounded-xl border border-indigo-200 bg-white p-3">
+                            <p className="text-[14px] text-indigo-900">
+                              Temporary password is no longer available after reset.
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           )}
         </div>

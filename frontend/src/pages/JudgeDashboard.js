@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import http from '../services/http-common';
 import { eventServiceAdapter as eventService, userServiceAdapter as userService } from '../services/serviceAdapter';
@@ -7,24 +6,49 @@ import scoreService from '../services/scoreService';
 import UserInfoHeader from '../components/UserInfoHeader';
 import PerformancePrediction from '../components/PerformancePrediction';
 import RecheckRequestsDropdown from '../components/RecheckRequestsDropdown';
-// Simple inline SVG icons to avoid external icon dependency
+
 const Trophy = ({ className }) => (
   <svg className={className} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
     <path d="M8 21h8M12 17a6 6 0 0 0 6-6V5H6v6a6 6 0 0 0 6 6Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
     <path d="M18 7h2a2 2 0 0 1 0 4h-2M6 7H4a2 2 0 0 0 0 4h2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
   </svg>
 );
+
 const CheckCircle = ({ className }) => (
   <svg className={className} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
     <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
     <path d="M22 4 12 14.01l-3-3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
   </svg>
 );
+
 const AlertCircle = ({ className }) => (
   <svg className={className} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
     <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" />
     <path d="M12 8v4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
     <circle cx="12" cy="16" r="1" fill="currentColor" />
+  </svg>
+);
+
+const Sparkles = ({ className }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M12 3l1.9 3.85L18 8.5l-4.1 1.65L12 14l-1.9-3.85L6 8.5l4.1-1.65L12 3Z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    <path d="M5 14l.95 1.9L8 16.85 5.95 17.8 5 19.7l-.95-1.9L2 16.85l2.05-.95L5 14Z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    <path d="M19 14l.95 1.9L22 16.85l-2.05.95L19 19.7l-.95-1.9L16 16.85l2.05-.95L19 14Z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
+
+const UsersIcon = ({ className }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    <circle cx="9" cy="7" r="4" stroke="currentColor" strokeWidth="2" />
+    <path d="M22 21v-2a4 4 0 0 0-3-3.87" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    <path d="M16 3.13a4 4 0 0 1 0 7.75" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
+
+const ChartBars = ({ className }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M4 20V10M10 20V4M16 20v-7M22 20V8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
   </svg>
 );
 
@@ -55,13 +79,7 @@ const JudgeDashboard = () => {
   const [pwdError, setPwdError] = useState('');
   const [showPrediction, setShowPrediction] = useState(false);
 
-  // Debug useEffect to track state changes
   useEffect(() => {
-    console.log('State changed - selectedEventId:', selectedEventId, 'selectedParticipantId:', selectedParticipantId);
-  }, [selectedEventId, selectedParticipantId]);
-
-  useEffect(() => {
-    // Inspect last login response cached user if available
     try {
       const access = localStorage.getItem('access_token');
       if (!access) return;
@@ -74,7 +92,9 @@ const JudgeDashboard = () => {
           setShowPasswordChoice(true);
         }
       }
-    } catch (_) { }
+    } catch (_) {
+      // no-op
+    }
   }, []);
 
   const acceptProvidedPassword = async () => {
@@ -110,31 +130,22 @@ const JudgeDashboard = () => {
     }
   };
 
-  const handleLogout = () => {
-    localStorage.removeItem('access_token');
-    localStorage.removeItem('refresh_token');
-    navigate('/login');
-  };
+  const currentKey = useMemo(
+    () => `${selectedEventId || ''}:${selectedParticipantId || ''}`,
+    [selectedEventId, selectedParticipantId],
+  );
 
-  const currentKey = useMemo(() => `${selectedEventId || ''}:${selectedParticipantId || ''}`, [selectedEventId, selectedParticipantId]);
-
-  // Initialize scores state for current key when it changes
   useEffect(() => {
-    if (currentKey && !scoresState[currentKey]) {
-      // Initialize scores for all criteria to empty values
-      const initialScores = {};
-      criteria.forEach(c => {
-        initialScores[c.id] = '';
-      });
-
-      setScoresState(prev => ({
-        ...prev,
-        [currentKey]: initialScores
-      }));
-
-      console.log('Initialized scores for key:', currentKey, initialScores);
-    }
-  }, [currentKey, criteria]);
+    if (!currentKey || scoresState[currentKey]) return;
+    const initialScores = criteria.reduce((acc, criterion) => {
+      acc[criterion.id] = '';
+      return acc;
+    }, {});
+    setScoresState((prev) => ({
+      ...prev,
+      [currentKey]: initialScores,
+    }));
+  }, [currentKey, criteria, scoresState]);
 
   const normalizeDecimal = (val) => {
     if (val === null || val === undefined) return '';
@@ -145,77 +156,54 @@ const JudgeDashboard = () => {
   };
 
   const handleScoreChange = (criterionId, value) => {
+    if (!currentKey) return;
     const parsed = normalizeDecimal(value);
-    console.log('handleScoreChange called:', criterionId, 'value:', value, 'parsed:', parsed, 'currentKey:', currentKey);
-
-    // Ensure scores state is initialized for current key
-    if (!scoresState[currentKey]) {
-      const initialScores = {};
-      criteria.forEach(c => {
-        initialScores[c.id] = '';
-      });
-
-      setScoresState(prev => ({
+    setScoresState((prev) => {
+      const existingScores = prev[currentKey] || criteria.reduce((acc, criterion) => {
+        acc[criterion.id] = '';
+        return acc;
+      }, {});
+      return {
         ...prev,
-        [currentKey]: initialScores
-      }));
-    }
-
-    setScoresState(prev => ({
-      ...prev,
-      [currentKey]: { ...(prev[currentKey] || {}), [criterionId]: parsed }
-    }));
-
-    // Debug: log the updated scores state
-    setTimeout(() => {
-      console.log('Updated scoresState for key', currentKey, ':', scoresState[currentKey]);
-    }, 0);
+        [currentKey]: {
+          ...existingScores,
+          [criterionId]: parsed,
+        },
+      };
+    });
   };
 
   const computedTotal = useMemo(() => {
     const sc = scoresState[currentKey] || {};
-    return criteria.reduce((sum, c) => {
-      const raw = normalizeDecimal(sc[c.id] ?? 0);
-      const bounded = Math.min(Number(raw || 0), c.max);
+    return criteria.reduce((sum, criterion) => {
+      const raw = normalizeDecimal(sc[criterion.id] ?? 0);
+      const bounded = Math.min(Number(raw || 0), criterion.max);
       return sum + bounded;
     }, 0);
   }, [scoresState, currentKey, criteria]);
 
   const handleSubmitScore = async () => {
-    console.log('handleSubmitScore called');
-    console.log('selectedEventId:', selectedEventId);
-    console.log('selectedParticipantId:', selectedParticipantId);
-    console.log('scoresState:', scoresState);
-    console.log('currentKey:', currentKey);
-
     if (!selectedEventId || !selectedParticipantId) {
       alert('Please select both an event and a participant');
       return;
     }
 
     const sc = scoresState[currentKey] || {};
-
-    // Validate that all criteria have been scored
     const missingScores = [];
-    for (const c of criteria) {
-      const scoreValue = sc[c.id];
-      console.log(`Criterion ${c.label} score:`, scoreValue);
+    for (const criterion of criteria) {
+      const scoreValue = sc[criterion.id];
       if (scoreValue === undefined || scoreValue === null || scoreValue === '') {
-        missingScores.push(c.label);
+        missingScores.push(criterion.label);
       }
     }
 
     if (missingScores.length > 0) {
       alert(`Please fill in scores for: ${missingScores.join(', ')}`);
-      console.log('Missing scores:', missingScores);
       return;
     }
 
-    const items = criteria.map(c => {
-      // Parse and validate the score
-      let scoreValue = sc[c.id];
-
-      // Convert to number and handle various input types
+    const items = criteria.map((criterion) => {
+      let scoreValue = sc[criterion.id];
       if (typeof scoreValue === 'string') {
         scoreValue = scoreValue.replace(',', '.');
         scoreValue = parseFloat(scoreValue);
@@ -223,39 +211,26 @@ const JudgeDashboard = () => {
         scoreValue = Number(scoreValue);
       }
 
-      // Validate the score is a valid number
-      if (isNaN(scoreValue)) {
+      if (Number.isNaN(scoreValue)) {
         scoreValue = 0;
       }
 
-      // Ensure score is within valid range
-      const finalScore = Math.min(Math.max(scoreValue, 0), c.max);
-
-      console.log(`Submitting criterion ${c.label}: ${finalScore}`);
-
+      const finalScore = Math.min(Math.max(scoreValue, 0), criterion.max);
       return {
-        criteria: c.label,
+        criteria: criterion.label,
         score: finalScore,
-        comments: (notesState[currentKey] || ''),
+        comments: notesState[currentKey] || '',
       };
     });
 
     try {
       setSubmitting(true);
-
-      console.log('Submitting to API with data:', { eventId: selectedEventId, participantId: selectedParticipantId, items });
-
-      const result = await scoreService.submitBundle({
+      await scoreService.submitBundle({
         eventId: selectedEventId,
         participantId: selectedParticipantId,
-        items
+        items,
       });
-
-      console.log('Score submission result:', result);
-
       alert('Score submitted successfully');
-
-      // refresh summary after submit
       try {
         setLoadingSummary(true);
         const res = await scoreService.getSummary(selectedEventId);
@@ -264,10 +239,10 @@ const JudgeDashboard = () => {
         setLoadingSummary(false);
       }
     } catch (e) {
-      console.error('Error submitting score:', e);
-
-      // Extract error message from response or provide default
-      const errorMessage = e?.response?.data?.error || e?.response?.data?.message || e?.message || 'Failed to submit score';
+      const errorMessage = e?.response?.data?.error
+        || e?.response?.data?.message
+        || e?.message
+        || 'Failed to submit score';
       alert(errorMessage);
     } finally {
       setSubmitting(false);
@@ -279,27 +254,16 @@ const JudgeDashboard = () => {
       try {
         const response = await http.get('/api/auth/current/');
         const userData = response.data;
-        console.log('Current user data:', userData);
-
-        // Check if user is a judge
         if (userData.role !== 'judge') {
           navigate('/dashboard');
           return;
         }
-
-
         setUser(userData);
-
-        // Fetch assigned events via dedicated endpoint
         try {
           const myEvents = await eventService.listMyAssignedEvents();
-          console.log('Assigned events:', myEvents);
           setAssignedEvents(myEvents);
           if (myEvents.length) {
-            console.log('Setting first event as selected:', myEvents[0].id);
             setSelectedEventId(myEvents[0].id);
-          } else {
-            console.log('No assigned events found');
           }
         } catch (error) {
           console.error('Failed to fetch assigned events:', error);
@@ -317,32 +281,29 @@ const JudgeDashboard = () => {
 
   useEffect(() => {
     const loadEventData = async () => {
-      console.log('Loading event data for selectedEventId:', selectedEventId);
-      if (!selectedEventId) return;
+      if (!selectedEventId) {
+        setParticipants([]);
+        setSelectedParticipantId(null);
+        return;
+      }
 
       try {
-        // Load participants
         const regs = await eventService.listParticipantsForEvent(selectedEventId);
-        console.log('Participants for event:', selectedEventId, regs);
         setParticipants(regs);
         if (regs.length) {
-          console.log('Setting first participant as selected:', regs[0].participant);
           setSelectedParticipantId(regs[0].participant);
         } else {
-          console.log('No participants found for event:', selectedEventId);
+          setSelectedParticipantId(null);
         }
 
-        // Load event-specific criteria
         setLoadingCriteria(true);
         try {
           const criteriaData = await scoreService.getEventCriteria(selectedEventId);
           if (criteriaData.criteria && criteriaData.criteria.length > 0) {
-            console.log('Setting event-specific criteria:', criteriaData.criteria);
             setCriteria(criteriaData.criteria);
           }
         } catch (criteriaError) {
           console.error('Failed to load criteria, using defaults', criteriaError);
-          // Keep default criteria if loading fails
         } finally {
           setLoadingCriteria(false);
         }
@@ -371,21 +332,43 @@ const JudgeDashboard = () => {
 
   const selectedSummary = useMemo(() => {
     if (!selectedParticipantId) return null;
-    return summary.results.find(r => r.participant === selectedParticipantId) || null;
+    return summary.results.find((result) => result.participant === selectedParticipantId) || null;
   }, [summary, selectedParticipantId]);
+
+  const selectedEvent = useMemo(
+    () => assignedEvents.find((event) => event.id === selectedEventId) || null,
+    [assignedEvents, selectedEventId],
+  );
+
+  const selectedParticipant = useMemo(
+    () => participants.find((participant) => participant.participant === selectedParticipantId) || null,
+    [participants, selectedParticipantId],
+  );
+
+  const judgesSubmittedCount = selectedSummary?.judges_submitted || 0;
+  const reviewedByMeCount = useMemo(
+    () => (summary.results || []).filter((result) => result.my_scores_total !== null && result.my_scores_total !== undefined).length,
+    [summary],
+  );
+  const completedFinalsCount = useMemo(
+    () => (summary.results || []).filter((result) => result.judges_submitted >= 5).length,
+    [summary],
+  );
 
   const computeFinalFromJudges = (totals = []) => {
     if (!totals || totals.length < 3) return null;
     const sorted = [...totals].sort((a, b) => a - b);
-    const trimmed = sorted.length >= 5 ? sorted.slice(1, -1) : sorted; // drop extremes when possible
+    const trimmed = sorted.length >= 5 ? sorted.slice(1, -1) : sorted;
     const avg = trimmed.reduce((a, b) => a + b, 0) / trimmed.length;
     return Math.round(avg * 100) / 100;
   };
 
   if (loading) {
     return (
-      <div className="flex justify-center items-center min-h-screen">
-        <div className="text-lg">Loading...</div>
+      <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-100 via-indigo-50 to-purple-100">
+        <div className="rounded-2xl border border-white/70 bg-white/70 px-6 py-4 text-base font-medium text-slate-700 shadow-lg backdrop-blur">
+          Loading dashboard...
+        </div>
       </div>
     );
   }
@@ -395,37 +378,79 @@ const JudgeDashboard = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50">
-      {/* User Info Header */}
+    <div className="min-h-screen bg-gradient-to-br from-slate-100 via-indigo-50 to-purple-100">
+      <div className="pointer-events-none fixed inset-0 -z-10 overflow-hidden">
+        <div className="absolute -right-16 -top-16 h-64 w-64 rounded-full bg-indigo-300/30 blur-3xl" />
+        <div className="absolute bottom-0 left-0 h-72 w-72 rounded-full bg-purple-300/30 blur-3xl" />
+      </div>
+
       <UserInfoHeader
         user={user}
         title="Judge Dashboard"
         subtitle="Score participants and manage assigned events"
       />
 
-      {/* Password Choice Modal */}
       {showPasswordChoice && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl p-6">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4">
+          <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl">
             {!creatingNew ? (
               <div>
-                <h3 className="text-xl font-bold mb-2">Would you prefer to continue with your provided password?</h3>
-                <p className="text-gray-600 mb-4">Password hint: <span className="font-mono bg-gray-100 px-2 py-0.5 rounded">{maskedPending}</span></p>
-                {pwdError ? <div className="text-red-600 text-sm mb-3">{pwdError}</div> : null}
-                <div className="flex gap-3 justify-end">
-                  <button onClick={() => setCreatingNew(true)} className="px-4 py-2 rounded-lg bg-gray-200 hover:bg-gray-300">Create new password</button>
-                  <button onClick={acceptProvidedPassword} className="px-4 py-2 rounded-lg bg-green-600 text-white hover:bg-green-700">Continue</button>
+                <h3 className="text-xl font-semibold text-slate-900">
+                  Continue with your provided password?
+                </h3>
+                <p className="mt-2 text-sm text-slate-600">
+                  Password hint:
+                  {' '}
+                  <span className="rounded bg-slate-100 px-2 py-0.5 font-mono text-slate-700">
+                    {maskedPending}
+                  </span>
+                </p>
+                {pwdError ? <div className="mt-3 text-sm font-medium text-rose-600">{pwdError}</div> : null}
+                <div className="mt-5 flex flex-wrap justify-end gap-3">
+                  <button
+                    onClick={() => setCreatingNew(true)}
+                    className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+                  >
+                    Create new password
+                  </button>
+                  <button
+                    onClick={acceptProvidedPassword}
+                    className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-800"
+                  >
+                    Continue
+                  </button>
                 </div>
               </div>
             ) : (
               <div>
-                <h3 className="text-xl font-bold mb-2">Create new password</h3>
-                <p className="text-gray-600 mb-4">Choose a strong password (min 8 characters).</p>
-                <input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} className="w-full border rounded-lg px-3 py-2 mb-2" placeholder="Enter new password" />
-                {pwdError ? <div className="text-red-600 text-sm mb-3">{pwdError}</div> : null}
-                <div className="flex gap-3 justify-end">
-                  <button onClick={() => { setCreatingNew(false); setPwdError(''); }} className="px-4 py-2 rounded-lg bg-gray-200 hover:bg-gray-300">Back</button>
-                  <button onClick={submitNewPassword} className="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700">Save password</button>
+                <h3 className="text-xl font-semibold text-slate-900">Create new password</h3>
+                <p className="mt-2 text-sm text-slate-600">
+                  Choose a strong password (minimum 8 characters).
+                </p>
+                <input
+                  type="password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  className="mt-4 w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900 outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200"
+                  placeholder="Enter new password"
+                />
+                {pwdError ? <div className="mt-3 text-sm font-medium text-rose-600">{pwdError}</div> : null}
+                <div className="mt-5 flex flex-wrap justify-end gap-3">
+                  <button
+                    onClick={() => {
+                      setCreatingNew(false);
+                      setPwdError('');
+                    }}
+                    className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+                  >
+                    Back
+                  </button>
+                  <button
+                    onClick={submitNewPassword}
+                    className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-indigo-700"
+                  >
+                    Save password
+                  </button>
                 </div>
               </div>
             )}
@@ -433,128 +458,222 @@ const JudgeDashboard = () => {
         </div>
       )}
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2 space-y-6">
-            <div className="bg-white p-8 rounded-2xl shadow border border-gray-200">
-              {/* Current Event Display */}
-              <div className="mb-6 p-4 bg-gradient-to-r from-indigo-50 to-purple-50 rounded-xl border-2 border-indigo-200">
-                <div className="text-sm font-semibold text-indigo-700 mb-1">Current Event</div>
-                <div className="text-2xl font-bold text-indigo-900">
-                  {assignedEvents.find(ev => ev.id === selectedEventId)?.name || 'No event selected'}
-                </div>
-                {selectedEventId && (
-                  <div className="text-sm text-indigo-600 mt-1">
-                    {assignedEvents.find(ev => ev.id === selectedEventId)?.date}
-                  </div>
-                )}
+      <div className="mx-auto max-w-7xl space-y-6 px-4 py-6 sm:px-6 lg:px-8">
+        <section className="rounded-3xl border border-white/70 bg-white/75 p-5 shadow-xl backdrop-blur sm:p-6">
+          <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+            <div>
+              <div className="inline-flex items-center gap-2 rounded-full bg-indigo-100 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-indigo-700">
+                <Sparkles className="h-3.5 w-3.5" />
+                Judge Workspace
+              </div>
+              <h2 className="mt-3 text-2xl font-bold text-slate-900 sm:text-3xl">
+                {selectedEvent?.name || 'Start by selecting an assigned event'}
+              </h2>
+              <p className="mt-1 text-sm text-slate-600">
+                {selectedEvent?.date || 'Select an event and participant to begin scoring with real-time progress visibility.'}
+              </p>
+            </div>
+            <div className="rounded-2xl border border-indigo-100 bg-gradient-to-br from-indigo-50 to-purple-50 px-4 py-3 text-right">
+              <div className="text-xs font-semibold uppercase tracking-wide text-indigo-600">Current Participant</div>
+              <div className="mt-1 text-lg font-semibold text-slate-900">
+                {selectedParticipant
+                  ? `${selectedParticipant?.participant_details?.first_name || ''} ${selectedParticipant?.participant_details?.last_name || ''}`.trim()
+                  : 'No participant selected'}
+              </div>
+              <div className="text-xs text-slate-500">
+                {selectedParticipant?.chess_number
+                  ? `Chess #${selectedParticipant.chess_number}`
+                  : 'Choose a verified participant'}
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <div className="rounded-2xl border border-indigo-100 bg-gradient-to-br from-indigo-50 to-indigo-100/60 p-4 shadow-sm">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold uppercase tracking-wide text-indigo-600">Assigned Events</span>
+                <Trophy className="h-4 w-4 text-indigo-500" />
+              </div>
+              <div className="mt-2 text-2xl font-bold text-slate-900">{assignedEvents.length}</div>
+            </div>
+
+            <div className="rounded-2xl border border-emerald-100 bg-gradient-to-br from-emerald-50 to-emerald-100/60 p-4 shadow-sm">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold uppercase tracking-wide text-emerald-700">Verified Participants</span>
+                <UsersIcon className="h-4 w-4 text-emerald-500" />
+              </div>
+              <div className="mt-2 text-2xl font-bold text-slate-900">{participants.length}</div>
+            </div>
+
+            <div className="rounded-2xl border border-amber-100 bg-gradient-to-br from-amber-50 to-orange-100/60 p-4 shadow-sm">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold uppercase tracking-wide text-amber-700">Reviewed By Me</span>
+                <CheckCircle className="h-4 w-4 text-amber-600" />
+              </div>
+              <div className="mt-2 text-2xl font-bold text-slate-900">{reviewedByMeCount}</div>
+            </div>
+
+            <div className="rounded-2xl border border-purple-100 bg-gradient-to-br from-purple-50 to-purple-100/60 p-4 shadow-sm">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold uppercase tracking-wide text-purple-700">Finalized Results</span>
+                <ChartBars className="h-4 w-4 text-purple-500" />
+              </div>
+              <div className="mt-2 text-2xl font-bold text-slate-900">{completedFinalsCount}</div>
+            </div>
+          </div>
+        </section>
+
+        <div className="grid grid-cols-1 gap-6 xl:grid-cols-12">
+          <section className="space-y-6 xl:col-span-8">
+            <div className="rounded-3xl border border-white/70 bg-white/80 p-6 shadow-xl backdrop-blur sm:p-8">
+              <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+                <h3 className="text-xl font-bold text-slate-900">Scoring Criteria</h3>
+                {loadingCriteria ? (
+                  <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    Loading criteria...
+                  </span>
+                ) : null}
               </div>
 
-              {/* Current Participant Display */}
-              <div className="mb-6 p-4 bg-gradient-to-r from-green-50 to-teal-50 rounded-xl border-2 border-green-200">
-                <div className="text-sm font-semibold text-green-700 mb-1">Current Participant</div>
-                <div className="text-2xl font-bold text-green-900">
-                  {participants.find(p => p.participant === selectedParticipantId)?.participant_details?.first_name || ''} {participants.find(p => p.participant === selectedParticipantId)?.participant_details?.last_name || 'No participant selected'}
-                </div>
-                {selectedParticipantId && (
-                  <div className="text-sm text-green-600 mt-1">
-                    Chess #{participants.find(p => p.participant === selectedParticipantId)?.chess_number}
-                  </div>
-                )}
-              </div>
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                {criteria.map((criterion) => {
+                  const rawCurrent = scoresState[currentKey]?.[criterion.id];
+                  const normalized = Number(normalizeDecimal(rawCurrent || 0) || 0);
+                  const bounded = Math.min(Math.max(normalized, 0), criterion.max);
+                  const percent = criterion.max ? Math.round((bounded / criterion.max) * 100) : 0;
+                  const hasValue = rawCurrent !== '' && rawCurrent !== null && rawCurrent !== undefined;
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {criteria.map(c => (
-                  <div key={c.id} className="bg-gradient-to-r from-gray-50 to-white p-6 rounded-xl border-2 border-gray-200 hover:border-indigo-300 transition-colors">
-                    <div className="flex items-center justify-between mb-3">
-                      <div className="text-lg font-semibold text-gray-800">{c.label}</div>
-                      <div className="text-base text-gray-600 font-medium">/ {c.max}</div>
-                    </div>
-                    <input
-                      type="range"
-                      min="0"
-                      max={c.max}
-                      step="0.1"
-                      value={(scoresState[currentKey]?.[c.id] ?? 0)}
-                      onChange={(e) => handleScoreChange(c.id, e.target.value)}
-                      className="w-full"
-                    />
-                    <div className="flex items-center justify-between mt-3">
+                  return (
+                    <div
+                      key={criterion.id}
+                      className={`rounded-2xl border p-4 transition duration-200 ${
+                        hasValue
+                          ? 'border-indigo-300 bg-indigo-50/70 shadow-sm'
+                          : 'border-slate-200 bg-white hover:border-indigo-200 hover:shadow-sm'
+                      }`}
+                    >
+                      <div className="mb-3 flex items-center justify-between">
+                        <div className="text-base font-semibold text-slate-900">{criterion.label}</div>
+                        <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                          {bounded.toFixed(1)}
+                          {' '}
+                          /
+                          {' '}
+                          {criterion.max}
+                        </div>
+                      </div>
+
+                      <div className="mb-3 h-1.5 w-full rounded bg-slate-200">
+                        <div
+                          className="h-1.5 rounded bg-gradient-to-r from-indigo-500 to-purple-500"
+                          style={{ width: `${Math.min(100, Math.max(0, percent))}%` }}
+                        />
+                      </div>
+
                       <input
-                        type="number"
+                        type="range"
                         min="0"
-                        max={c.max}
+                        max={criterion.max}
                         step="0.1"
-                        inputMode="decimal"
-                        className="w-32 p-3 border-2 border-gray-300 rounded-lg font-mono text-lg font-semibold focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200"
-                        placeholder="0.0"
-                        value={(scoresState[currentKey]?.[c.id] ?? '')}
-                        onChange={(e) => handleScoreChange(c.id, e.target.value)}
+                        value={scoresState[currentKey]?.[criterion.id] ?? 0}
+                        onChange={(e) => handleScoreChange(criterion.id, e.target.value)}
+                        className="w-full accent-indigo-600"
                       />
-                      <div className="flex gap-2">
-                        {[0.25, 0.5, 0.75, 1].map(f => (
-                          <button key={f} onClick={() => handleScoreChange(c.id, (c.max * f).toFixed(1))} className="px-3 py-2 bg-indigo-100 hover:bg-indigo-200 rounded-lg text-sm font-semibold text-indigo-700 transition-colors">
-                            {(f * 100).toFixed(0)}%
+
+                      <div className="mt-3 flex flex-wrap items-center gap-2">
+                        <input
+                          type="number"
+                          min="0"
+                          max={criterion.max}
+                          step="0.1"
+                          inputMode="decimal"
+                          className="w-28 rounded-lg border border-slate-300 bg-white px-3 py-2 font-mono text-base font-semibold text-slate-900 outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200"
+                          placeholder="0.0"
+                          value={scoresState[currentKey]?.[criterion.id] ?? ''}
+                          onChange={(e) => handleScoreChange(criterion.id, e.target.value)}
+                        />
+                        {[0.25, 0.5, 0.75, 1].map((factor) => (
+                          <button
+                            key={factor}
+                            onClick={() => handleScoreChange(criterion.id, (criterion.max * factor).toFixed(1))}
+                            className="rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 text-xs font-semibold text-indigo-700 transition hover:bg-indigo-100"
+                          >
+                            {(factor * 100).toFixed(0)}
+                            %
                           </button>
                         ))}
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
 
               <div className="mt-6">
-                <label className="block text-base font-semibold text-gray-700 mb-2">Notes</label>
+                <label className="mb-2 block text-sm font-semibold text-slate-700">Notes</label>
                 <textarea
-                  className="w-full p-4 border-2 border-gray-300 rounded-lg text-base focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200"
+                  className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200"
                   rows="4"
                   placeholder="Add your comments here..."
                   value={notesState[currentKey] || ''}
-                  onChange={(e) => setNotesState(prev => ({ ...prev, [currentKey]: e.target.value }))}
-                ></textarea>
+                  onChange={(e) => setNotesState((prev) => ({ ...prev, [currentKey]: e.target.value }))}
+                />
               </div>
 
-              <div className="mt-8 flex items-center justify-between p-6 bg-gradient-to-r from-indigo-50 to-purple-50 rounded-xl border-2 border-indigo-200">
-                <div className="text-gray-700">
-                  <div className="text-base font-semibold text-indigo-700">My Total Score</div>
-                  <div className="text-4xl font-bold text-indigo-900">{computedTotal}</div>
+              <div className="mt-6 rounded-2xl border border-indigo-100 bg-gradient-to-br from-indigo-50 to-purple-50 p-5">
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                  <div>
+                    <div className="text-xs font-semibold uppercase tracking-wide text-indigo-600">My Total Score</div>
+                    <div className="mt-1 text-4xl font-bold text-slate-900">{computedTotal}</div>
+                  </div>
+
+                  <div className="flex flex-col gap-3 sm:flex-row">
+                    <button
+                      disabled={submitting || !selectedEventId || !selectedParticipantId}
+                      onClick={handleSubmitScore}
+                      className={`inline-flex items-center justify-center gap-2 rounded-xl px-6 py-3 text-sm font-semibold text-white transition ${
+                        submitting || !selectedEventId || !selectedParticipantId
+                          ? 'cursor-not-allowed bg-slate-400'
+                          : 'bg-gradient-to-r from-indigo-600 to-purple-600 shadow-md hover:from-indigo-700 hover:to-purple-700'
+                      }`}
+                    >
+                      <CheckCircle className="h-5 w-5" />
+                      {submitting
+                        ? 'Submitting...'
+                        : !selectedEventId
+                          ? 'Select Event'
+                          : !selectedParticipantId
+                            ? 'Select Participant'
+                            : 'Submit Score'}
+                    </button>
+
+                    <button
+                      onClick={() => setShowPrediction(!showPrediction)}
+                      disabled={!selectedParticipantId || !selectedEventId}
+                      className="inline-flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-6 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-400"
+                    >
+                      <Sparkles className="h-4 w-4" />
+                      {showPrediction
+                        ? 'Hide AI Prediction'
+                        : !selectedEventId
+                          ? 'Select Event'
+                          : !selectedParticipantId
+                            ? 'Select Participant'
+                            : 'Show AI Prediction'}
+                    </button>
+                  </div>
                 </div>
-                <button
-                  disabled={submitting || !selectedEventId || !selectedParticipantId}
-                  onClick={handleSubmitScore}
-                  className={`px-8 py-4 rounded-xl text-white text-lg font-semibold flex items-center gap-3 transition-all ${submitting ? 'bg-gray-400' : 'bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 shadow-lg hover:shadow-xl'}`}
-                  onMouseEnter={() => {
-                    console.log('Button state - submitting:', submitting, 'selectedEventId:', selectedEventId, 'selectedParticipantId:', selectedParticipantId);
-                  }}
-                >
-                  <CheckCircle className="w-6 h-6" />
-                  {submitting ? 'Submitting…' : !selectedEventId ? 'Select Event' : !selectedParticipantId ? 'Select Participant' : 'Submit Score'}
-                </button>
-                <button
-                  onClick={() => setShowPrediction(!showPrediction)}
-                  disabled={!selectedParticipantId || !selectedEventId}
-                  className="px-8 py-3 rounded-xl bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white text-lg font-semibold shadow-lg hover:shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-3"
-                >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                  </svg>
-                  {showPrediction ? 'Hide AI Prediction' : !selectedEventId ? 'Select Event' : !selectedParticipantId ? 'Select Participant' : 'Show AI Prediction'}
-                </button>
               </div>
 
-              {/* Recheck Requests Section - Appears below Submit Score button */}
-              <div className="mt-6">
+              <div className="mt-6 border-t border-slate-200 pt-6">
                 <RecheckRequestsDropdown
                   selectedEventId={selectedEventId}
                   onReanalyze={(request) => {
-                    // Set the participant for reanalysis
                     setSelectedParticipantId(request.participant);
                   }}
                 />
               </div>
             </div>
 
-            {/* Performance Prediction */}
             {showPrediction && selectedParticipantId && selectedEventId && (
               <PerformancePrediction
                 participantId={selectedParticipantId}
@@ -562,23 +681,35 @@ const JudgeDashboard = () => {
                 onClose={() => setShowPrediction(false)}
               />
             )}
-          </div>
+          </section>
 
-          <div className="space-y-6">
-            <div className="bg-white p-6 rounded-2xl shadow border border-gray-200">
-              <div className="flex items-center gap-3 mb-4">
-                <Trophy className="w-6 h-6 text-indigo-600" />
-                <div className="text-lg font-bold">Assigned Events</div>
+          <aside className="space-y-6 xl:col-span-4 xl:sticky xl:top-24 xl:self-start">
+            <div className="rounded-3xl border border-white/70 bg-white/80 p-6 shadow-xl backdrop-blur">
+              <div className="mb-4 flex items-center gap-3">
+                <Trophy className="h-5 w-5 text-indigo-600" />
+                <div className="text-lg font-bold text-slate-900">Assigned Events</div>
               </div>
               {assignedEvents.length === 0 ? (
-                <div className="text-gray-500 text-sm">No assigned events yet.</div>
+                <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-500">
+                  No assigned events yet.
+                </div>
               ) : (
                 <ul className="space-y-3">
-                  {assignedEvents.map(ev => (
-                    <li key={ev.id} className={`p-4 rounded-lg border-2 transition-all ${selectedEventId === ev.id ? 'border-indigo-500 bg-indigo-50 shadow-md' : 'border-gray-200 hover:border-indigo-300'}`}>
-                      <button className="w-full text-left" onClick={() => setSelectedEventId(ev.id)}>
-                        <div className="text-base font-semibold">{ev.name}</div>
-                        <div className="text-sm text-gray-600 mt-1">{ev.date}</div>
+                  {assignedEvents.map((event) => (
+                    <li key={event.id}>
+                      <button
+                        className={`relative w-full overflow-hidden rounded-xl border px-4 py-3 text-left transition ${
+                          selectedEventId === event.id
+                            ? 'border-indigo-300 bg-gradient-to-r from-indigo-50 to-purple-50 shadow-sm'
+                            : 'border-slate-200 bg-white hover:border-indigo-200'
+                        }`}
+                        onClick={() => setSelectedEventId(event.id)}
+                      >
+                        {selectedEventId === event.id ? (
+                          <span className="absolute inset-y-0 left-0 w-1 bg-indigo-500" />
+                        ) : null}
+                        <div className="pl-1 text-sm font-semibold text-slate-900">{event.name}</div>
+                        <div className="mt-1 pl-1 text-xs text-slate-500">{event.date || 'Date not available'}</div>
                       </button>
                     </li>
                   ))}
@@ -586,131 +717,226 @@ const JudgeDashboard = () => {
               )}
             </div>
 
-            {selectedEventId && (
-              <div className="bg-white p-6 rounded-2xl shadow border border-gray-200">
-                <div className="flex items-center gap-3 mb-4">
-                  <AlertCircle className="w-6 h-6 text-indigo-600" />
-                  <div className="text-lg font-bold">Verified Participants</div>
+            <div className="rounded-3xl border border-white/70 bg-white/80 p-6 shadow-xl backdrop-blur">
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <UsersIcon className="h-5 w-5 text-emerald-600" />
+                  <div className="text-lg font-bold text-slate-900">Verified Participants</div>
                 </div>
-                <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                  <p className="text-sm text-blue-700">
-                    <span className="font-semibold">Note:</span> Only participants verified by volunteers will appear here.
-                  </p>
-                </div>
-                {participants.length === 0 ? (
-                  <div className="text-base text-gray-500">No verified participants yet. Participants will appear here after volunteer verification.</div>
-                ) : (
-                  <ul className="space-y-3">
-                    {participants.map(reg => (
-                      <li key={reg.id} className={`p-4 rounded-lg border-2 transition-all ${selectedParticipantId === reg.participant ? 'border-green-500 bg-green-50 shadow-md' : 'border-gray-200 hover:border-green-300'}`}>
-                        <button className="w-full text-left" onClick={() => setSelectedParticipantId(reg.participant)}>
-                          <div className="flex items-center gap-2">
-                            <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                            </svg>
-                            <div className="text-base font-semibold">{reg.participant_details?.first_name} {reg.participant_details?.last_name}</div>
-                          </div>
-                          <div className="text-sm text-gray-600 mt-1">Chess #{reg.chess_number}</div>
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                )}
+                {selectedEventId ? (
+                  <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-emerald-700">
+                    {participants.length}
+                    {' '}
+                    total
+                  </span>
+                ) : null}
               </div>
-            )}
+              <div className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-700">
+                Only participants verified by volunteers appear in this list.
+              </div>
+
+              {!selectedEventId ? (
+                <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-500">
+                  Select an event to view verified participants.
+                </div>
+              ) : participants.length === 0 ? (
+                <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-500">
+                  No verified participants yet. They will appear here once verification is complete.
+                </div>
+              ) : (
+                <>
+                  <div className="mb-4 grid grid-cols-2 gap-2 text-xs">
+                    <div className="rounded-lg border border-slate-200 bg-white px-3 py-2">
+                      <div className="font-semibold uppercase tracking-wide text-slate-500">Visible</div>
+                      <div className="mt-0.5 text-sm font-bold text-slate-900">
+                        {participants.length}
+                        {' '}
+                        participants
+                      </div>
+                    </div>
+                    <div className="rounded-lg border border-slate-200 bg-white px-3 py-2">
+                      <div className="font-semibold uppercase tracking-wide text-slate-500">Selected</div>
+                      <div className="mt-0.5 truncate text-sm font-bold text-slate-900">
+                        {selectedParticipant
+                          ? `${selectedParticipant?.participant_details?.first_name || ''} ${selectedParticipant?.participant_details?.last_name || ''}`.trim()
+                          : 'None'}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="max-h-[26rem] overflow-y-auto pr-1">
+                    <ul className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
+                      {participants.map((registration) => {
+                        const isSelected = selectedParticipantId === registration.participant;
+                        const fullName = `${registration.participant_details?.first_name || ''} ${registration.participant_details?.last_name || ''}`.trim() || 'Participant';
+                        const initials = fullName
+                          .split(' ')
+                          .filter(Boolean)
+                          .slice(0, 2)
+                          .map((part) => part[0]?.toUpperCase())
+                          .join('');
+
+                        return (
+                          <li key={registration.id}>
+                            <button
+                              className={`group relative w-full overflow-hidden rounded-2xl border px-4 py-3 text-left transition ${
+                                isSelected
+                                  ? 'border-emerald-300 bg-gradient-to-br from-emerald-50 to-teal-50 shadow-sm ring-1 ring-emerald-100'
+                                  : 'border-slate-200 bg-white hover:border-emerald-200 hover:shadow-sm'
+                              }`}
+                              onClick={() => setSelectedParticipantId(registration.participant)}
+                            >
+                              {isSelected ? (
+                                <span className="absolute inset-y-0 left-0 w-1 bg-emerald-500" />
+                              ) : null}
+
+                              <div className="flex items-start gap-3 pl-1">
+                                <div
+                                  className={`mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
+                                    isSelected
+                                      ? 'bg-emerald-200 text-emerald-800'
+                                      : 'bg-slate-100 text-slate-600 group-hover:bg-emerald-100 group-hover:text-emerald-700'
+                                  }`}
+                                >
+                                  {initials || 'P'}
+                                </div>
+
+                                <div className="min-w-0 flex-1">
+                                  <div className="truncate text-sm font-semibold text-slate-900">{fullName}</div>
+                                  <div className="mt-1 inline-flex rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-slate-600">
+                                    Chess #
+                                    {registration.chess_number ?? '—'}
+                                  </div>
+                                </div>
+
+                                {isSelected ? <CheckCircle className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" /> : null}
+                              </div>
+                            </button>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </div>
+                </>
+              )}
+            </div>
 
             {selectedEventId && (
-              <div className="bg-gradient-to-br from-indigo-600 to-purple-600 p-6 rounded-2xl text-white shadow">
-                <div className="font-semibold mb-2">Live Judges Panel</div>
-                <div className="text-indigo-100 text-sm mb-4">Shows submitted scores count and current final after dropping extremes.</div>
-                <div className="bg-white/10 rounded-lg p-4">
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="text-sm">Judges submitted</div>
-                    <div className="font-bold">{loadingSummary ? '…' : (selectedSummary?.judges_submitted || 0)} / 5</div>
+              <div className="rounded-3xl bg-gradient-to-br from-slate-900 via-indigo-900 to-slate-900 p-6 text-slate-100 shadow-xl">
+                <div className="flex items-center gap-2 text-base font-semibold">
+                  <ChartBars className="h-5 w-5 text-indigo-300" />
+                  Live Judges Panel
+                </div>
+                <div className="mt-1 text-sm text-slate-300">
+                  Submission status and live final score for the selected participant.
+                </div>
+
+                <div className="mt-4 rounded-xl bg-white/10 p-4">
+                  <div className="mb-2 flex items-center justify-between text-sm">
+                    <div>Judges submitted</div>
+                    <div className="font-semibold">
+                      {loadingSummary ? '...' : judgesSubmittedCount}
+                      {' '}
+                      / 5
+                    </div>
                   </div>
-                  <div className="w-full bg-white/20 h-2 rounded">
-                    <div className="h-2 rounded bg-white" style={{ width: `${Math.min(100, ((selectedSummary?.judges_submitted || 0) / 5) * 100)}%` }} />
+                  <div className="h-2 w-full rounded bg-white/20">
+                    <div
+                      className="h-2 rounded bg-gradient-to-r from-emerald-300 to-cyan-300"
+                      style={{ width: `${Math.min(100, (judgesSubmittedCount / 5) * 100)}%` }}
+                    />
                   </div>
                 </div>
+
                 <div className="mt-4 grid grid-cols-2 gap-3">
-                  <div className="bg-white/10 rounded-lg p-4">
-                    <div className="text-sm text-indigo-100">My Submitted Total</div>
-                    <div className="text-2xl font-bold">{selectedSummary?.my_scores_total ?? '—'}</div>
+                  <div className="rounded-xl bg-white/10 p-4">
+                    <div className="text-xs uppercase tracking-wide text-slate-300">My Submitted Total</div>
+                    <div className="mt-1 text-xl font-semibold">{selectedSummary?.my_scores_total ?? '—'}</div>
                   </div>
-                  <div className="bg-white/10 rounded-lg p-4">
-                    <div className="text-sm text-indigo-100">Current Final (drop extremes)</div>
-                    <div className="text-2xl font-bold">
+                  <div className="rounded-xl bg-white/10 p-4">
+                    <div className="text-xs uppercase tracking-wide text-slate-300">Current Final</div>
+                    <div className="mt-1 text-xl font-semibold">
                       {computeFinalFromJudges(selectedSummary?.judges_totals || []) ?? '—'}
                     </div>
                   </div>
                 </div>
               </div>
             )}
-          </div>
+          </aside>
         </div>
-      </div>
 
-      {/* Results Section */}
-      {selectedEventId && summary.results && summary.results.length > 0 && (
-        <div className="mt-8">
-          <div className="bg-white p-8 rounded-2xl shadow border border-gray-200">
-            <div className="flex items-center gap-4 mb-6">
-              <Trophy className="w-8 h-8 text-indigo-600" />
-              <h2 className="text-3xl font-bold">Results</h2>
+        {selectedEventId && summary.results && summary.results.length > 0 && (
+          <section className="rounded-3xl border border-white/70 bg-white/85 p-6 shadow-xl backdrop-blur sm:p-8">
+            <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <Trophy className="h-6 w-6 text-indigo-600" />
+                <h2 className="text-2xl font-bold text-slate-900">Results</h2>
+              </div>
+              <span className="rounded-full bg-indigo-100 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-indigo-700">
+                {summary.results.length}
+                {' '}
+                Participants
+              </span>
             </div>
 
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b-2 border-gray-300">
-                    <th className="text-left py-4 px-5 text-base font-bold text-gray-800">Participant</th>
-                    <th className="text-center py-4 px-5 text-base font-bold text-gray-800">Judges Submitted</th>
-                    <th className="text-center py-4 px-5 text-base font-bold text-gray-800">My Score</th>
-                    <th className="text-center py-4 px-5 text-base font-bold text-gray-800">Final Score</th>
-                    <th className="text-center py-4 px-5 text-base font-bold text-gray-800">Status</th>
+            <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
+              <table className="min-w-full divide-y divide-slate-200 text-sm">
+                <thead className="bg-slate-50">
+                  <tr>
+                    <th className="px-4 py-3 text-left font-semibold text-slate-700">Participant</th>
+                    <th className="px-4 py-3 text-center font-semibold text-slate-700">Judges Submitted</th>
+                    <th className="px-4 py-3 text-center font-semibold text-slate-700">My Score</th>
+                    <th className="px-4 py-3 text-center font-semibold text-slate-700">Final Score</th>
+                    <th className="px-4 py-3 text-center font-semibold text-slate-700">Status</th>
                   </tr>
                 </thead>
-                <tbody>
+                <tbody className="divide-y divide-slate-200">
                   {summary.results.map((result) => {
-                    const participant = participants.find(p => p.participant === result.participant);
+                    const participant = participants.find((p) => p.participant === result.participant);
                     const isComplete = result.judges_submitted >= 5;
                     const finalScore = computeFinalFromJudges(result.judges_totals);
 
                     return (
-                      <tr key={result.participant} className="border-b border-gray-200 hover:bg-gray-50 transition-colors">
-                        <td className="py-5 px-5">
-                          <div className="text-base font-semibold text-gray-900">
-                            {participant?.participant_details?.first_name} {participant?.participant_details?.last_name}
+                      <tr key={result.participant} className="hover:bg-slate-50">
+                        <td className="px-4 py-4">
+                          <div className="font-semibold text-slate-900">
+                            {participant?.participant_details?.first_name}
+                            {' '}
+                            {participant?.participant_details?.last_name}
                           </div>
-                          <div className="text-sm text-gray-600 mt-1">
-                            Chess #{participant?.chess_number}
+                          <div className="mt-1 text-xs text-slate-500">
+                            Chess #
+                            {participant?.chess_number || '—'}
                           </div>
                         </td>
-                        <td className="text-center py-5 px-5">
-                          <span className={`inline-flex items-center px-4 py-2 rounded-full text-base font-bold ${isComplete ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
-                            }`}>
-                            {result.judges_submitted} / 5
+                        <td className="px-4 py-4 text-center">
+                          <span
+                            className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${
+                              isComplete ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
+                            }`}
+                          >
+                            {result.judges_submitted}
+                            {' '}
+                            / 5
                           </span>
                         </td>
-                        <td className="text-center py-5 px-5 text-lg font-bold text-gray-900">
+                        <td className="px-4 py-4 text-center font-semibold text-slate-900">
                           {result.my_scores_total !== null && result.my_scores_total !== undefined
                             ? result.my_scores_total.toFixed(1)
                             : '—'}
                         </td>
-                        <td className="text-center py-5 px-5">
+                        <td className="px-4 py-4 text-center">
                           {finalScore !== null ? (
-                            <span className="text-2xl font-bold text-indigo-600">
-                              {finalScore}
-                            </span>
+                            <span className="text-lg font-bold text-indigo-600">{finalScore.toFixed(2)}</span>
                           ) : (
-                            <span className="text-base text-gray-400 font-medium">Pending</span>
+                            <span className="text-sm font-medium text-slate-400">Pending</span>
                           )}
                         </td>
-                        <td className="text-center py-5 px-5">
+                        <td className="px-4 py-4 text-center">
                           {isComplete ? (
-                            <CheckCircle className="w-6 h-6 text-green-600 mx-auto" />
+                            <CheckCircle className="mx-auto h-5 w-5 text-emerald-600" />
                           ) : (
-                            <AlertCircle className="w-6 h-6 text-yellow-600 mx-auto" />
+                            <AlertCircle className="mx-auto h-5 w-5 text-amber-500" />
                           )}
                         </td>
                       </tr>
@@ -720,55 +946,13 @@ const JudgeDashboard = () => {
               </table>
             </div>
 
-            <div className="mt-6 p-4 bg-blue-50 border-2 border-blue-200 rounded-lg">
-              <p className="text-base text-blue-700">
-                <span className="font-bold">Note:</span> Final scores are calculated by dropping the highest and lowest scores from 5 judges, then averaging the remaining 3 scores.
-              </p>
+            <div className="mt-4 rounded-xl border border-indigo-200 bg-indigo-50 p-3 text-sm text-indigo-700">
+              Final scores are calculated by dropping the highest and lowest scores from 5 judges, then averaging the
+              remaining 3 scores.
             </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-};
-
-const DashboardSection = ({ title, children }) => {
-  return (
-    <div>
-      <h3 className="text-xl font-semibold mb-4">{title}</h3>
-      {children}
-    </div>
-  );
-};
-
-const EventCard = ({ name, date, time, venue }) => {
-  return (
-    <div className="bg-white p-4 rounded shadow flex justify-between items-center">
-      <div>
-        <h4 className="font-semibold">{name}</h4>
-        <p className="text-gray-600">{date} at {time} - {venue}</p>
+          </section>
+        )}
       </div>
-      <button className="bg-blue-500 text-white px-4 py-2 rounded">
-        View Details
-      </button>
-    </div>
-  );
-};
-
-const ScoreInput = ({ label, value, onChange }) => {
-  return (
-    <div>
-      <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
-      <input
-        type="number"
-        min="0"
-        max="10"
-        step="0.1"
-        className="w-full p-2 border rounded"
-        placeholder="0-10"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-      />
     </div>
   );
 };

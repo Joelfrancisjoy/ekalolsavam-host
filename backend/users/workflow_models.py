@@ -225,6 +225,11 @@ class SchoolGroupMember(models.Model):
     """
     Individual members within a school group entry.
     """
+    GENDER_CHOICES = [
+        ('BOYS', 'Boys'),
+        ('GIRLS', 'Girls'),
+    ]
+
     group_entry = models.ForeignKey(
         SchoolGroupEntry,
         on_delete=models.CASCADE,
@@ -233,6 +238,9 @@ class SchoolGroupMember(models.Model):
     member_order = models.PositiveSmallIntegerField()
     first_name = models.CharField(max_length=100)
     last_name = models.CharField(max_length=100)
+    gender = models.CharField(max_length=10, choices=GENDER_CHOICES, null=True, blank=True)
+    student_class = models.PositiveSmallIntegerField(null=True, blank=True, help_text="Class 1-12")
+    phone = models.CharField(max_length=15, blank=True, default='')
     is_leader = models.BooleanField(default=False)
 
     class Meta:
@@ -240,6 +248,17 @@ class SchoolGroupMember(models.Model):
         verbose_name_plural = 'School Group Members'
         ordering = ['member_order']
         unique_together = [['group_entry', 'member_order']]
+        constraints = [
+            models.CheckConstraint(
+                check=models.Q(student_class__isnull=True) |
+                      (models.Q(student_class__gte=1) & models.Q(student_class__lte=12)),
+                name='school_group_member_class_range',
+            ),
+            models.CheckConstraint(
+                check=models.Q(gender__isnull=True) | models.Q(gender__in=['BOYS', 'GIRLS']),
+                name='school_group_member_gender_choices',
+            ),
+        ]
 
     def __str__(self):
         return f"{self.group_entry.group_id} - {self.first_name} {self.last_name}"

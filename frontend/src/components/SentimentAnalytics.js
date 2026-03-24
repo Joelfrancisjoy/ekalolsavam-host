@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import http from '../services/http-common';
+import { API_ROUTES } from '../services/apiRoutes';
 
 const SentimentAnalytics = () => {
   const [analytics, setAnalytics] = useState(null);
@@ -25,7 +26,7 @@ const SentimentAnalytics = () => {
       if (filter.feedback_type) params.append('feedback_type', filter.feedback_type);
       if (filter.days) params.append('days', filter.days);
       
-      const response = await http.get(`/api/feedback/sentiment-analytics/?${params}`);
+      const response = await http.get(API_ROUTES.feedback.analyticsWithParams(params));
       setAnalytics(response.data);
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to fetch analytics');

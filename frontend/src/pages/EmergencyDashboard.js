@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import http from '../services/http-common';
+import { API_ROUTES } from '../services/apiRoutes';
 
 const EmergencyDashboard = () => {
   const [emergencies, setEmergencies] = useState([]);
@@ -136,7 +137,7 @@ const EmergencyDashboard = () => {
         severity: triageForm.severity,
         status: 'resolved',
       };
-      const res = await http.patch(`/api/emergencies/${selectedEmergencyId}/volunteer-complete/`, payload);
+      const res = await http.patch(API_ROUTES.emergencies.volunteerComplete(selectedEmergencyId), payload);
 
       setEmergencies((prev) => {
         const next = (prev || []).map((em) => (em.id === res.data.id ? { ...em, ...res.data } : em));

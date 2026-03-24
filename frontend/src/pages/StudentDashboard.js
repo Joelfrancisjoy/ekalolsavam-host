@@ -2,16 +2,17 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   eventServiceAdapter as eventService,
-  resultServiceAdapter as resultService,
-  userServiceAdapter as userService
+  resultServiceAdapter as resultService
 } from '../services/serviceAdapter';
 import http from '../services/http-common';
+import { API_ROUTES } from '../services/apiRoutes';
 import UserInfoHeader from '../components/UserInfoHeader';
 import StudentFeedbackDisplay from '../components/StudentFeedbackDisplay';
 import feedbackService from '../services/feedbackService';
 import authManager from '../utils/authManager';
 import { GENDER_OPTIONS, getGenderLabel, normalizeGenderValue } from '../constants/gender';
 import { COORDINATOR_HELP_TEXT, extractApiErrorMessage, mapGenderRuleErrorToUi } from '../utils/genderEligibility';
+import { GENDER_CATEGORY_OPTIONS } from '../utils/groupParticipants';
 
 // Static data for Live Results Carousel
 const staticResultsForCarousel = [
@@ -260,6 +261,172 @@ const parseAllowedEventsPayload = (payload) => {
   }
   const groupEventIds = Array.from(new Set(groupEntries.flatMap((entry) => entry.event_ids || [])));
   return { eventIds: groupEventIds, groupEntries };
+};
+
+const toErrorList = (value) => {
+  if (Array.isArray(value)) return value.map((item) => String(item)).filter(Boolean);
+  if (value === null || value === undefined || value === '') return [];
+  return [String(value)];
+};
+
+const createGroupProfileFieldErrors = () => ({
+  non_field_errors: [],
+  gender_category: [],
+  notes: [],
+  participants_non_field: [],
+  participants: {}
+});
+
+const hasGroupProfileFieldErrors = (errors) => {
+  if (!errors) return false;
+  if (
+    (Array.isArray(errors.non_field_errors) && errors.non_field_errors.length > 0) ||
+    (Array.isArray(errors.gender_category) && errors.gender_category.length > 0) ||
+    (Array.isArray(errors.participants_non_field) && errors.participants_non_field.length > 0)
+  ) {
+    return true;
+  }
+  return Object.values(errors.participants || {}).some((item) => (
+    (Array.isArray(item?.first_name) && item.first_name.length > 0) ||
+    (Array.isArray(item?.last_name) && item.last_name.length > 0) ||
+    (Array.isArray(item?.gender) && item.gender.length > 0) ||
+    (Array.isArray(item?.student_class) && item.student_class.length > 0) ||
+    (Array.isArray(item?.phone) && item.phone.length > 0) ||
+    (Array.isArray(item?.non_field_errors) && item.non_field_errors.length > 0)
+  ));
+};
+
+const normalizeParticipantGenderValue = (value) => {
+  const normalized = normalizeGenderValue(value);
+  if (normalized) return normalized;
+  return String(value || '').trim().toUpperCase();
+};
+
+const normalizeGroupProfileParticipants = (value) => {
+  if (!Array.isArray(value)) return [];
+  return value.map((participant, index) => {
+    const participantId = participant?.id ?? participant?.participant_id ?? null;
+    const memberOrderCandidate = Number(participant?.member_order ?? participant?.memberOrder ?? index + 1);
+    const memberOrder = Number.isInteger(memberOrderCandidate) && memberOrderCandidate > 0
+      ? memberOrderCandidate
+      : index + 1;
+    return {
+      id: participantId,
+      member_order: memberOrder,
+      first_name: String(participant?.first_name || '').trim(),
+      last_name: String(participant?.last_name || '').trim(),
+      gender: normalizeParticipantGenderValue(participant?.gender),
+      student_class: String(participant?.student_class ?? participant?.studentClass ?? '').trim(),
+      phone: String(participant?.phone || '').trim()
+    };
+  });
+};
+
+const buildGroupProfileParticipantsPayload = (value) => {
+  return normalizeGroupProfileParticipants(value).map((participant, index) => {
+    const payload = {
+      first_name: String(participant?.first_name || '').trim(),
+      last_name: String(participant?.last_name || '').trim(),
+      gender: normalizeParticipantGenderValue(participant?.gender),
+      student_class: String(participant?.student_class || '').trim(),
+      phone: String(participant?.phone || '').trim()
+    };
+    const participantId = participant?.id;
+    if (participantId !== null && participantId !== undefined && participantId !== '') {
+      payload.id = participantId;
+    } else {
+      const fallbackOrder = Number(participant?.member_order ?? index + 1);
+      payload.member_order = Number.isInteger(fallbackOrder) && fallbackOrder > 0 ? fallbackOrder : (index + 1);
+    }
+    return payload;
+  });
+};
+
+const parseParticipantFieldErrors = (participantErrors) => {
+  const rows = {};
+  const nonField = [];
+  if (!participantErrors) return { rows, nonField };
+
+  const consumeRowError = (rowIndex, item) => {
+    if (!item || typeof item !== 'object') return;
+    const rowErrors = {
+      first_name: toErrorList(item?.first_name),
+      last_name: toErrorList(item?.last_name),
+      gender: toErrorList(item?.gender),
+      student_class: toErrorList(item?.student_class),
+      phone: toErrorList(item?.phone),
+      non_field_errors: toErrorList(item?.non_field_errors)
+    };
+    if (
+      rowErrors.first_name.length ||
+      rowErrors.last_name.length ||
+      rowErrors.gender.length ||
+      rowErrors.student_class.length ||
+      rowErrors.phone.length ||
+      rowErrors.non_field_errors.length
+    ) {
+      rows[rowIndex] = rowErrors;
+    }
+  };
+
+  if (Array.isArray(participantErrors)) {
+    participantErrors.forEach((item, index) => {
+      if (!item) return;
+      if (typeof item === 'string') {
+        nonField.push(item);
+        return;
+      }
+      if (Array.isArray(item)) {
+        nonField.push(...toErrorList(item));
+        return;
+      }
+      consumeRowError(index, item);
+    });
+    return { rows, nonField };
+  }
+
+  if (typeof participantErrors === 'object') {
+    Object.entries(participantErrors).forEach(([key, item]) => {
+      const rowIndex = Number(key);
+      if (!Number.isInteger(rowIndex) || rowIndex < 0) {
+        nonField.push(...toErrorList(item));
+        return;
+      }
+      if (typeof item === 'string') {
+        nonField.push(item);
+        return;
+      }
+      if (Array.isArray(item)) {
+        nonField.push(...toErrorList(item));
+        return;
+      }
+      consumeRowError(rowIndex, item);
+    });
+  } else {
+    nonField.push(...toErrorList(participantErrors));
+  }
+  return { rows, nonField };
+};
+
+const parseGroupProfileErrors = (payload) => {
+  const errors = createGroupProfileFieldErrors();
+  if (!payload) return errors;
+  if (typeof payload === 'string') {
+    errors.non_field_errors = [payload];
+    return errors;
+  }
+
+  errors.non_field_errors.push(...toErrorList(payload?.non_field_errors));
+  errors.non_field_errors.push(...toErrorList(payload?.detail));
+  errors.non_field_errors.push(...toErrorList(payload?.error));
+  errors.gender_category = toErrorList(payload?.gender_category);
+  errors.notes = toErrorList(payload?.notes);
+
+  const participantParse = parseParticipantFieldErrors(payload?.participants);
+  errors.participants = participantParse.rows;
+  errors.participants_non_field = participantParse.nonField;
+
+  return errors;
 };
 
 // Create a QR image Data URL using a public QR service, then draw to canvas (so we get a stable data URL)
@@ -739,6 +906,7 @@ const TopRightFloatingMenu = ({ onOpen }) => {
 
       <button
         onClick={() => onOpen(iconInfo.key)}
+        aria-label={iconInfo.label}
         className={`group relative w-20 h-20 rounded-3xl bg-gradient-to-br ${iconInfo.gradient} ${iconInfo.shadowColor} shadow-xl hover:shadow-2xl flex items-center justify-center transition-all duration-700 ease-out hover:scale-105 hover:-translate-y-3 overflow-hidden transform-gpu backdrop-blur-sm`}
         style={{
           filter: 'drop-shadow(0 20px 40px rgba(0,0,0,0.15))',
@@ -853,8 +1021,22 @@ const StudentDashboard = () => {
     gender: ''
   });
   const [profileError, setProfileError] = useState('');
+  const [profileFieldErrors, setProfileFieldErrors] = useState({});
   const [profileSaving, setProfileSaving] = useState(false);
   const [profileReturnTarget, setProfileReturnTarget] = useState(null);
+  const [groupProfileLoadingId, setGroupProfileLoadingId] = useState('');
+  const [groupProfileForm, setGroupProfileForm] = useState({
+    groupEntryId: '',
+    group_id: '',
+    group_class: '',
+    gender_category: '',
+    notes: '',
+    participants: []
+  });
+  const [groupProfileError, setGroupProfileError] = useState('');
+  const [groupProfileFieldErrors, setGroupProfileFieldErrors] = useState(createGroupProfileFieldErrors());
+  const [groupProfileSaving, setGroupProfileSaving] = useState(false);
+  const [groupProfileReturnTarget, setGroupProfileReturnTarget] = useState(null);
 
   const hasMorePublishedEvents = publishedEvents.length > PUBLISHED_EVENTS_INITIAL_VISIBLE;
   const visiblePublishedEvents = useMemo(
@@ -913,14 +1095,34 @@ const StudentDashboard = () => {
 
   const openProfileEditor = (returnTarget = null) => {
     setProfileError('');
+    setProfileFieldErrors({});
     setProfileReturnTarget(returnTarget);
     setOpen('profile');
   };
 
   const closeProfileEditor = () => {
     setProfileError('');
+    setProfileFieldErrors({});
     const nextTarget = profileReturnTarget;
     setProfileReturnTarget(null);
+    setOpen(nextTarget || null);
+  };
+
+  const closeGroupProfileEditor = () => {
+    setGroupProfileError('');
+    setGroupProfileFieldErrors(createGroupProfileFieldErrors());
+    setGroupProfileLoadingId('');
+    setGroupProfileSaving(false);
+    setGroupProfileForm({
+      groupEntryId: '',
+      group_id: '',
+      group_class: '',
+      gender_category: '',
+      notes: '',
+      participants: []
+    });
+    const nextTarget = groupProfileReturnTarget;
+    setGroupProfileReturnTarget(null);
     setOpen(nextTarget || null);
   };
 
@@ -940,6 +1142,10 @@ const StudentDashboard = () => {
     if (key === 'profile') {
       setProfileReturnTarget(null);
       setProfileError('');
+      setProfileFieldErrors({});
+    }
+    if (key === 'groupProfile') {
+      return;
     }
     setOpen(key);
     if (key === 'qr') {
@@ -1414,6 +1620,7 @@ const StudentDashboard = () => {
   const submitProfileUpdate = async (e) => {
     e.preventDefault();
     setProfileError('');
+    setProfileFieldErrors({});
 
     const firstNameValue = String(profileForm.first_name || '').trim();
     const lastNameValue = String(profileForm.last_name || '').trim();
@@ -1428,11 +1635,6 @@ const StudentDashboard = () => {
       setProfileError('Please select your gender.');
       return;
     }
-    if (!currentUser?.id) {
-      setProfileError('Unable to update profile right now. Please refresh and try again.');
-      return;
-    }
-
     const payload = {
       first_name: firstNameValue,
       last_name: lastNameValue,
@@ -1442,11 +1644,7 @@ const StudentDashboard = () => {
 
     setProfileSaving(true);
     try {
-      if (typeof userService?.update === 'function') {
-        await userService.update(currentUser.id, payload);
-      } else {
-        await http.patch(`/api/auth/users/${currentUser.id}/`, payload);
-      }
+      await http.patch('/api/auth/profile/', payload);
 
       try {
         const userRes = await http.get('/api/auth/current/');
@@ -1460,9 +1658,151 @@ const StudentDashboard = () => {
       setProfileReturnTarget(null);
       setOpen(nextTarget || null);
     } catch (err) {
-      setProfileError(extractApiErrorMessage(err) || 'Failed to update profile.');
+      const statusCode = Number(err?.response?.status || 0);
+      const errorPayload = err?.response?.data;
+      if (statusCode === 400 && errorPayload && typeof errorPayload === 'object' && !Array.isArray(errorPayload)) {
+        setProfileFieldErrors(errorPayload);
+        const fallbackMessage = extractApiErrorMessage(err) || 'Please correct the highlighted fields.';
+        setProfileError(fallbackMessage);
+      } else if (statusCode === 403) {
+        setProfileError('Your role is not allowed to update this profile.');
+      } else {
+        setProfileError(extractApiErrorMessage(err) || 'Failed to update profile.');
+      }
     } finally {
       setProfileSaving(false);
+    }
+  };
+
+  const openGroupProfileEditor = async (groupEntryId, returnTarget = null) => {
+    const normalizedId = String(groupEntryId || '').trim();
+    if (!normalizedId) return;
+
+    setGroupProfileReturnTarget(returnTarget);
+    setGroupProfileError('');
+    setGroupProfileFieldErrors(createGroupProfileFieldErrors());
+    setGroupProfileLoadingId(normalizedId);
+    setOpen('groupProfile');
+    try {
+      const response = await http.get(API_ROUTES.students.groupProfile(normalizedId));
+      const data = response?.data || {};
+      const fallbackEntry = allowedGroupEntries.find((entry) => String(entry?.id) === normalizedId || String(entry?.group_entry_id) === normalizedId);
+      const participants = normalizeGroupProfileParticipants(data?.participants);
+      setGroupProfileForm({
+        groupEntryId: normalizedId,
+        group_id: String(data?.group_id || fallbackEntry?.group_id || '').trim().toUpperCase(),
+        group_class: String(data?.group_class || fallbackEntry?.group_class || '').trim(),
+        gender_category: String(data?.gender_category || fallbackEntry?.gender_category || '').trim().toUpperCase(),
+        notes: String(data?.notes || data?.review_notes || fallbackEntry?.review_notes || '').trim(),
+        participants
+      });
+    } catch (err) {
+      const statusCode = Number(err?.response?.status || 0);
+      if (statusCode === 403) {
+        setGroupProfileError('Your role is not allowed to edit this group profile.');
+      } else if (statusCode === 404) {
+        setGroupProfileError('This group profile was not found or is not owned by your account.');
+      } else {
+        setGroupProfileError(extractApiErrorMessage(err) || 'Failed to load group profile.');
+      }
+    } finally {
+      setGroupProfileLoadingId('');
+    }
+  };
+
+  const updateGroupProfileParticipantField = (index, field, value) => {
+    setGroupProfileForm((prev) => {
+      const nextParticipants = Array.isArray(prev.participants) ? [...prev.participants] : [];
+      const current = nextParticipants[index] || { first_name: '', last_name: '' };
+      nextParticipants[index] = { ...current, [field]: value };
+      return { ...prev, participants: nextParticipants };
+    });
+    setGroupProfileFieldErrors((prev) => {
+      if (!prev?.participants?.[index]?.[field]?.length) return prev;
+      const nextParticipants = { ...(prev.participants || {}) };
+      const row = { ...(nextParticipants[index] || {}) };
+      row[field] = [];
+      nextParticipants[index] = row;
+      return { ...prev, participants: nextParticipants };
+    });
+  };
+
+  const submitGroupProfileUpdate = async (event) => {
+    event.preventDefault();
+    setGroupProfileError('');
+    setGroupProfileFieldErrors(createGroupProfileFieldErrors());
+
+    const groupEntryId = String(groupProfileForm.groupEntryId || '').trim();
+    const genderCategory = String(groupProfileForm.gender_category || '').trim().toUpperCase();
+    const participants = buildGroupProfileParticipantsPayload(groupProfileForm.participants);
+    const notes = String(groupProfileForm.notes || '').trim();
+
+    if (!groupEntryId) {
+      setGroupProfileError('Unable to update this group profile. Please reopen and try again.');
+      return;
+    }
+    if (!GENDER_CATEGORY_OPTIONS.includes(genderCategory)) {
+      setGroupProfileError('Please choose a valid gender category.');
+      return;
+    }
+    if (!participants.length) {
+      setGroupProfileError('At least one participant is required.');
+      return;
+    }
+
+    setGroupProfileSaving(true);
+    try {
+      await http.patch(API_ROUTES.students.groupProfile(groupEntryId), {
+        gender_category: genderCategory,
+        ...(notes ? { notes } : {}),
+        participants
+      });
+
+      setAllowedGroupEntries((prev) => {
+        const list = Array.isArray(prev) ? prev : [];
+        return list.map((entry) => {
+          const entryId = String(entry?.id ?? entry?.group_entry_id ?? '');
+          if (entryId !== groupEntryId) return entry;
+          const participantCount = participants.length;
+          const leaderIndex = Number(entry?.leader_index);
+          const leaderParticipant = Number.isInteger(leaderIndex) && leaderIndex > 0 && leaderIndex <= participantCount
+            ? participants[leaderIndex - 1]
+            : null;
+          const leaderFullName = leaderParticipant
+            ? `${leaderParticipant.first_name || ''} ${leaderParticipant.last_name || ''}`.trim()
+            : entry?.leader_full_name || '-';
+          return {
+            ...entry,
+            gender_category: genderCategory,
+            review_notes: notes || entry?.review_notes || '',
+            participants: normalizeGroupProfileParticipants(participants),
+            participant_count: participantCount,
+            leader_full_name: leaderFullName || '-'
+          };
+        });
+      });
+
+      closeGroupProfileEditor();
+    } catch (err) {
+      const statusCode = Number(err?.response?.status || 0);
+      const payload = err?.response?.data;
+      if (statusCode === 400) {
+        const parsedErrors = parseGroupProfileErrors(payload);
+        if (hasGroupProfileFieldErrors(parsedErrors)) {
+          setGroupProfileFieldErrors(parsedErrors);
+          setGroupProfileError('Please correct the highlighted fields.');
+        } else {
+          setGroupProfileError(extractApiErrorMessage(err) || 'Validation failed.');
+        }
+      } else if (statusCode === 403) {
+        setGroupProfileError('Your role is not allowed to edit this group profile.');
+      } else if (statusCode === 404) {
+        setGroupProfileError('This group profile was not found or is not owned by your account.');
+      } else {
+        setGroupProfileError(extractApiErrorMessage(err) || 'Failed to update group profile.');
+      }
+    } finally {
+      setGroupProfileSaving(false);
     }
   };
 
@@ -2219,6 +2559,9 @@ const StudentDashboard = () => {
                 className="w-full px-4 py-3 border-2 border-amber-200 rounded-xl focus:ring-2 focus:ring-amber-400 focus:border-amber-400"
                 required
               />
+              {toErrorList(profileFieldErrors?.first_name).map((msg, index) => (
+                <p key={`profile-first-name-error-${index}`} className="mt-1 text-sm text-red-600">{msg}</p>
+              ))}
             </div>
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">Last Name</label>
@@ -2229,6 +2572,9 @@ const StudentDashboard = () => {
                 className="w-full px-4 py-3 border-2 border-amber-200 rounded-xl focus:ring-2 focus:ring-amber-400 focus:border-amber-400"
                 required
               />
+              {toErrorList(profileFieldErrors?.last_name).map((msg, index) => (
+                <p key={`profile-last-name-error-${index}`} className="mt-1 text-sm text-red-600">{msg}</p>
+              ))}
             </div>
           </div>
 
@@ -2241,6 +2587,9 @@ const StudentDashboard = () => {
                 onChange={(e) => setProfileForm((prev) => ({ ...prev, phone: e.target.value }))}
                 className="w-full px-4 py-3 border-2 border-amber-200 rounded-xl focus:ring-2 focus:ring-amber-400 focus:border-amber-400"
               />
+              {toErrorList(profileFieldErrors?.phone).map((msg, index) => (
+                <p key={`profile-phone-error-${index}`} className="mt-1 text-sm text-red-600">{msg}</p>
+              ))}
             </div>
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">Gender</label>
@@ -2257,6 +2606,9 @@ const StudentDashboard = () => {
                   </option>
                 ))}
               </select>
+              {toErrorList(profileFieldErrors?.gender).map((msg, index) => (
+                <p key={`profile-gender-error-${index}`} className="mt-1 text-sm text-red-600">{msg}</p>
+              ))}
             </div>
           </div>
 
@@ -2278,6 +2630,180 @@ const StudentDashboard = () => {
             </button>
           </div>
         </form>
+      </Modal>
+
+      <Modal open={open === 'groupProfile'} title="Edit Group Profile" onClose={closeGroupProfileEditor}>
+        {groupProfileLoadingId ? (
+          <div className="flex items-center justify-center py-10">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+          </div>
+        ) : (
+          <form onSubmit={submitGroupProfileUpdate} className="space-y-5">
+            <div className="rounded-xl border border-indigo-200 bg-indigo-50 p-4">
+              <p className="text-indigo-900 font-semibold">
+                Group ID: {groupProfileForm.group_id || '-'} • Class: {groupProfileForm.group_class || '-'}
+              </p>
+              {groupProfileReturnTarget === 'register' && (
+                <p className="text-sm text-indigo-700 mt-1">Save your group profile and you will return to event registration.</p>
+              )}
+            </div>
+
+            {groupProfileError && (
+              <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                {groupProfileError}
+              </div>
+            )}
+
+            {groupProfileFieldErrors.non_field_errors.length > 0 && (
+              <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 space-y-1">
+                {groupProfileFieldErrors.non_field_errors.map((msg, index) => (
+                  <p key={`group-profile-non-field-error-${index}`}>{msg}</p>
+                ))}
+              </div>
+            )}
+
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">Gender Category</label>
+              <select
+                value={groupProfileForm.gender_category}
+                onChange={(e) => {
+                  const value = String(e.target.value || '').toUpperCase();
+                  setGroupProfileForm((prev) => ({ ...prev, gender_category: value }));
+                  setGroupProfileFieldErrors((prev) => ({ ...prev, gender_category: [] }));
+                }}
+                className="w-full px-4 py-3 border-2 border-indigo-200 rounded-xl focus:ring-2 focus:ring-indigo-400 focus:border-indigo-400 bg-white"
+                required
+              >
+                <option value="">Select gender category</option>
+                {GENDER_CATEGORY_OPTIONS.map((option) => (
+                  <option key={option} value={option}>{option}</option>
+                ))}
+              </select>
+              {groupProfileFieldErrors.gender_category.map((msg, index) => (
+                <p key={`group-profile-gender-error-${index}`} className="mt-1 text-sm text-red-600">{msg}</p>
+              ))}
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">Notes (optional)</label>
+              <textarea
+                rows={2}
+                value={groupProfileForm.notes}
+                onChange={(e) => {
+                  setGroupProfileForm((prev) => ({ ...prev, notes: e.target.value }));
+                  setGroupProfileFieldErrors((prev) => ({ ...prev, notes: [] }));
+                }}
+                className="w-full px-4 py-3 border-2 border-indigo-200 rounded-xl focus:ring-2 focus:ring-indigo-400 focus:border-indigo-400 bg-white"
+                placeholder="Optional note for this update"
+              />
+              {toErrorList(groupProfileFieldErrors.notes).map((msg, index) => (
+                <p key={`group-profile-notes-error-${index}`} className="mt-1 text-sm text-red-600">{msg}</p>
+              ))}
+            </div>
+
+            <div className="space-y-3">
+              <h4 className="text-sm font-semibold text-gray-700">Participants</h4>
+              {groupProfileFieldErrors.participants_non_field.length > 0 && (
+                <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 space-y-1">
+                  {groupProfileFieldErrors.participants_non_field.map((msg, index) => (
+                    <p key={`group-profile-participants-non-field-${index}`}>{msg}</p>
+                  ))}
+                </div>
+              )}
+              {(groupProfileForm.participants || []).map((participant, index) => (
+                <div key={`group-profile-participant-${index}`} className="grid grid-cols-1 md:grid-cols-2 gap-3 p-3 border border-indigo-100 rounded-lg bg-white">
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1">First Name</label>
+                    <input
+                      type="text"
+                      value={participant.first_name}
+                      onChange={(e) => updateGroupProfileParticipantField(index, 'first_name', e.target.value)}
+                      className="w-full px-3 py-2 border border-indigo-200 rounded-lg focus:ring-2 focus:ring-indigo-400 focus:border-indigo-400"
+                      required
+                    />
+                    {toErrorList(groupProfileFieldErrors.participants?.[index]?.first_name).map((msg, errorIndex) => (
+                      <p key={`group-profile-participant-first-name-${index}-${errorIndex}`} className="mt-1 text-xs text-red-600">{msg}</p>
+                    ))}
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1">Last Name</label>
+                    <input
+                      type="text"
+                      value={participant.last_name}
+                      onChange={(e) => updateGroupProfileParticipantField(index, 'last_name', e.target.value)}
+                      className="w-full px-3 py-2 border border-indigo-200 rounded-lg focus:ring-2 focus:ring-indigo-400 focus:border-indigo-400"
+                      required
+                    />
+                    {toErrorList(groupProfileFieldErrors.participants?.[index]?.last_name).map((msg, errorIndex) => (
+                      <p key={`group-profile-participant-last-name-${index}-${errorIndex}`} className="mt-1 text-xs text-red-600">{msg}</p>
+                    ))}
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1">Gender</label>
+                    <select
+                      value={participant.gender || ''}
+                      onChange={(e) => updateGroupProfileParticipantField(index, 'gender', e.target.value)}
+                      className="w-full px-3 py-2 border border-indigo-200 rounded-lg focus:ring-2 focus:ring-indigo-400 focus:border-indigo-400 bg-white"
+                    >
+                      <option value="">Select gender</option>
+                      {GENDER_OPTIONS.map((option) => (
+                        <option key={`${option.value}-${index}`} value={option.value}>{option.label}</option>
+                      ))}
+                    </select>
+                    {toErrorList(groupProfileFieldErrors.participants?.[index]?.gender).map((msg, errorIndex) => (
+                      <p key={`group-profile-participant-gender-${index}-${errorIndex}`} className="mt-1 text-xs text-red-600">{msg}</p>
+                    ))}
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1">Class</label>
+                    <input
+                      type="text"
+                      value={participant.student_class || ''}
+                      onChange={(e) => updateGroupProfileParticipantField(index, 'student_class', e.target.value)}
+                      className="w-full px-3 py-2 border border-indigo-200 rounded-lg focus:ring-2 focus:ring-indigo-400 focus:border-indigo-400"
+                    />
+                    {toErrorList(groupProfileFieldErrors.participants?.[index]?.student_class).map((msg, errorIndex) => (
+                      <p key={`group-profile-participant-class-${index}-${errorIndex}`} className="mt-1 text-xs text-red-600">{msg}</p>
+                    ))}
+                  </div>
+                  <div className="md:col-span-2">
+                    <label className="block text-xs font-semibold text-gray-600 mb-1">Phone</label>
+                    <input
+                      type="text"
+                      value={participant.phone || ''}
+                      onChange={(e) => updateGroupProfileParticipantField(index, 'phone', e.target.value)}
+                      className="w-full px-3 py-2 border border-indigo-200 rounded-lg focus:ring-2 focus:ring-indigo-400 focus:border-indigo-400"
+                    />
+                    {toErrorList(groupProfileFieldErrors.participants?.[index]?.phone).map((msg, errorIndex) => (
+                      <p key={`group-profile-participant-phone-${index}-${errorIndex}`} className="mt-1 text-xs text-red-600">{msg}</p>
+                    ))}
+                  </div>
+                  {toErrorList(groupProfileFieldErrors.participants?.[index]?.non_field_errors).map((msg, errorIndex) => (
+                    <p key={`group-profile-participant-non-field-${index}-${errorIndex}`} className="md:col-span-2 text-xs text-red-600">{msg}</p>
+                  ))}
+                </div>
+              ))}
+            </div>
+
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <button
+                type="button"
+                onClick={closeGroupProfileEditor}
+                className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50"
+                disabled={groupProfileSaving}
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={groupProfileSaving}
+                className="px-5 py-2.5 rounded-lg bg-indigo-600 text-white font-semibold hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {groupProfileSaving ? 'Saving...' : 'Save Group Profile'}
+              </button>
+            </div>
+          </form>
+        )}
       </Modal>
 
       {/* Event Registration Modal - Enhanced */}
@@ -2523,6 +3049,15 @@ const StudentDashboard = () => {
                         <div><strong>Participants:</strong> {entry.participant_count || '-'}</div>
                         <div><strong>Gender:</strong> {entry.gender_category || '-'}</div>
                         <div className="mt-1"><strong>Events:</strong> {eventLabels.length > 0 ? eventLabels.join(', ') : '-'}</div>
+                      </div>
+                      <div className="mt-3">
+                        <button
+                          type="button"
+                          onClick={() => openGroupProfileEditor(entry.id, open === 'register' ? 'register' : null)}
+                          className="px-3 py-1.5 rounded-lg bg-indigo-100 text-indigo-800 border border-indigo-300 text-sm font-semibold hover:bg-indigo-200 transition-colors"
+                        >
+                          Edit Group Profile
+                        </button>
                       </div>
                     </div>
                   );

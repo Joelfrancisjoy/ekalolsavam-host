@@ -282,11 +282,6 @@
       "participation_type": "INDIVIDUAL",
       "rules": [
         {
-          "level": "LP",
-          "gender_eligibility": "MIXED",
-          "duration_minutes": 4
-        },
-        {
           "level": "UP",
           "gender_eligibility": "MIXED",
           "duration_minutes": 5
@@ -309,16 +304,6 @@
       "category": "DANCE",
       "participation_type": "INDIVIDUAL",
       "rules": [
-        {
-          "level": "LP",
-          "gender_eligibility": "GIRLS",
-          "duration_minutes": 5
-        },
-        {
-          "level": "UP",
-          "gender_eligibility": "GIRLS",
-          "duration_minutes": 6
-        },
         {
           "level": "HS",
           "gender_eligibility": "GIRLS",
@@ -389,11 +374,6 @@
       "participation_type": "INDIVIDUAL",
       "rules": [
         {
-          "level": "LP",
-          "gender_eligibility": "MIXED",
-          "duration_minutes": 4
-        },
-        {
           "level": "UP",
           "gender_eligibility": "MIXED",
           "duration_minutes": 5
@@ -453,15 +433,10 @@
     },
     {
       "event_code": "EVT012",
-      "event_name": "Water Colour",
+      "event_name": "Painting - Water Colour",
       "category": "FINE_ARTS",
       "participation_type": "INDIVIDUAL",
       "rules": [
-        {
-          "level": "UP",
-          "gender_eligibility": "MIXED",
-          "duration_minutes": 120
-        },
         {
           "level": "HS",
           "gender_eligibility": "MIXED",
@@ -714,6 +689,16 @@
           "level": "UP",
           "gender_eligibility": "MIXED",
           "duration_minutes": 120
+        },
+        {
+          "level": "HS",
+          "gender_eligibility": "MIXED",
+          "duration_minutes": 120
+        },
+        {
+          "level": "HSS",
+          "gender_eligibility": "MIXED",
+          "duration_minutes": 120
         }
       ]
     },
@@ -772,11 +757,6 @@
       "category": "THEATRE",
       "participation_type": "INDIVIDUAL",
       "rules": [
-        {
-          "level": "UP",
-          "gender_eligibility": "MIXED",
-          "duration_minutes": 5
-        },
         {
           "level": "HS",
           "gender_eligibility": "MIXED",
@@ -1068,7 +1048,7 @@
     },
     {
       "event_code": "EVT036",
-      "event_name": "Western Band / Jazz / Triple",
+      "event_name": "Western Music Group / Jazz / Triple",
       "category": "MUSIC",
       "participation_type": "GROUP",
       "rules": [
@@ -1096,6 +1076,13 @@
         },
         {
           "level": "UP",
+          "gender_eligibility": "MIXED",
+          "min_participants": 5,
+          "max_participants": 12,
+          "duration_minutes": 15
+        },
+        {
+          "level": "HS",
           "gender_eligibility": "MIXED",
           "min_participants": 5,
           "max_participants": 12,
@@ -1144,6 +1131,79 @@
           "min_participants": 10,
           "max_participants": 20,
           "duration_minutes": 30
+        }
+      ]
+    },
+    {
+      "event_code": "EVT040",
+      "event_name": "Violin (Eastern)",
+      "category": "MUSIC",
+      "participation_type": "INDIVIDUAL",
+      "rules": [
+        {
+          "level": "HS",
+          "gender_eligibility": "MIXED",
+          "duration_minutes": 6
+        },
+        {
+          "level": "HSS",
+          "gender_eligibility": "MIXED",
+          "duration_minutes": 7
+        }
+      ]
+    },
+    {
+      "event_code": "EVT041",
+      "event_name": "Instrumental Music",
+      "category": "MUSIC",
+      "participation_type": "INDIVIDUAL",
+      "rules": [
+        {
+          "level": "HS",
+          "gender_eligibility": "MIXED",
+          "duration_minutes": 6
+        },
+        {
+          "level": "HSS",
+          "gender_eligibility": "MIXED",
+          "duration_minutes": 7
+        }
+      ]
+    },
+    {
+      "event_code": "EVT042",
+      "event_name": "Western Dance",
+      "category": "DANCE",
+      "participation_type": "GROUP",
+      "rules": [
+        {
+          "level": "HS",
+          "gender_eligibility": "MIXED",
+          "min_participants": 6,
+          "max_participants": 12,
+          "duration_minutes": 8
+        },
+        {
+          "level": "HSS",
+          "gender_eligibility": "MIXED",
+          "min_participants": 6,
+          "max_participants": 12,
+          "duration_minutes": 8
+        }
+      ]
+    },
+    {
+      "event_code": "EVT043",
+      "event_name": "Western Band / Jazz / Triple",
+      "category": "MUSIC",
+      "participation_type": "GROUP",
+      "rules": [
+        {
+          "level": "HSS",
+          "gender_eligibility": "MIXED",
+          "min_participants": 6,
+          "max_participants": 15,
+          "duration_minutes": 12
         }
       ]
     }

@@ -10,6 +10,7 @@ from .views import (
     get_volunteer_assignments, volunteer_check_in,
     assign_volunteers,
     lookup_participant_by_chess_number,
+    recommend_event_timeslots,
 )
 
 urlpatterns = [
@@ -40,4 +41,6 @@ urlpatterns = [
          name='participant-lookup'),
     path('<int:pk>/assign-volunteers/',
          assign_volunteers, name='assign-volunteers'),
+    path('<int:pk>/recommend-timeslots/',
+         recommend_event_timeslots, name='recommend-event-timeslots'),
 ]

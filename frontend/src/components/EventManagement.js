@@ -86,6 +86,7 @@ const EventManagement = () => {
     // Anomaly detection state
     const [eventAnomalies, setEventAnomalies] = useState({});
     const [anomalyModalEventId, setAnomalyModalEventId] = useState(null);
+    const [scheduleModalEventId, setScheduleModalEventId] = useState(null);
 
     useEffect(() => {
         loadAll();
@@ -413,6 +414,11 @@ const EventManagement = () => {
         });
         return list;
     }, [filteredEvents, sort]);
+
+    const selectedScheduleEvent = useMemo(
+        () => resolvedEvents.find((event) => event.id === scheduleModalEventId) || null,
+        [resolvedEvents, scheduleModalEventId]
+    );
 
     const totalPages = useMemo(() => Math.max(1, Math.ceil(sortedEvents.length / pageSize)), [sortedEvents, pageSize]);
     const currentPageEvents = useMemo(() => {
@@ -890,6 +896,7 @@ const EventManagement = () => {
                                 onAssignVolunteers={handleAssignVolunteers}
                                 eventAnomalies={eventAnomalies}
                                 onViewAnomalies={setAnomalyModalEventId}
+                                onRecommendTimeslots={setScheduleModalEventId}
                             />
                             <Pagination
                                 page={page}
@@ -913,6 +920,13 @@ const EventManagement = () => {
                                         setAnomalyModalEventId(null);
                                         loadAnomalies(); // Reload after closing modal
                                     }}
+                                />
+                            )}
+                            {selectedScheduleEvent && (
+                                <ScheduleRecommendationModal
+                                    event={selectedScheduleEvent}
+                                    venues={venues}
+                                    onClose={() => setScheduleModalEventId(null)}
                                 />
                             )}
                         </>
@@ -976,7 +990,7 @@ const Filters = ({ filters, onChange, onApply, search, onSearch, publishedOnly, 
     );
 };
 
-const EventList = ({ events, venues, judges, volunteers = [], onEdit, onDelete, onTogglePublish, selectedIds, onToggleRowSelect, allSelected, onToggleSelectAll, sort, onChangeSort, columnsVisible, density, onAssignVolunteers, eventAnomalies = {}, onViewAnomalies }) => {
+const EventList = ({ events, venues, judges, volunteers = [], onEdit, onDelete, onTogglePublish, selectedIds, onToggleRowSelect, allSelected, onToggleSelectAll, sort, onChangeSort, columnsVisible, density, onAssignVolunteers, eventAnomalies = {}, onViewAnomalies, onRecommendTimeslots }) => {
     const venueLabel = (id) => venues.find((v) => v.id === id)?.name || '-';
     const judgeName = (id) => judges.find((u) => u.id === id)?.username || `User#${id}`;
     const volunteerName = (id) => volunteers.find((u) => u.id === id)?.username || `User#${id}`;
@@ -1148,6 +1162,14 @@ const EventList = ({ events, venues, judges, volunteers = [], onEdit, onDelete, 
                                         <td className={`px-8 ${density === 'compact' ? 'py-3' : 'py-6'} whitespace-nowrap text-base font-semibold space-x-3 sticky right-0 ${selectedIds.includes(ev.id) ? 'bg-blue-50' : 'bg-white'} border-l border-slate-200`}>
                                             <button title="Edit" aria-label="Edit" onClick={() => onEdit(ev)} className="inline-flex items-center px-4 py-2 rounded-lg border-2 text-blue-700 border-blue-300 hover:bg-blue-50 hover:border-blue-400 transition-all duration-200 font-semibold">Edit</button>
                                             <button title={ev.is_published ? 'Unpublish' : 'Publish'} aria-label="Toggle publish" onClick={() => onTogglePublish(ev)} className={`inline-flex items-center px-4 py-2 rounded-lg border-2 transition-all duration-200 font-semibold ${ev.is_published ? 'text-indigo-700 border-indigo-300 hover:bg-indigo-50 hover:border-indigo-400' : 'text-slate-700 border-slate-300 hover:bg-slate-50 hover:border-slate-400'}`}>{ev.is_published ? 'Unpublish' : 'Publish'}</button>
+                                            <button
+                                                title="Recommend schedule"
+                                                aria-label="Recommend schedule"
+                                                onClick={() => onRecommendTimeslots(ev.id)}
+                                                className="inline-flex items-center px-4 py-2 rounded-lg border-2 text-violet-700 border-violet-300 hover:bg-violet-50 hover:border-violet-400 transition-all duration-200 font-semibold"
+                                            >
+                                                Recommend Slot
+                                            </button>
                                             <VolunteerAssignDropdown event={ev} volunteers={volunteers} onAssign={onAssignVolunteers} />
                                             <button title="Delete" aria-label="Delete" onClick={() => onDelete(ev.id)} className="inline-flex items-center px-4 py-2 rounded-lg border-2 text-red-700 border-red-300 hover:bg-red-50 hover:border-red-400 transition-all duration-200 font-semibold">Delete</button>
                                         </td>
@@ -1648,5 +1670,158 @@ const StatCard = ({ label, value }) => (
         <div className="text-3xl md:text-4xl font-bold text-slate-900">{value}</div>
     </div>
 );
+
+const ScheduleRecommendationModal = ({ event, venues = [], onClose }) => {
+    const [form, setForm] = useState({
+        from_date: event?.date || '',
+        to_date: event?.date || '',
+        top_k: 5,
+        venue_id: event?.venue || '',
+    });
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState('');
+    const [result, setResult] = useState(null);
+
+    const handleChange = (key, value) => {
+        setForm((prev) => ({ ...prev, [key]: value }));
+    };
+
+    const runRecommendation = async () => {
+        if (!form.from_date || !form.to_date) {
+            setError('from_date and to_date are required.');
+            return;
+        }
+        setLoading(true);
+        setError('');
+        try {
+            const payload = {
+                from_date: form.from_date,
+                to_date: form.to_date,
+                top_k: Number(form.top_k || 5),
+            };
+            if (form.venue_id) {
+                payload.venue_id = Number(form.venue_id);
+            }
+            const data = await eventService.recommendTimeslots(event.id, payload);
+            setResult(data);
+        } catch (err) {
+            const message = err?.response?.data?.error || err?.message || 'Failed to fetch recommendations.';
+            setError(message);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+            <div className="absolute inset-0 bg-black/40" aria-hidden="true" onClick={onClose}></div>
+            <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-4xl mx-4 p-6 border border-slate-200 max-h-[90vh] overflow-y-auto">
+                <div className="flex items-center justify-between mb-6">
+                    <div>
+                        <h3 className="text-2xl font-bold text-slate-900">ML Schedule Recommendation</h3>
+                        <p className="text-sm text-slate-600 mt-1">
+                            Event: <span className="font-semibold">{event?.resolved_name || event?.name}</span>
+                        </p>
+                    </div>
+                    <button onClick={onClose} className="px-3 py-2 rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-50">
+                        Close
+                    </button>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+                    <div>
+                        <label className="block text-sm font-semibold text-slate-700 mb-1">From Date</label>
+                        <input
+                            type="date"
+                            value={form.from_date}
+                            onChange={(e) => handleChange('from_date', e.target.value)}
+                            className="w-full border border-slate-300 rounded-lg px-3 py-2"
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-semibold text-slate-700 mb-1">To Date</label>
+                        <input
+                            type="date"
+                            value={form.to_date}
+                            onChange={(e) => handleChange('to_date', e.target.value)}
+                            className="w-full border border-slate-300 rounded-lg px-3 py-2"
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-semibold text-slate-700 mb-1">Top K</label>
+                        <input
+                            type="number"
+                            min="1"
+                            max="20"
+                            value={form.top_k}
+                            onChange={(e) => handleChange('top_k', e.target.value)}
+                            className="w-full border border-slate-300 rounded-lg px-3 py-2"
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-semibold text-slate-700 mb-1">Venue (Optional)</label>
+                        <select
+                            value={form.venue_id}
+                            onChange={(e) => handleChange('venue_id', e.target.value)}
+                            className="w-full border border-slate-300 rounded-lg px-3 py-2"
+                        >
+                            <option value="">Any venue</option>
+                            {venues.map((v) => (
+                                <option key={v.id} value={v.id}>{v.name}</option>
+                            ))}
+                        </select>
+                    </div>
+                </div>
+
+                <div className="flex items-center gap-3 mb-6">
+                    <button
+                        onClick={runRecommendation}
+                        disabled={loading}
+                        className="px-5 py-2.5 rounded-lg bg-violet-600 text-white font-semibold hover:bg-violet-700 disabled:opacity-50"
+                    >
+                        {loading ? 'Generating...' : 'Generate Recommendations'}
+                    </button>
+                    {error && <span className="text-sm text-red-700">{error}</span>}
+                </div>
+
+                {result && (
+                    <div className="space-y-4">
+                        <div className="rounded-lg bg-violet-50 border border-violet-200 px-4 py-3 text-sm text-violet-900">
+                            Goal: <span className="font-semibold">{result.recommendation_goal}</span> | Window: {result.window?.from_date} → {result.window?.to_date} | Count: {result.count}
+                        </div>
+                        <div className="overflow-x-auto rounded-xl border border-slate-200">
+                            <table className="min-w-full divide-y divide-slate-200">
+                                <thead className="bg-slate-50">
+                                    <tr>
+                                        <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-slate-600">Date</th>
+                                        <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-slate-600">Time</th>
+                                        <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-slate-600">Venue</th>
+                                        <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-slate-600">Penalty</th>
+                                        <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-slate-600">Overlaps</th>
+                                        <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-slate-600">Method</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-100">
+                                    {(result.recommendations || []).map((item, idx) => (
+                                        <tr key={`${item.date}-${item.start_time}-${item.venue_id}-${idx}`} className="hover:bg-slate-50">
+                                            <td className="px-4 py-3 text-sm text-slate-800">{item.date}</td>
+                                            <td className="px-4 py-3 text-sm text-slate-800">{item.start_time} - {item.end_time}</td>
+                                            <td className="px-4 py-3 text-sm text-slate-800">{item.venue_name}</td>
+                                            <td className="px-4 py-3 text-sm font-semibold text-indigo-700">{item.predicted_conflict_penalty}</td>
+                                            <td className="px-4 py-3 text-sm text-slate-700">
+                                                total {item.conflict_breakdown?.total_overlap} (v:{item.conflict_breakdown?.venue_overlap}, j:{item.conflict_breakdown?.judge_overlap}, vol:{item.conflict_breakdown?.volunteer_overlap})
+                                            </td>
+                                            <td className="px-4 py-3 text-xs text-slate-600">{item.method}</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+};
 
 export default EventManagement;

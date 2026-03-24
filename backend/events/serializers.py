@@ -451,7 +451,8 @@ class EventRegistrationSerializer(serializers.ModelSerializer):
             variant_specific_qs = base_rules_qs.filter(variant_id=selected_event.event_variant_id)
             rules_qs = variant_specific_qs if variant_specific_qs.exists() else base_rules_qs.filter(variant__isnull=True)
         else:
-            rules_qs = base_rules_qs.filter(variant__isnull=True)
+            default_rules_qs = base_rules_qs.filter(variant__isnull=True)
+            rules_qs = default_rules_qs if default_rules_qs.exists() else base_rules_qs.filter(variant__isnull=False)
 
         eligible_genders = set(rules_qs.values_list('gender_eligibility', flat=True))
         if not eligible_genders:

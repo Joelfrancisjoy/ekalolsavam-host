@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import http from '../services/http-common';
+import { API_ROUTES } from '../services/apiRoutes';
 import authManager from '../utils/authManager';
 
 const IDManagementEnhanced = () => {
@@ -18,7 +19,6 @@ const IDManagementEnhanced = () => {
     const [filterRole, setFilterRole] = useState('');
     const [searchTerm, setSearchTerm] = useState('');
 
-    const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
     const getToken = () => authManager.getTokens().access;
 
     // Generate IDs with name assignments
@@ -38,7 +38,7 @@ const IDManagementEnhanced = () => {
             // Filter out empty assignments
             const validAssignments = assignments.filter(a => a.name.trim());
 
-            const response = await http.post('/api/auth/admin/ids/generate/', {
+            const response = await http.post(API_ROUTES.admin.idsGenerate, {
                 role,
                 assignments: validAssignments.length > 0 ? validAssignments : undefined,
                 count: validAssignments.length > 0 ? validAssignments.length : count
@@ -85,7 +85,7 @@ const IDManagementEnhanced = () => {
             if (filterStatus !== 'all') params.append('status', filterStatus);
             if (searchTerm) params.append('search', searchTerm);
 
-            const response = await http.get(`/api/auth/admin/ids/?${params.toString()}`);
+            const response = await http.get(API_ROUTES.admin.idsListWithParams(params));
 
             setAllIds(response.data);
         } catch (error) {
@@ -118,7 +118,7 @@ const IDManagementEnhanced = () => {
                 params.append('status', status);
             }
 
-            const response = await http.get(`/api/auth/admin/signup-requests/?${params.toString()}`);
+            const response = await http.get(API_ROUTES.admin.signupRequestsWithParams(params));
 
             if (status === 'all') {
                 setAllRequests(response.data);
@@ -148,7 +148,7 @@ const IDManagementEnhanced = () => {
                 return;
             }
 
-            await http.patch(`/api/auth/admin/signup-requests/${requestId}/`, { status, notes });
+            await http.patch(API_ROUTES.admin.signupRequest(requestId), { status, notes });
 
             setMessage(`Request ${status} successfully`);
             loadSignupRequests('pending'); // Reload pending requests
@@ -189,7 +189,7 @@ const IDManagementEnhanced = () => {
     const toggleIdStatus = async (id, currentStatus) => {
         try {
             const token = getToken();
-            await http.patch(`/api/auth/admin/ids/${id}/`, { is_active: !currentStatus });
+            await http.patch(API_ROUTES.admin.idRecord(id), { is_active: !currentStatus });
             setMessage(`ID ${!currentStatus ? 'activated' : 'deactivated'} successfully`);
             loadAllIds();
         } catch (error) {

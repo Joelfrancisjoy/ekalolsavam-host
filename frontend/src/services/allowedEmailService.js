@@ -1,31 +1,32 @@
 import http from './http-common';
+import { API_ROUTES } from './apiRoutes';
 
 const getAllowedEmails = () => {
-  return http.get('/api/auth/allowed-emails/');
+  return http.get(API_ROUTES.auth.allowedEmails);
 };
 
 const addAllowedEmail = (email) => {
-  return http.post('/api/auth/allowed-emails/', { email });
+  return http.post(API_ROUTES.auth.allowedEmails, { email });
 };
 
 const bulkAddAllowedEmails = (emails) => {
-  return http.post('/api/auth/allowed-emails/bulk-add/', { emails });
+  return http.post(API_ROUTES.auth.allowedEmailsBulkAdd, { emails });
 };
 
 const toggleEmailStatus = (id) => {
-  return http.patch(`/api/auth/allowed-emails/${id}/toggle/`);
+  return http.patch(API_ROUTES.auth.allowedEmailToggle(id));
 };
 
 const deleteAllowedEmail = (id) => {
-  return http.delete(`/api/auth/allowed-emails/${id}/`);
+  return http.delete(API_ROUTES.auth.allowedEmailDelete(id));
 };
 
 const checkEmailAllowed = (email) => {
-  return http.get(`/api/auth/allowed-emails/check/?email=${encodeURIComponent(email)}`);
+  return http.get(API_ROUTES.auth.allowedEmailCheck(email));
 };
 
 const checkEmailRegistered = (email) => {
-  return http.get(`/api/auth/allowed-emails/check-registered/?email=${encodeURIComponent(email)}`);
+  return http.get(API_ROUTES.auth.allowedEmailCheckRegistered(email));
 };
 
 const allowedEmailService = {

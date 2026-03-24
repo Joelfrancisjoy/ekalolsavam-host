@@ -1,0 +1,6216 @@
+openapi: 3.0.3
+info:
+  title: E-Kalolsavam API
+  version: 1.0.0
+  description: OpenAPI contract for frontend-backend integration.
+paths:
+  /api/auth/admin/assign-volunteer/:
+    post:
+      operationId: api_auth_admin_assign_volunteer_create
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          description: No response body
+  /api/auth/admin/ids/:
+    get:
+      operationId: api_auth_admin_ids_list
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AdminIssuedID'
+          description: ''
+  /api/auth/admin/ids/{id}/:
+    get:
+      operationId: api_auth_admin_ids_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminIssuedID'
+          description: ''
+    put:
+      operationId: api_auth_admin_ids_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminIssuedID'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/AdminIssuedID'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/AdminIssuedID'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminIssuedID'
+          description: ''
+    patch:
+      operationId: api_auth_admin_ids_partial_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedAdminIssuedID'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedAdminIssuedID'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedAdminIssuedID'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminIssuedID'
+          description: ''
+  /api/auth/admin/ids/generate/:
+    post:
+      operationId: api_auth_admin_ids_generate_create
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          description: No response body
+  /api/auth/admin/school-group-participants/:
+    get:
+      operationId: api_auth_admin_school_group_participants_list
+      description: Admin endpoint to view submitted school group entries.
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SchoolGroupEntry'
+          description: ''
+  /api/auth/admin/school-group-participants/{group_entry_id}/:
+    patch:
+      operationId: api_auth_admin_school_group_participants_partial_update
+      parameters:
+      - in: path
+        name: group_entry_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedStudentGroupProfileUpdate'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedStudentGroupProfileUpdate'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedStudentGroupProfileUpdate'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SchoolGroupEntry'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+  /api/auth/admin/school-group-participants/{group_entry_id}/approve/:
+    post:
+      operationId: api_auth_admin_school_group_participants_approve_create
+      parameters:
+      - in: path
+        name: group_entry_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminSchoolGroupApproveRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/AdminSchoolGroupApproveRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/AdminSchoolGroupApproveRequest'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminSchoolGroupApproveResponse'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+  /api/auth/admin/school-group-participants/{group_entry_id}/reject/:
+    post:
+      operationId: api_auth_admin_school_group_participants_reject_create
+      parameters:
+      - in: path
+        name: group_entry_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminSchoolGroupRejectRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/AdminSchoolGroupRejectRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/AdminSchoolGroupRejectRequest'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminSchoolGroupRejectResponse'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+  /api/auth/admin/school-participants/:
+    get:
+      operationId: api_auth_admin_school_participants_list
+      description: |-
+        Admin endpoint to view all school participants pending approval.
+        This displays in the User Management panel under Students section.
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SchoolParticipant'
+          description: ''
+  /api/auth/admin/school-participants/{participant_id}/approve/:
+    post:
+      operationId: api_auth_admin_school_participants_approve_create
+      description: |-
+        Approve a school participant and create their user account.
+        Generates username/password and assigns section based on class.
+      parameters:
+      - in: path
+        name: participant_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: No response body
+  /api/auth/admin/school-participants/bulk-approve/:
+    post:
+      operationId: api_auth_admin_school_participants_bulk_approve_create
+      description: Bulk approve multiple school participants at once.
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: No response body
+  /api/auth/admin/schools/create/:
+    post:
+      operationId: api_auth_admin_schools_create_create
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          description: No response body
+  /api/auth/admin/schools/link-user/:
+    post:
+      operationId: api_auth_admin_schools_link_user_create
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: No response body
+  /api/auth/admin/signup-requests/:
+    get:
+      operationId: api_auth_admin_signup_requests_list
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/IDSignupRequest'
+          description: ''
+  /api/auth/admin/signup-requests/{id}/:
+    get:
+      operationId: api_auth_admin_signup_requests_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IDSignupRequest'
+          description: ''
+    put:
+      operationId: api_auth_admin_signup_requests_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/IDSignupRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/IDSignupRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/IDSignupRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IDSignupRequest'
+          description: ''
+    patch:
+      operationId: api_auth_admin_signup_requests_partial_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedIDSignupRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedIDSignupRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedIDSignupRequest'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IDSignupRequest'
+          description: ''
+  /api/auth/allowed-emails/:
+    get:
+      operationId: api_auth_allowed_emails_list
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AllowedEmail'
+          description: ''
+    post:
+      operationId: api_auth_allowed_emails_create
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AllowedEmail'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/AllowedEmail'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/AllowedEmail'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AllowedEmail'
+          description: ''
+  /api/auth/allowed-emails/{id}/:
+    get:
+      operationId: api_auth_allowed_emails_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AllowedEmail'
+          description: ''
+    put:
+      operationId: api_auth_allowed_emails_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AllowedEmail'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/AllowedEmail'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/AllowedEmail'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AllowedEmail'
+          description: ''
+    patch:
+      operationId: api_auth_allowed_emails_partial_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedAllowedEmail'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedAllowedEmail'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedAllowedEmail'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AllowedEmail'
+          description: ''
+    delete:
+      operationId: api_auth_allowed_emails_destroy
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/auth/allowed-emails/{id}/toggle/:
+    post:
+      operationId: api_auth_allowed_emails_toggle_create
+      description: Toggle the active status of an allowed email
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: No response body
+  /api/auth/allowed-emails/bulk-add/:
+    post:
+      operationId: api_auth_allowed_emails_bulk_add_create
+      description: Bulk add multiple email addresses to the allowed list
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: No response body
+  /api/auth/allowed-emails/check/:
+    get:
+      operationId: api_auth_allowed_emails_check_retrieve
+      description: Check if an email is in the allowed list (public endpoint for frontend
+        validation)
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          description: No response body
+  /api/auth/allowed-emails/check-registered/:
+    get:
+      operationId: api_auth_allowed_emails_check_registered_retrieve
+      description: Check if an email is registered with valid role (student, volunteer,
+        judge) - for admin validation
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: No response body
+  /api/auth/current/:
+    get:
+      operationId: api_auth_current_retrieve
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+          description: ''
+  /api/auth/emails/exists/:
+    get:
+      operationId: api_auth_emails_exists_retrieve
+      description: |-
+        Public endpoint to check if an email is already registered (for registration form validation).
+        Returns: { email, exists: true|false }
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          description: No response body
+  /api/auth/google/:
+    post:
+      operationId: api_auth_google_create
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          description: No response body
+  /api/auth/ids/check/:
+    post:
+      operationId: api_auth_ids_check_create
+      description: |-
+        Public endpoint to check if an ID code is valid and available.
+        Used by registration form for real-time validation.
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          description: No response body
+  /api/auth/login/:
+    post:
+      operationId: api_auth_login_create
+      tags:
+      - api
+      security:
+      - {}
+      responses:
+        '200':
+          description: No response body
+  /api/auth/password/accept-pending/:
+    post:
+      operationId: api_auth_password_accept_pending_create
+      description: |-
+        Accept the password provided during registration (if any) as the new password
+        after logging in with the temporary password sent by admin.
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: No response body
+  /api/auth/password/set-new/:
+    post:
+      operationId: api_auth_password_set_new_create
+      description: |-
+        Set a brand new password instead of using the registration-time pending one.
+        Expects: { new_password }
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: No response body
+  /api/auth/profile/:
+    patch:
+      operationId: api_auth_profile_partial_update
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: No response body
+  /api/auth/register/:
+    post:
+      operationId: api_auth_register_create
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserRegistration'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/UserRegistration'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/UserRegistration'
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserRegistration'
+          description: ''
+  /api/auth/register/with-id/:
+    post:
+      operationId: api_auth_register_with_id_create
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '201':
+          description: No response body
+  /api/auth/schools/:
+    get:
+      operationId: api_auth_schools_list
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/School'
+          description: ''
+  /api/auth/schools/group-events/:
+    get:
+      operationId: api_auth_schools_group_events_list
+      parameters:
+      - in: query
+        name: genderCategory
+        schema:
+          enum:
+          - BOYS
+          - GIRLS
+          - MIXED
+          type: string
+          minLength: 1
+        description: |-
+          * `BOYS` - BOYS
+          * `GIRLS` - GIRLS
+          * `MIXED` - MIXED
+      - in: query
+        name: gender_category
+        schema:
+          enum:
+          - BOYS
+          - GIRLS
+          - MIXED
+          type: string
+          minLength: 1
+        description: |-
+          * `BOYS` - BOYS
+          * `GIRLS` - GIRLS
+          * `MIXED` - MIXED
+      - in: query
+        name: groupClass
+        schema:
+          enum:
+          - LP
+          - UP
+          - HS
+          - HSS
+          type: string
+          minLength: 1
+        description: |-
+          * `LP` - LP
+          * `UP` - UP
+          * `HS` - HS
+          * `HSS` - HSS
+      - in: query
+        name: group_class
+        schema:
+          enum:
+          - LP
+          - UP
+          - HS
+          - HSS
+          type: string
+          minLength: 1
+        description: |-
+          * `LP` - LP
+          * `UP` - UP
+          * `HS` - HS
+          * `HSS` - HSS
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Event'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+  /api/auth/schools/group-participants/:
+    get:
+      operationId: api_auth_schools_group_participants_list
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SchoolGroupEntry'
+          description: ''
+  /api/auth/schools/group-participants/{group_entry_id}/:
+    patch:
+      operationId: api_auth_schools_group_participants_partial_update
+      parameters:
+      - in: path
+        name: group_entry_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedStudentGroupProfileUpdate'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedStudentGroupProfileUpdate'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedStudentGroupProfileUpdate'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SchoolGroupEntry'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+  /api/auth/schools/group-participants/import/:
+    post:
+      operationId: api_auth_schools_group_participants_import_create
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: No response body
+  /api/auth/schools/group-participants/submit/:
+    post:
+      operationId: api_auth_schools_group_participants_submit_create
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: No response body
+  /api/auth/schools/individual-events/:
+    get:
+      operationId: api_auth_schools_individual_events_list
+      parameters:
+      - in: query
+        name: genderCategory
+        schema:
+          enum:
+          - BOYS
+          - GIRLS
+          - MIXED
+          type: string
+          minLength: 1
+        description: |-
+          * `BOYS` - BOYS
+          * `GIRLS` - GIRLS
+          * `MIXED` - MIXED
+      - in: query
+        name: gender_category
+        schema:
+          enum:
+          - BOYS
+          - GIRLS
+          - MIXED
+          type: string
+          minLength: 1
+        description: |-
+          * `BOYS` - BOYS
+          * `GIRLS` - GIRLS
+          * `MIXED` - MIXED
+      - in: query
+        name: levelCode
+        schema:
+          enum:
+          - LP
+          - UP
+          - HS
+          - HSS
+          type: string
+          minLength: 1
+        description: |-
+          * `LP` - LP
+          * `UP` - UP
+          * `HS` - HS
+          * `HSS` - HSS
+      - in: query
+        name: level_code
+        schema:
+          enum:
+          - LP
+          - UP
+          - HS
+          - HSS
+          type: string
+          minLength: 1
+        description: |-
+          * `LP` - LP
+          * `UP` - UP
+          * `HS` - HS
+          * `HSS` - HSS
+      - in: query
+        name: studentClass
+        schema:
+          type: integer
+          maximum: 12
+          minimum: 1
+      - in: query
+        name: student_class
+        schema:
+          type: integer
+          maximum: 12
+          minimum: 1
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Event'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+  /api/auth/schools/participants/:
+    get:
+      operationId: api_auth_schools_participants_list
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SchoolParticipant'
+          description: ''
+  /api/auth/schools/participants/submit/:
+    post:
+      operationId: api_auth_schools_participants_submit_create
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: No response body
+  /api/auth/schools/students/generate-ids/:
+    post:
+      operationId: api_auth_schools_students_generate_ids_create
+      description: |-
+        Allows schools to generate student IDs for pre-registration.
+        Students will use these IDs to sign up on the platform.
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          description: No response body
+  /api/auth/standings/:
+    get:
+      operationId: api_auth_standings_list
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SchoolStanding'
+          description: ''
+  /api/auth/students/allowed-events/:
+    get:
+      operationId: api_auth_students_allowed_events_retrieve
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StudentAllowedEventsResponse'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+  /api/auth/students/group-profiles/{group_entry_id}/:
+    get:
+      operationId: api_auth_students_group_profiles_retrieve
+      parameters:
+      - in: path
+        name: group_entry_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SchoolGroupEntry'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+    patch:
+      operationId: api_auth_students_group_profiles_partial_update
+      parameters:
+      - in: path
+        name: group_entry_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedStudentGroupProfileUpdate'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedStudentGroupProfileUpdate'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedStudentGroupProfileUpdate'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SchoolGroupEntry'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+  /api/auth/usernames/exists/:
+    get:
+      operationId: api_auth_usernames_exists_retrieve
+      description: |-
+        Public endpoint to check if a username is already taken (case-insensitive).
+        Returns: { username, exists: true|false }
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          description: No response body
+  /api/auth/users/:
+    get:
+      operationId: api_auth_users_list
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedUserList'
+          description: ''
+  /api/auth/users/{id}/:
+    get:
+      operationId: api_auth_users_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminUserUpdate'
+          description: ''
+    put:
+      operationId: api_auth_users_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminUserUpdate'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/AdminUserUpdate'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/AdminUserUpdate'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminUserUpdate'
+          description: ''
+    patch:
+      operationId: api_auth_users_partial_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedAdminUserUpdate'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedAdminUserUpdate'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedAdminUserUpdate'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminUserUpdate'
+          description: ''
+    delete:
+      operationId: api_auth_users_destroy
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/auth/users/{id}/set-approval/:
+    patch:
+      operationId: api_auth_users_set_approval_partial_update
+      description: Set approval_status for a user.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: No response body
+  /api/auth/users/{id}/set-role/:
+    patch:
+      operationId: api_auth_users_set_role_partial_update
+      description: Set user role. Prevent removing last admin role.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: No response body
+  /api/auth/users/{id}/toggle-active/:
+    patch:
+      operationId: api_auth_users_toggle_active_partial_update
+      description: Activate/Deactivate user while ensuring at least one admin remains
+        active.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: No response body
+  /api/auth/users/bulk/activate/:
+    post:
+      operationId: api_auth_users_bulk_activate_create
+      description: 'Bulk activate or deactivate users: { ids: [], is_active: true/false
+        }'
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: No response body
+  /api/auth/users/bulk/set-approval/:
+    post:
+      operationId: api_auth_users_bulk_set_approval_create
+      description: 'Bulk set approval_status: { ids: [], approval_status: ''approved''|''rejected''|''pending''
+        }'
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: No response body
+  /api/auth/volunteer/school-participants/:
+    get:
+      operationId: api_auth_volunteer_school_participants_list
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SchoolParticipant'
+          description: ''
+  /api/auth/volunteer/verify-student/:
+    post:
+      operationId: api_auth_volunteer_verify_student_create
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          description: No response body
+  /api/catalog/categories/:
+    get:
+      operationId: api_catalog_categories_list
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ArtCategory'
+          description: ''
+    post:
+      operationId: api_catalog_categories_create
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ArtCategory'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ArtCategory'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ArtCategory'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ArtCategory'
+          description: ''
+  /api/catalog/event-rules/:
+    get:
+      operationId: api_catalog_event_rules_list
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/EventRule'
+          description: ''
+    post:
+      operationId: api_catalog_event_rules_create
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EventRule'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/EventRule'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/EventRule'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventRule'
+          description: ''
+  /api/catalog/event-rules/{id}/:
+    get:
+      operationId: api_catalog_event_rules_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventRule'
+          description: ''
+    put:
+      operationId: api_catalog_event_rules_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EventRule'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/EventRule'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/EventRule'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventRule'
+          description: ''
+    patch:
+      operationId: api_catalog_event_rules_partial_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedEventRule'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedEventRule'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedEventRule'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventRule'
+          description: ''
+    delete:
+      operationId: api_catalog_event_rules_destroy
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/catalog/events/:
+    get:
+      operationId: api_catalog_events_list
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/EventDefinition'
+          description: ''
+    post:
+      operationId: api_catalog_events_create
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EventDefinition'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/EventDefinition'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/EventDefinition'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventDefinition'
+          description: ''
+  /api/catalog/events/{event_id}/variants/:
+    get:
+      operationId: api_catalog_events_variants_list
+      parameters:
+      - in: path
+        name: event_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/EventVariant'
+          description: ''
+    post:
+      operationId: api_catalog_events_variants_create
+      parameters:
+      - in: path
+        name: event_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EventVariant'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/EventVariant'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/EventVariant'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventVariant'
+          description: ''
+  /api/catalog/events/{id}/:
+    get:
+      operationId: api_catalog_events_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventDefinition'
+          description: ''
+    put:
+      operationId: api_catalog_events_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EventDefinition'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/EventDefinition'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/EventDefinition'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventDefinition'
+          description: ''
+    patch:
+      operationId: api_catalog_events_partial_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedEventDefinition'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedEventDefinition'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedEventDefinition'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventDefinition'
+          description: ''
+    delete:
+      operationId: api_catalog_events_destroy
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/catalog/levels/:
+    get:
+      operationId: api_catalog_levels_list
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Level'
+          description: ''
+  /api/catalog/participation-types/:
+    get:
+      operationId: api_catalog_participation_types_list
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ParticipationType'
+          description: ''
+  /api/certificates/:
+    get:
+      operationId: api_certificates_list
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Certificate'
+          description: ''
+  /api/certificates/generate/:
+    post:
+      operationId: api_certificates_generate_create
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Certificate'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Certificate'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Certificate'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Certificate'
+          description: ''
+  /api/emergencies/{id}/volunteer-complete/:
+    patch:
+      operationId: api_emergencies_volunteer_complete_partial_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: No response body
+  /api/emergencies/active/:
+    get:
+      operationId: api_emergencies_active_retrieve
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: No response body
+  /api/emergencies/public-initiate/:
+    post:
+      operationId: api_emergencies_public_initiate_create
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          description: No response body
+  /api/emergencies/volunteer/:
+    post:
+      operationId: api_emergencies_volunteer_create
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: No response body
+  /api/events/:
+    get:
+      operationId: api_events_list
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Event'
+          description: ''
+    post:
+      operationId: api_events_create
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Event'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Event'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Event'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Event'
+          description: ''
+  /api/events/{id}/:
+    get:
+      operationId: api_events_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Event'
+          description: ''
+    put:
+      operationId: api_events_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Event'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Event'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Event'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Event'
+          description: ''
+    patch:
+      operationId: api_events_partial_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedEvent'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedEvent'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedEvent'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Event'
+          description: ''
+    delete:
+      operationId: api_events_destroy
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/events/{id}/assign-volunteers/:
+    post:
+      operationId: api_events_assign_volunteers_create
+      description: |-
+        Assign volunteers to an event. Body: { "volunteer_ids": [1,2,3] }
+        Only users with role=volunteer are allowed; others are ignored/raise error.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: No response body
+  /api/events/{id}/participants/:
+    get:
+      operationId: api_events_participants_list
+      description: |-
+        List participants (registrations) for a given event, only if the current
+        judge is assigned to that event. Supports filtering by chess number.
+
+        For judges: Only returns verified participants (those verified by volunteers).
+        For volunteers: Returns all registered participants.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/EventRegistration'
+          description: ''
+  /api/events/{id}/recommend-timeslots/:
+    post:
+      operationId: api_events_recommend_timeslots_create
+      description: |-
+        Recommend low-conflict timeslots for an existing event.
+
+        POST /api/events/{id}/recommend-timeslots/
+        {
+          "from_date": "2026-03-25",
+          "to_date": "2026-03-27",
+          "venue_id": 3,
+          "top_k": 5
+        }
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: No response body
+  /api/events/{id}/transition/:
+    post:
+      operationId: api_events_transition_create
+      description: |-
+        Transition event to a new status.
+        POST /api/events/{id}/transition/
+        { "to": "published" }
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: No response body
+  /api/events/judges/:
+    get:
+      operationId: api_events_judges_list
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Judge'
+          description: ''
+    post:
+      operationId: api_events_judges_create
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Judge'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Judge'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Judge'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Judge'
+          description: ''
+  /api/events/judges/{id}/:
+    get:
+      operationId: api_events_judges_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Judge'
+          description: ''
+    put:
+      operationId: api_events_judges_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Judge'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Judge'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Judge'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Judge'
+          description: ''
+    patch:
+      operationId: api_events_judges_partial_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedJudge'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedJudge'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedJudge'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Judge'
+          description: ''
+    delete:
+      operationId: api_events_judges_destroy
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/events/my-assigned/:
+    get:
+      operationId: api_events_my_assigned_list
+      description: |-
+        List events assigned to the current judge. Admins get empty by default here
+        (use the regular listing instead).
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Event'
+          description: ''
+  /api/events/my-registrations/:
+    get:
+      operationId: api_events_my_registrations_list
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/EventRegistration'
+          description: ''
+  /api/events/participant-lookup/:
+    get:
+      operationId: api_events_participant_lookup_retrieve
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: No response body
+  /api/events/participant-verifications/:
+    get:
+      operationId: api_events_participant_verifications_list
+      description: List and create participant verifications for volunteers
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ParticipantVerification'
+          description: ''
+    post:
+      operationId: api_events_participant_verifications_create
+      description: List and create participant verifications for volunteers
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ParticipantVerification'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ParticipantVerification'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ParticipantVerification'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ParticipantVerification'
+          description: ''
+  /api/events/registrations/:
+    get:
+      operationId: api_events_registrations_list
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/EventRegistration'
+          description: ''
+    post:
+      operationId: api_events_registrations_create
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EventRegistration'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/EventRegistration'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/EventRegistration'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventRegistration'
+          description: ''
+  /api/events/venues/:
+    get:
+      operationId: api_events_venues_list
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Venue'
+          description: ''
+    post:
+      operationId: api_events_venues_create
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Venue'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Venue'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Venue'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Venue'
+          description: ''
+  /api/events/venues/{id}/:
+    get:
+      operationId: api_events_venues_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Venue'
+          description: ''
+    put:
+      operationId: api_events_venues_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Venue'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Venue'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Venue'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Venue'
+          description: ''
+    patch:
+      operationId: api_events_venues_partial_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedVenue'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedVenue'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedVenue'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Venue'
+          description: ''
+    delete:
+      operationId: api_events_venues_destroy
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/events/verify-participant/:
+    post:
+      operationId: api_events_verify_participant_create
+      description: Verify a participant by chess number for a specific event and send
+        details to assigned judges
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: No response body
+  /api/events/volunteer-assignments/:
+    get:
+      operationId: api_events_volunteer_assignments_retrieve
+      description: Get events assigned to the current volunteer
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: No response body
+  /api/events/volunteer-check-in/:
+    post:
+      operationId: api_events_volunteer_check_in_create
+      description: Allow volunteers to check in for their shifts
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: No response body
+  /api/feedback/:
+    get:
+      operationId: api_feedback_list
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Feedback'
+          description: ''
+  /api/feedback/admin/list/:
+    get:
+      operationId: api_feedback_admin_list_list
+      description: Admin-only endpoint to list all feedback with filtering capabilities.
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Feedback'
+          description: ''
+  /api/feedback/admin/summary/:
+    get:
+      operationId: api_feedback_admin_summary_retrieve
+      description: |-
+        Get sentiment analytics for feedback.
+
+        Query params:
+            - event: Filter by event ID
+            - feedback_type: Filter by feedback type
+            - days: Last N days (default: 30)
+
+        Returns:
+            - overall_sentiment: Average sentiment score
+            - sentiment_distribution: Count by sentiment category
+            - recent_feedback: Latest feedback with sentiment
+            - trends: Sentiment over time
+      parameters:
+      - in: query
+        name: days
+        schema:
+          type: integer
+          minimum: 1
+          default: 30
+      - in: query
+        name: event
+        schema:
+          type: integer
+      - in: query
+        name: feedback_type
+        schema:
+          enum:
+          - event
+          - system
+          - other
+          type: string
+          minLength: 1
+        description: |-
+          * `event` - Event Feedback
+          * `system` - System Feedback
+          * `other` - Other
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SentimentAnalyticsResponse'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+  /api/feedback/analyze/:
+    post:
+      operationId: api_feedback_analyze_create
+      description: |-
+        Analyze sentiment of arbitrary text (for testing/preview).
+
+        POST body:
+            {
+                "text": "Your feedback text here"
+            }
+
+        Returns:
+            Sentiment analysis results
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AnalyzeTextRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/AnalyzeTextRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/AnalyzeTextRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnalyzeTextResponse'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+  /api/feedback/analyze-text/:
+    post:
+      operationId: api_feedback_analyze_text_create
+      description: |-
+        Analyze sentiment of arbitrary text (for testing/preview).
+
+        POST body:
+            {
+                "text": "Your feedback text here"
+            }
+
+        Returns:
+            Sentiment analysis results
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AnalyzeTextRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/AnalyzeTextRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/AnalyzeTextRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnalyzeTextResponse'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+  /api/feedback/create/:
+    post:
+      operationId: api_feedback_create_create
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FeedbackCreate'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/FeedbackCreate'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/FeedbackCreate'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FeedbackCreate'
+          description: ''
+  /api/feedback/sentiment-analytics/:
+    get:
+      operationId: api_feedback_sentiment_analytics_retrieve
+      description: |-
+        Get sentiment analytics for feedback.
+
+        Query params:
+            - event: Filter by event ID
+            - feedback_type: Filter by feedback type
+            - days: Last N days (default: 30)
+
+        Returns:
+            - overall_sentiment: Average sentiment score
+            - sentiment_distribution: Count by sentiment category
+            - recent_feedback: Latest feedback with sentiment
+            - trends: Sentiment over time
+      parameters:
+      - in: query
+        name: days
+        schema:
+          type: integer
+          minimum: 1
+          default: 30
+      - in: query
+        name: event
+        schema:
+          type: integer
+      - in: query
+        name: feedback_type
+        schema:
+          enum:
+          - event
+          - system
+          - other
+          type: string
+          minLength: 1
+        description: |-
+          * `event` - Event Feedback
+          * `system` - System Feedback
+          * `other` - Other
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SentimentAnalyticsResponse'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+  /api/feedback/submit/:
+    post:
+      operationId: api_feedback_submit_create
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FeedbackCreate'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/FeedbackCreate'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/FeedbackCreate'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FeedbackCreate'
+          description: ''
+  /api/health/:
+    get:
+      operationId: api_health_retrieve
+      description: |-
+        Health check endpoint that returns system status.
+
+        Returns:
+            JSON response with system health information including:
+            - Server status
+            - Database connectivity
+            - Environment configuration
+            - Authentication system status
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthCheckResponse'
+          description: ''
+        '503':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthCheckResponse'
+          description: ''
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+  /api/info/:
+    get:
+      operationId: api_info_retrieve
+      description: |-
+        System information endpoint for debugging and monitoring.
+
+        Returns basic system information without sensitive data.
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SystemInfoResponse'
+          description: ''
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ''
+  /api/notifications/:
+    get:
+      operationId: api_notifications_list
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Notification'
+          description: ''
+  /api/notifications/unread-count/:
+    get:
+      operationId: api_notifications_unread_count_retrieve
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: No response body
+  /api/scores/:
+    get:
+      operationId: api_scores_list
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Score'
+          description: ''
+    post:
+      operationId: api_scores_create
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Score'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Score'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Score'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Score'
+          description: ''
+  /api/scores/batch-predict/:
+    get:
+      operationId: api_scores_batch_predict_retrieve
+      description: |-
+        Predict performance for multiple participants in an event.
+
+        Query params:
+            - event_id: Event ID (required)
+
+        Returns:
+            List of predictions for all registered participants
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: No response body
+  /api/scores/criteria/:
+    get:
+      operationId: api_scores_criteria_retrieve
+      description: |-
+        Get scoring criteria for a specific event.
+        Query params: event=<id>
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: No response body
+  /api/scores/event-anomalies/:
+    get:
+      operationId: api_scores_event_anomalies_retrieve
+      description: |-
+        Get anomaly counts per event for admin panel display.
+
+        Returns:
+            Dict with event_id -> anomaly count mapping
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: No response body
+  /api/scores/flagged/:
+    get:
+      operationId: api_scores_flagged_retrieve
+      description: |-
+        Get all flagged scores for admin review.
+
+        Query params:
+            - event: Filter by event ID
+            - judge: Filter by judge ID
+            - severity: Filter by severity (high, medium, low)
+            - reviewed: Filter by review status (true/false)
+
+        Returns:
+            List of flagged scores with details
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: No response body
+  /api/scores/flagged/{score_id}/review/:
+    post:
+      operationId: api_scores_flagged_review_create
+      description: |-
+        Mark a flagged score as reviewed by admin.
+
+        POST body:
+            {
+                "approved": true/false,
+                "notes": "Admin notes"
+            }
+      parameters:
+      - in: path
+        name: score_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: No response body
+  /api/scores/judge-results/:
+    get:
+      operationId: api_scores_judge_results_list
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Result'
+          description: ''
+  /api/scores/judge-stats/:
+    get:
+      operationId: api_scores_judge_stats_retrieve
+      description: |-
+        Get anomaly statistics for all judges.
+
+        Returns:
+            List of judges with their anomaly rates
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: No response body
+  /api/scores/judge/{judge_id}/analyze/:
+    post:
+      operationId: api_scores_judge_analyze_create
+      description: |-
+        Analyze a specific judge's scoring pattern for bias.
+
+        Returns:
+            Detailed analysis of judge's scoring patterns
+      parameters:
+      - in: path
+        name: judge_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: No response body
+  /api/scores/judge/recheck-requests/:
+    get:
+      operationId: api_scores_judge_recheck_requests_retrieve
+      description: |-
+        GET /api/scores/judge/recheck-requests/
+        List all re-check requests that have been accepted by volunteers and need to be re-analyzed by judges.
+
+        Returns a list of re-check requests that have been accepted and are ready for re-analysis.
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: No response body
+  /api/scores/performance-history/:
+    get:
+      operationId: api_scores_performance_history_retrieve
+      description: |-
+        Get participant's performance history and trends.
+
+        Query params:
+            - participant_id: Participant user ID (optional, defaults to current user)
+
+        Returns:
+            Historical performance data with trends and statistics
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: No response body
+  /api/scores/predict-performance/:
+    get:
+      operationId: api_scores_predict_performance_retrieve
+      description: |-
+        Predict participant's performance for an event.
+
+        GET: Predict for current user
+        POST: Predict for specific participant (judges/admins only)
+
+        Query/Body params:
+            - participant_id: Participant user ID (optional for GET, required for POST)
+            - event_id: Event ID (required)
+            - event_category: Event category (optional, will be fetched from event)
+
+        Returns:
+            Predicted score with confidence and details
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: No response body
+    post:
+      operationId: api_scores_predict_performance_create
+      description: |-
+        Predict participant's performance for an event.
+
+        GET: Predict for current user
+        POST: Predict for specific participant (judges/admins only)
+
+        Query/Body params:
+            - participant_id: Participant user ID (optional for GET, required for POST)
+            - event_id: Event ID (required)
+            - event_category: Event category (optional, will be fetched from event)
+
+        Returns:
+            Predicted score with confidence and details
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: No response body
+  /api/scores/results/:
+    get:
+      operationId: api_scores_results_list
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Result'
+          description: ''
+  /api/scores/student/:
+    get:
+      operationId: api_scores_student_retrieve
+      description: |-
+        Get scores and feedback for the authenticated student.
+        Returns scores with judge feedback for all events the student participated in.
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: No response body
+  /api/scores/student/recheck-request/{recheck_request_id}/:
+    get:
+      operationId: api_scores_student_recheck_request_retrieve
+      description: Student-only endpoint to view accepted recheck request details
+        (including payment info).
+      parameters:
+      - in: path
+        name: recheck_request_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: No response body
+  /api/scores/student/recheck-request/{recheck_request_id}/initiate-payment/:
+    post:
+      operationId: api_scores_student_recheck_request_initiate_payment_create
+      description: Initiate a Razorpay payment for recheck request.
+      parameters:
+      - in: path
+        name: recheck_request_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: No response body
+  /api/scores/student/recheck-request/{recheck_request_id}/pay/:
+    post:
+      operationId: api_scores_student_recheck_request_pay_create
+      description: |-
+        Student-only payment processing placeholder for accepted recheck requests.
+
+        For now, this records the outstanding amount as paid on the student's EventRegistration.
+      parameters:
+      - in: path
+        name: recheck_request_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: No response body
+  /api/scores/student/recheck-request/verify-payment/:
+    post:
+      operationId: api_scores_student_recheck_request_verify_payment_create
+      description: Verify Razorpay payment and update registration status.
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: No response body
+  /api/scores/student/result-recheck/:
+    post:
+      operationId: api_scores_student_result_recheck_create
+      description: |-
+        POST /api/student/result-recheck
+        Submit a re-check request for a student's result.
+
+        Expected payload:
+        {
+            "result": <result_id>
+        }
+
+        Automatically collects participant information and routes to assigned volunteer.
+        Prevents duplicate submissions for the same result.
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: No response body
+  /api/scores/student/results/{result_id}/:
+    get:
+      operationId: api_scores_student_results_retrieve
+      description: |-
+        GET /api/student/results/{resultId}
+        Fetch result details with re-check eligibility for students.
+
+        Returns result data including:
+        - All participant information (full name, category, event name, chest number, final score)
+        - isRecheckAllowed flag indicating if re-check can be requested
+      parameters:
+      - in: path
+        name: result_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: No response body
+  /api/scores/submit/:
+    post:
+      operationId: api_scores_submit_create
+      description: |-
+        Accepts a score submission from a judge for a participant in an event.
+        Supports both legacy format and new dynamic criteria format.
+
+        New format payload:
+        {
+          "eventId": <event_id>,
+          "participantId": <user_id>,
+          "items": [
+            {"criteria": "Technical Skill", "score": 20.5, "comments": ""},
+            {"criteria": "Artistic Expression", "score": 18.0, "comments": ""},
+            ...
+          ]
+        }
+
+        Legacy format still supported for backward compatibility.
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: No response body
+  /api/scores/summary/:
+    get:
+      operationId: api_scores_summary_retrieve
+      description: |-
+        Returns per-participant per-event summary for the requesting judge, including:
+        - my_scores_total: my total score for that participant in that event
+        - judges_submitted: number of distinct judges who have submitted scores for that participant
+        - judges_totals: list of total scores per judge
+        - current_final: current final score after dropping extremes (if 5+ judges)
+        Query params: event=<id>
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: No response body
+  /api/scores/volunteer/result-re-evaluation/:
+    get:
+      operationId: api_scores_volunteer_result_re_evaluation_retrieve
+      description: |-
+        GET /api/volunteer/result-re-evaluation
+        List all re-check requests assigned to the authenticated volunteer.
+
+        Returns a list of re-check requests for events where the volunteer is assigned.
+        Shows participant full name, category, event name, chest number, and final score.
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: No response body
+  /api/scores/volunteer/result-re-evaluation/{recheck_request_id}/:
+    get:
+      operationId: api_scores_volunteer_result_re_evaluation_retrieve_2
+      description: |-
+        GET /api/volunteer/result-re-evaluation/{recheckRequestId}
+        Get detailed information about a specific re-check request.
+
+        Returns detailed participant information for volunteer review.
+        Verifies that the volunteer is assigned to the corresponding event.
+      parameters:
+      - in: path
+        name: recheck_request_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: No response body
+  /api/scores/volunteer/result-re-evaluation/{recheck_request_id}/accept/:
+    put:
+      operationId: api_scores_volunteer_result_re_evaluation_accept_update
+      description: |-
+        PUT /api/volunteer/result-re-evaluation/{recheckRequestId}/accept
+        Accept a re-check request and update its status.
+
+        Updates the request status to "Accepted" and records the acceptance timestamp.
+        Verifies that the volunteer has proper authorization for the specific event.
+      parameters:
+      - in: path
+        name: recheck_request_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: No response body
+  /api/token/:
+    post:
+      operationId: api_token_create
+      description: |-
+        Takes a set of user credentials and returns an access and refresh JSON web
+        token pair to prove the authentication of those credentials.
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TokenObtainPair'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/TokenObtainPair'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/TokenObtainPair'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenObtainPair'
+          description: ''
+  /api/token/refresh/:
+    post:
+      operationId: api_token_refresh_create
+      description: |-
+        Takes a refresh type JSON web token and returns an access type JSON web
+        token if the refresh token is valid.
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TokenRefresh'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/TokenRefresh'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/TokenRefresh'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenRefresh'
+          description: ''
+  /api/volunteers/assignments/:
+    get:
+      operationId: api_volunteers_assignments_list
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/VolunteerAssignment'
+          description: ''
+    post:
+      operationId: api_volunteers_assignments_create
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VolunteerAssignment'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/VolunteerAssignment'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/VolunteerAssignment'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VolunteerAssignment'
+          description: ''
+  /api/volunteers/shifts/:
+    get:
+      operationId: api_volunteers_shifts_list
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/VolunteerShift'
+          description: ''
+    post:
+      operationId: api_volunteers_shifts_create
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VolunteerShift'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/VolunteerShift'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/VolunteerShift'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VolunteerShift'
+          description: ''
+components:
+  schemas:
+    AdminIssuedID:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        id_code:
+          type: string
+          maxLength: 50
+        role:
+          $ref: '#/components/schemas/AdminIssuedIDRoleEnum'
+        assigned_name:
+          type: string
+          nullable: true
+          description: Full name of the person this ID is assigned to
+          maxLength: 200
+        assigned_phone:
+          type: string
+          nullable: true
+          description: Phone number for verification
+          maxLength: 15
+        is_active:
+          type: boolean
+          description: Whether this ID is active and can be used for registration
+        created_by:
+          type: integer
+          readOnly: true
+        created_by_username:
+          type: string
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        is_used:
+          type: boolean
+          readOnly: true
+        used_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        used_by:
+          type: integer
+          readOnly: true
+          nullable: true
+        used_by_username:
+          type: string
+          readOnly: true
+          nullable: true
+        used_by_details:
+          type: string
+          readOnly: true
+        is_verified:
+          type: boolean
+          readOnly: true
+          description: Whether admin has verified the account created with this ID
+        verified_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        verified_by:
+          type: integer
+          readOnly: true
+          nullable: true
+        verified_by_username:
+          type: string
+          readOnly: true
+          nullable: true
+        notes:
+          type: string
+          description: Internal notes about this ID assignment
+        status_display:
+          type: string
+          readOnly: true
+      required:
+      - created_at
+      - created_by
+      - created_by_username
+      - id
+      - id_code
+      - is_used
+      - is_verified
+      - role
+      - status_display
+      - used_at
+      - used_by
+      - used_by_details
+      - used_by_username
+      - verified_at
+      - verified_by
+      - verified_by_username
+    AdminIssuedIDRoleEnum:
+      enum:
+      - student
+      - volunteer
+      - judge
+      type: string
+      description: |-
+        * `student` - Student
+        * `volunteer` - Volunteer
+        * `judge` - Judge
+    AdminSchoolGroupApproveRequest:
+      type: object
+      properties:
+        notes:
+          type: string
+    AdminSchoolGroupApproveResponse:
+      type: object
+      properties:
+        message:
+          type: string
+        group:
+          $ref: '#/components/schemas/SchoolGroupEntry'
+        user_credentials:
+          $ref: '#/components/schemas/SchoolGroupLeaderCredentials'
+      required:
+      - group
+      - message
+      - user_credentials
+    AdminSchoolGroupRejectRequest:
+      type: object
+      properties:
+        notes:
+          type: string
+        reason:
+          type: string
+    AdminSchoolGroupRejectResponse:
+      type: object
+      properties:
+        message:
+          type: string
+        group:
+          $ref: '#/components/schemas/SchoolGroupEntry'
+      required:
+      - group
+      - message
+    AdminUserUpdate:
+      type: object
+      properties:
+        role:
+          $ref: '#/components/schemas/Role083Enum'
+        phone:
+          type: string
+          maxLength: 15
+        approval_status:
+          $ref: '#/components/schemas/ApprovalStatusEnum'
+        student_class:
+          type: integer
+          maximum: 65535
+          minimum: 0
+          nullable: true
+        school:
+          type: integer
+          nullable: true
+        school_category_extra:
+          type: string
+          nullable: true
+          maxLength: 10
+        gender:
+          nullable: true
+          oneOf:
+          - $ref: '#/components/schemas/Gender8c3Enum'
+          - $ref: '#/components/schemas/BlankEnum'
+          - $ref: '#/components/schemas/NullEnum'
+      required:
+      - role
+    AllowedEmail:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        email:
+          type: string
+          format: email
+          title: Email Address
+          maxLength: 254
+        is_active:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        created_by:
+          type: integer
+          readOnly: true
+          nullable: true
+        created_by_username:
+          type: string
+          readOnly: true
+      required:
+      - created_at
+      - created_by
+      - created_by_username
+      - email
+      - id
+    AnalyzeTextRequest:
+      type: object
+      properties:
+        text:
+          type: string
+      required:
+      - text
+    AnalyzeTextResponse:
+      type: object
+      properties:
+        text:
+          type: string
+        sentiment:
+          $ref: '#/components/schemas/SentimentEnum'
+        confidence:
+          type: number
+          format: double
+        score:
+          type: number
+          format: double
+        probabilities:
+          type: object
+          additionalProperties:
+            type: number
+            format: double
+      required:
+      - confidence
+      - probabilities
+      - score
+      - sentiment
+      - text
+    ApprovalStatusEnum:
+      enum:
+      - pending
+      - approved
+      - rejected
+      type: string
+      description: |-
+        * `pending` - Pending
+        * `approved` - Approved
+        * `rejected` - Rejected
+    ArtCategory:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        category_name:
+          type: string
+          maxLength: 50
+      required:
+      - category_name
+      - id
+    BlankEnum:
+      enum:
+      - ''
+    Category248Enum:
+      enum:
+      - LP
+      - UP
+      - HS
+      - HSS
+      type: string
+      description: |-
+        * `LP` - Lower Primary
+        * `UP` - Upper Primary
+        * `HS` - High School
+        * `HSS` - Higher Secondary School
+    CategoryBfbEnum:
+      enum:
+      - registration
+      - schedule
+      - venue
+      - organization
+      - technical
+      - other
+      type: string
+      description: |-
+        * `registration` - Registration
+        * `schedule` - Schedule
+        * `venue` - Venue
+        * `organization` - Organization
+        * `technical` - Technical
+        * `other` - Other
+    Certificate:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        participant_details:
+          type: string
+          readOnly: true
+        event_details:
+          type: string
+          readOnly: true
+        school_name:
+          type: string
+          maxLength: 200
+        district_name:
+          type: string
+          maxLength: 100
+        category:
+          allOf:
+          - $ref: '#/components/schemas/CertificateCategoryEnum'
+          title: Participant Category
+        certificate_type:
+          $ref: '#/components/schemas/CertificateTypeEnum'
+        prize:
+          nullable: true
+          title: Prize/Rank
+          oneOf:
+          - $ref: '#/components/schemas/PrizeEnum'
+          - $ref: '#/components/schemas/BlankEnum'
+          - $ref: '#/components/schemas/NullEnum'
+        issue_date:
+          type: string
+          format: date
+        certificate_number:
+          type: string
+          maxLength: 50
+        certificate_file:
+          type: string
+          format: uri
+          nullable: true
+        issued_at:
+          type: string
+          format: date-time
+          readOnly: true
+        qr_code:
+          type: string
+          format: uri
+        participant:
+          type: integer
+        event:
+          type: integer
+      required:
+      - certificate_number
+      - event
+      - event_details
+      - id
+      - issued_at
+      - participant
+      - participant_details
+    CertificateCategoryEnum:
+      enum:
+      - LP
+      - UP
+      - HS
+      - HSS
+      type: string
+      description: |-
+        * `LP` - LP
+        * `UP` - UP
+        * `HS` - HS
+        * `HSS` - HSS
+    CertificateTypeEnum:
+      enum:
+      - merit
+      - participation
+      type: string
+      description: |-
+        * `merit` - Merit Certificate
+        * `participation` - Participation Certificate
+    ErrorEnvelope:
+      type: object
+      properties:
+        error:
+          type: string
+        detail:
+          type: string
+        code:
+          type: string
+        details: {}
+      required:
+      - detail
+      - error
+    Event:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        venue_details:
+          allOf:
+          - $ref: '#/components/schemas/Venue'
+          readOnly: true
+        judges_details:
+          type: string
+          readOnly: true
+        volunteers_details:
+          type: string
+          readOnly: true
+        created_by_details:
+          type: string
+          readOnly: true
+        event_definition_details:
+          type: string
+          readOnly: true
+        event_variant_details:
+          type: string
+          readOnly: true
+        effective_level_codes:
+          type: string
+          readOnly: true
+        name:
+          type: string
+          maxLength: 100
+        description:
+          type: string
+        category:
+          $ref: '#/components/schemas/EventCategoryEnum'
+        date:
+          type: string
+          format: date
+        start_time:
+          type: string
+          format: time
+        end_time:
+          type: string
+          format: time
+        max_participants:
+          type: integer
+          maximum: 2147483647
+          minimum: -2147483648
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+        status:
+          $ref: '#/components/schemas/EventStatusEnum'
+        event_definition:
+          type: integer
+          nullable: true
+        event_variant:
+          type: integer
+          nullable: true
+        venue:
+          type: integer
+        created_by:
+          type: integer
+          readOnly: true
+        judges:
+          type: array
+          items:
+            type: integer
+        volunteers:
+          type: array
+          items:
+            type: integer
+      required:
+      - category
+      - created_at
+      - created_by
+      - created_by_details
+      - date
+      - description
+      - effective_level_codes
+      - end_time
+      - event_definition_details
+      - event_variant_details
+      - id
+      - judges
+      - judges_details
+      - max_participants
+      - name
+      - start_time
+      - updated_at
+      - venue
+      - venue_details
+      - volunteers_details
+    EventCategoryEnum:
+      enum:
+      - dance
+      - music
+      - theatre
+      - literary
+      - visual_arts
+      - traditional_arts
+      type: string
+      description: |-
+        * `dance` - Dance
+        * `music` - Music
+        * `theatre` - Theatre
+        * `literary` - Literary
+        * `visual_arts` - Visual Arts
+        * `traditional_arts` - Traditional Arts
+    EventDefinition:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        category_details:
+          allOf:
+          - $ref: '#/components/schemas/ArtCategory'
+          readOnly: true
+        participation_type_details:
+          allOf:
+          - $ref: '#/components/schemas/ParticipationType'
+          readOnly: true
+        event_code:
+          type: string
+          maxLength: 20
+        event_name:
+          type: string
+          maxLength: 200
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+        category:
+          type: integer
+        participation_type:
+          type: integer
+      required:
+      - category
+      - category_details
+      - created_at
+      - event_code
+      - event_name
+      - id
+      - participation_type
+      - participation_type_details
+      - updated_at
+    EventRegistration:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        event_details:
+          allOf:
+          - $ref: '#/components/schemas/Event'
+          readOnly: true
+        participant_details:
+          type: string
+          readOnly: true
+        first_name:
+          type: string
+          writeOnly: true
+        last_name:
+          type: string
+          writeOnly: true
+        group_id:
+          type: string
+          writeOnly: true
+        group_reference_id:
+          type: string
+          nullable: true
+          maxLength: 100
+        group_leader_name:
+          type: string
+          nullable: true
+          maxLength: 220
+        registration_date:
+          type: string
+          format: date-time
+          readOnly: true
+        status:
+          type: string
+          maxLength: 20
+        chess_number:
+          type: string
+          nullable: true
+          maxLength: 20
+        registration_amount:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+        amount_paid:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+        event:
+          type: integer
+        participant:
+          type: integer
+          readOnly: true
+        school_group_entry:
+          type: integer
+          nullable: true
+      required:
+      - event
+      - event_details
+      - first_name
+      - id
+      - last_name
+      - participant
+      - participant_details
+      - registration_date
+    EventRule:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        event_details:
+          allOf:
+          - $ref: '#/components/schemas/EventDefinition'
+          readOnly: true
+        variant_details:
+          allOf:
+          - $ref: '#/components/schemas/EventVariant'
+          readOnly: true
+        level_details:
+          allOf:
+          - $ref: '#/components/schemas/Level'
+          readOnly: true
+        gender_eligibility:
+          $ref: '#/components/schemas/GenderEligibilityEnum'
+        min_participants:
+          type: integer
+          maximum: 65535
+          minimum: 0
+          nullable: true
+        max_participants:
+          type: integer
+          maximum: 65535
+          minimum: 0
+          nullable: true
+        duration_minutes:
+          type: integer
+          maximum: 65535
+          minimum: 0
+          nullable: true
+        event:
+          type: integer
+        variant:
+          type: integer
+          nullable: true
+        level:
+          type: integer
+      required:
+      - event
+      - event_details
+      - gender_eligibility
+      - id
+      - level
+      - level_details
+      - variant_details
+    EventStatusEnum:
+      enum:
+      - draft
+      - published
+      - registration_closed
+      - in_progress
+      - scoring_closed
+      - results_published
+      - archived
+      type: string
+      description: |-
+        * `draft` - Draft
+        * `published` - Published
+        * `registration_closed` - Registration Closed
+        * `in_progress` - In Progress
+        * `scoring_closed` - Scoring Closed
+        * `results_published` - Results Published
+        * `archived` - Archived
+    EventVariant:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        variant_name:
+          type: string
+          maxLength: 100
+        event:
+          type: integer
+      required:
+      - event
+      - id
+      - variant_name
+    Feedback:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        user_details:
+          type: string
+          readOnly: true
+        feedback_type:
+          $ref: '#/components/schemas/FeedbackTypeEnum'
+        subject:
+          type: string
+          maxLength: 200
+        message:
+          type: string
+        category:
+          nullable: true
+          oneOf:
+          - $ref: '#/components/schemas/CategoryBfbEnum'
+          - $ref: '#/components/schemas/BlankEnum'
+          - $ref: '#/components/schemas/NullEnum'
+        rating:
+          type: integer
+          maximum: 65535
+          minimum: 0
+          nullable: true
+        contact_email:
+          type: string
+          format: email
+          nullable: true
+          maxLength: 254
+        sentiment_score:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,1}(?:\.\d{0,2})?$
+          readOnly: true
+          nullable: true
+        sentiment_label:
+          allOf:
+          - $ref: '#/components/schemas/SentimentLabelEnum'
+          readOnly: true
+        sentiment_confidence:
+          type: number
+          format: double
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+        user:
+          type: integer
+          readOnly: true
+        event:
+          type: integer
+          nullable: true
+      required:
+      - created_at
+      - id
+      - message
+      - sentiment_confidence
+      - sentiment_label
+      - sentiment_score
+      - updated_at
+      - user
+      - user_details
+    FeedbackCreate:
+      type: object
+      properties:
+        event:
+          type: integer
+          nullable: true
+        feedback_type:
+          $ref: '#/components/schemas/FeedbackTypeEnum'
+        subject:
+          type: string
+          maxLength: 200
+        message:
+          type: string
+        category:
+          nullable: true
+          oneOf:
+          - $ref: '#/components/schemas/CategoryBfbEnum'
+          - $ref: '#/components/schemas/BlankEnum'
+          - $ref: '#/components/schemas/NullEnum'
+        rating:
+          type: integer
+          maximum: 65535
+          minimum: 0
+          nullable: true
+        contact_email:
+          type: string
+          format: email
+          nullable: true
+          maxLength: 254
+        sentiment_score:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,1}(?:\.\d{0,2})?$
+          readOnly: true
+          nullable: true
+        sentiment_label:
+          allOf:
+          - $ref: '#/components/schemas/SentimentLabelEnum'
+          readOnly: true
+        sentiment_confidence:
+          type: number
+          format: double
+          readOnly: true
+        id:
+          type: integer
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - created_at
+      - id
+      - message
+      - sentiment_confidence
+      - sentiment_label
+      - sentiment_score
+    FeedbackTypeEnum:
+      enum:
+      - event
+      - system
+      - other
+      type: string
+      description: |-
+        * `event` - Event Feedback
+        * `system` - System Feedback
+        * `other` - Other
+    Gender8c3Enum:
+      enum:
+      - BOYS
+      - GIRLS
+      type: string
+      description: |-
+        * `BOYS` - Boys
+        * `GIRLS` - Girls
+    GenderCategoryEebEnum:
+      enum:
+      - BOYS
+      - GIRLS
+      - MIXED
+      type: string
+      description: |-
+        * `BOYS` - Boys
+        * `GIRLS` - Girls
+        * `MIXED` - Mixed
+    GenderEligibilityEnum:
+      enum:
+      - BOYS
+      - GIRLS
+      - MIXED
+      type: string
+      description: |-
+        * `BOYS` - Boys
+        * `GIRLS` - Girls
+        * `MIXED` - Mixed
+    GroupClassEnum:
+      enum:
+      - LP
+      - UP
+      - HS
+      - HSS
+      type: string
+      description: |-
+        * `LP` - Lower Primary
+        * `UP` - Upper Primary
+        * `HS` - High School
+        * `HSS` - Higher Secondary School
+    HealthCheckChecks:
+      type: object
+      properties:
+        database:
+          $ref: '#/components/schemas/HealthCheckStatus'
+        authentication:
+          $ref: '#/components/schemas/HealthCheckStatus'
+        cors:
+          $ref: '#/components/schemas/HealthCheckStatus'
+        environment:
+          $ref: '#/components/schemas/HealthCheckStatus'
+        static_files:
+          $ref: '#/components/schemas/HealthCheckStatus'
+      required:
+      - authentication
+      - cors
+      - database
+      - environment
+      - static_files
+    HealthCheckResponse:
+      type: object
+      properties:
+        status:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+        version:
+          type: string
+        environment:
+          type: string
+        checks:
+          $ref: '#/components/schemas/HealthCheckChecks'
+      required:
+      - checks
+      - environment
+      - status
+      - timestamp
+      - version
+    HealthCheckStatus:
+      type: object
+      properties:
+        status:
+          type: string
+        message:
+          type: string
+        engine:
+          type: string
+        user_count:
+          type: integer
+        jwt_configured:
+          type: boolean
+        oauth_configured:
+          type: boolean
+        app_installed:
+          type: boolean
+        middleware_configured:
+          type: boolean
+        allowed_origins:
+          type: integer
+        missing_variables:
+          type: array
+          items:
+            type: string
+        debug_mode:
+          type: boolean
+        static_url:
+          type: boolean
+        static_root:
+          type: boolean
+        whitenoise_configured:
+          type: boolean
+      required:
+      - message
+      - status
+    IDSignupRequest:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        issued_id:
+          type: integer
+        issued_id_code:
+          type: string
+          readOnly: true
+        user:
+          type: integer
+        user_details:
+          type: string
+          readOnly: true
+        requested_at:
+          type: string
+          format: date-time
+          readOnly: true
+        status:
+          $ref: '#/components/schemas/StatusDe3Enum'
+        reviewed_by:
+          type: integer
+          readOnly: true
+          nullable: true
+        reviewed_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        notes:
+          type: string
+      required:
+      - id
+      - issued_id
+      - issued_id_code
+      - requested_at
+      - reviewed_at
+      - reviewed_by
+      - user
+      - user_details
+    Judge:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        user_details:
+          type: string
+          readOnly: true
+        specialization:
+          type: string
+          maxLength: 100
+        user:
+          type: integer
+        assigned_events:
+          type: array
+          items:
+            type: integer
+      required:
+      - id
+      - user
+      - user_details
+    Level:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        level_code:
+          type: string
+          maxLength: 10
+        level_name:
+          type: string
+          maxLength: 100
+      required:
+      - id
+      - level_code
+      - level_name
+    Notification:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        title:
+          type: string
+          maxLength: 200
+        message:
+          type: string
+        notification_type:
+          $ref: '#/components/schemas/NotificationTypeEnum'
+        is_read:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        user:
+          type: integer
+      required:
+      - created_at
+      - id
+      - message
+      - notification_type
+      - title
+      - user
+    NotificationTypeEnum:
+      enum:
+      - event
+      - registration
+      - result
+      - system
+      type: string
+      description: |-
+        * `event` - Event Update
+        * `registration` - Registration Update
+        * `result` - Result Announcement
+        * `system` - System Notification
+    NullEnum:
+      enum:
+      - null
+    PaginatedUserList:
+      type: object
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/User'
+    ParticipantVerification:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        participant_details:
+          type: string
+          readOnly: true
+        volunteer_details:
+          type: string
+          readOnly: true
+        event_details:
+          type: string
+          readOnly: true
+        chess_number:
+          type: string
+          maxLength: 20
+        verification_time:
+          type: string
+          format: date-time
+          readOnly: true
+        status:
+          $ref: '#/components/schemas/ParticipantVerificationStatusEnum'
+        notes:
+          type: string
+          nullable: true
+        event:
+          type: integer
+        participant:
+          type: integer
+        volunteer:
+          type: integer
+          readOnly: true
+      required:
+      - chess_number
+      - event
+      - event_details
+      - id
+      - participant
+      - participant_details
+      - verification_time
+      - volunteer
+      - volunteer_details
+    ParticipantVerificationStatusEnum:
+      enum:
+      - pending
+      - verified
+      - rejected
+      type: string
+      description: |-
+        * `pending` - Pending
+        * `verified` - Verified
+        * `rejected` - Rejected
+    ParticipationType:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        type_name:
+          type: string
+          maxLength: 50
+      required:
+      - id
+      - type_name
+    PatchedAdminIssuedID:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        id_code:
+          type: string
+          maxLength: 50
+        role:
+          $ref: '#/components/schemas/AdminIssuedIDRoleEnum'
+        assigned_name:
+          type: string
+          nullable: true
+          description: Full name of the person this ID is assigned to
+          maxLength: 200
+        assigned_phone:
+          type: string
+          nullable: true
+          description: Phone number for verification
+          maxLength: 15
+        is_active:
+          type: boolean
+          description: Whether this ID is active and can be used for registration
+        created_by:
+          type: integer
+          readOnly: true
+        created_by_username:
+          type: string
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        is_used:
+          type: boolean
+          readOnly: true
+        used_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        used_by:
+          type: integer
+          readOnly: true
+          nullable: true
+        used_by_username:
+          type: string
+          readOnly: true
+          nullable: true
+        used_by_details:
+          type: string
+          readOnly: true
+        is_verified:
+          type: boolean
+          readOnly: true
+          description: Whether admin has verified the account created with this ID
+        verified_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        verified_by:
+          type: integer
+          readOnly: true
+          nullable: true
+        verified_by_username:
+          type: string
+          readOnly: true
+          nullable: true
+        notes:
+          type: string
+          description: Internal notes about this ID assignment
+        status_display:
+          type: string
+          readOnly: true
+    PatchedAdminUserUpdate:
+      type: object
+      properties:
+        role:
+          $ref: '#/components/schemas/Role083Enum'
+        phone:
+          type: string
+          maxLength: 15
+        approval_status:
+          $ref: '#/components/schemas/ApprovalStatusEnum'
+        student_class:
+          type: integer
+          maximum: 65535
+          minimum: 0
+          nullable: true
+        school:
+          type: integer
+          nullable: true
+        school_category_extra:
+          type: string
+          nullable: true
+          maxLength: 10
+        gender:
+          nullable: true
+          oneOf:
+          - $ref: '#/components/schemas/Gender8c3Enum'
+          - $ref: '#/components/schemas/BlankEnum'
+          - $ref: '#/components/schemas/NullEnum'
+    PatchedAllowedEmail:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        email:
+          type: string
+          format: email
+          title: Email Address
+          maxLength: 254
+        is_active:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        created_by:
+          type: integer
+          readOnly: true
+          nullable: true
+        created_by_username:
+          type: string
+          readOnly: true
+    PatchedEvent:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        venue_details:
+          allOf:
+          - $ref: '#/components/schemas/Venue'
+          readOnly: true
+        judges_details:
+          type: string
+          readOnly: true
+        volunteers_details:
+          type: string
+          readOnly: true
+        created_by_details:
+          type: string
+          readOnly: true
+        event_definition_details:
+          type: string
+          readOnly: true
+        event_variant_details:
+          type: string
+          readOnly: true
+        effective_level_codes:
+          type: string
+          readOnly: true
+        name:
+          type: string
+          maxLength: 100
+        description:
+          type: string
+        category:
+          $ref: '#/components/schemas/EventCategoryEnum'
+        date:
+          type: string
+          format: date
+        start_time:
+          type: string
+          format: time
+        end_time:
+          type: string
+          format: time
+        max_participants:
+          type: integer
+          maximum: 2147483647
+          minimum: -2147483648
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+        status:
+          $ref: '#/components/schemas/EventStatusEnum'
+        event_definition:
+          type: integer
+          nullable: true
+        event_variant:
+          type: integer
+          nullable: true
+        venue:
+          type: integer
+        created_by:
+          type: integer
+          readOnly: true
+        judges:
+          type: array
+          items:
+            type: integer
+        volunteers:
+          type: array
+          items:
+            type: integer
+    PatchedEventDefinition:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        category_details:
+          allOf:
+          - $ref: '#/components/schemas/ArtCategory'
+          readOnly: true
+        participation_type_details:
+          allOf:
+          - $ref: '#/components/schemas/ParticipationType'
+          readOnly: true
+        event_code:
+          type: string
+          maxLength: 20
+        event_name:
+          type: string
+          maxLength: 200
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+        category:
+          type: integer
+        participation_type:
+          type: integer
+    PatchedEventRule:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        event_details:
+          allOf:
+          - $ref: '#/components/schemas/EventDefinition'
+          readOnly: true
+        variant_details:
+          allOf:
+          - $ref: '#/components/schemas/EventVariant'
+          readOnly: true
+        level_details:
+          allOf:
+          - $ref: '#/components/schemas/Level'
+          readOnly: true
+        gender_eligibility:
+          $ref: '#/components/schemas/GenderEligibilityEnum'
+        min_participants:
+          type: integer
+          maximum: 65535
+          minimum: 0
+          nullable: true
+        max_participants:
+          type: integer
+          maximum: 65535
+          minimum: 0
+          nullable: true
+        duration_minutes:
+          type: integer
+          maximum: 65535
+          minimum: 0
+          nullable: true
+        event:
+          type: integer
+        variant:
+          type: integer
+          nullable: true
+        level:
+          type: integer
+    PatchedIDSignupRequest:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        issued_id:
+          type: integer
+        issued_id_code:
+          type: string
+          readOnly: true
+        user:
+          type: integer
+        user_details:
+          type: string
+          readOnly: true
+        requested_at:
+          type: string
+          format: date-time
+          readOnly: true
+        status:
+          $ref: '#/components/schemas/StatusDe3Enum'
+        reviewed_by:
+          type: integer
+          readOnly: true
+          nullable: true
+        reviewed_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        notes:
+          type: string
+    PatchedJudge:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        user_details:
+          type: string
+          readOnly: true
+        specialization:
+          type: string
+          maxLength: 100
+        user:
+          type: integer
+        assigned_events:
+          type: array
+          items:
+            type: integer
+    PatchedStudentGroupProfileUpdate:
+      type: object
+      properties:
+        gender_category:
+          $ref: '#/components/schemas/StudentGroupProfileUpdateGenderCategoryEnum'
+        notes:
+          type: string
+        participants:
+          type: array
+          items:
+            $ref: '#/components/schemas/StudentGroupMemberUpdate'
+    PatchedVenue:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        name:
+          type: string
+          maxLength: 100
+        location:
+          type: string
+        capacity:
+          type: integer
+          maximum: 2147483647
+          minimum: -2147483648
+        event_limit:
+          type: integer
+          maximum: 2147483647
+          minimum: -2147483648
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+    PrizeEnum:
+      enum:
+      - 1st
+      - 2nd
+      - 3rd
+      - consolation
+      - participation
+      type: string
+      description: |-
+        * `1st` - 1st Prize
+        * `2nd` - 2nd Prize
+        * `3rd` - 3rd Prize
+        * `consolation` - Consolation Prize
+        * `participation` - Participation
+    RecentFeedback:
+      type: object
+      properties:
+        id:
+          type: integer
+        subject:
+          type: string
+        message:
+          type: string
+        sentiment_score:
+          type: number
+          format: double
+          nullable: true
+        sentiment_label:
+          $ref: '#/components/schemas/SentimentLabelEnum'
+        feedback_type:
+          $ref: '#/components/schemas/FeedbackTypeEnum'
+        created_at:
+          type: string
+          format: date-time
+        user:
+          type: string
+      required:
+      - created_at
+      - feedback_type
+      - id
+      - message
+      - sentiment_label
+      - sentiment_score
+      - subject
+      - user
+    Result:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        event:
+          type: integer
+        participant:
+          type: integer
+        total_score:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,4}(?:\.\d{0,2})?$
+        rank:
+          type: integer
+          maximum: 2147483647
+          minimum: -2147483648
+        published:
+          type: boolean
+        published_at:
+          type: string
+          format: date-time
+          nullable: true
+        participant_details:
+          type: string
+          readOnly: true
+        is_recheck_allowed:
+          type: string
+          readOnly: true
+        chest_number:
+          type: string
+          readOnly: true
+        full_name:
+          type: string
+          readOnly: true
+        category:
+          type: string
+          readOnly: true
+        event_name:
+          type: string
+          readOnly: true
+        recheck_request_status:
+          type: string
+          readOnly: true
+        recheck_request_id:
+          type: string
+          readOnly: true
+      required:
+      - category
+      - chest_number
+      - event
+      - event_name
+      - full_name
+      - id
+      - is_recheck_allowed
+      - participant
+      - participant_details
+      - rank
+      - recheck_request_id
+      - recheck_request_status
+      - total_score
+    Role083Enum:
+      enum:
+      - student
+      - judge
+      - admin
+      - volunteer
+      - school
+      type: string
+      description: |-
+        * `student` - Student
+        * `judge` - Judge
+        * `admin` - Admin
+        * `volunteer` - Volunteer
+        * `school` - School
+    School:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        name:
+          type: string
+          maxLength: 255
+        category:
+          $ref: '#/components/schemas/Category248Enum'
+        is_active:
+          type: boolean
+      required:
+      - category
+      - id
+      - name
+    SchoolGroupEntry:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        school:
+          type: integer
+        school_name:
+          type: string
+          readOnly: true
+        group_id:
+          type: string
+          description: School-assigned unique group ID
+          maxLength: 100
+        group_class:
+          $ref: '#/components/schemas/GroupClassEnum'
+        gender_category:
+          $ref: '#/components/schemas/GenderCategoryEebEnum'
+        participant_count:
+          type: integer
+          maximum: 65535
+          minimum: 0
+        leader_full_name:
+          type: string
+          maxLength: 220
+        leader_user:
+          type: integer
+          nullable: true
+        leader_user_details:
+          type: string
+          readOnly: true
+        events:
+          type: array
+          items:
+            type: integer
+        events_display:
+          type: string
+          readOnly: true
+        members:
+          type: array
+          items:
+            $ref: '#/components/schemas/SchoolGroupMember'
+          readOnly: true
+        participants:
+          type: array
+          items:
+            $ref: '#/components/schemas/SchoolGroupMember'
+          readOnly: true
+        status:
+          $ref: '#/components/schemas/StatusDe3Enum'
+        review_notes:
+          type: string
+        reviewed_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        reviewed_by:
+          type: integer
+          readOnly: true
+          nullable: true
+        reviewed_by_username:
+          type: string
+          readOnly: true
+          nullable: true
+        source:
+          $ref: '#/components/schemas/SourceEnum'
+        submitted_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - events_display
+      - gender_category
+      - group_class
+      - group_id
+      - id
+      - leader_full_name
+      - leader_user_details
+      - members
+      - participant_count
+      - participants
+      - reviewed_at
+      - reviewed_by
+      - reviewed_by_username
+      - school
+      - school_name
+      - submitted_at
+      - updated_at
+    SchoolGroupLeaderCredentials:
+      type: object
+      properties:
+        username:
+          type: string
+        password:
+          type: string
+        section:
+          type: string
+          nullable: true
+        user_id:
+          type: integer
+      required:
+      - password
+      - section
+      - user_id
+      - username
+    SchoolGroupMember:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        member_order:
+          type: integer
+          maximum: 65535
+          minimum: 0
+        first_name:
+          type: string
+          maxLength: 100
+        last_name:
+          type: string
+          maxLength: 100
+        full_name:
+          type: string
+          readOnly: true
+        gender:
+          nullable: true
+          oneOf:
+          - $ref: '#/components/schemas/Gender8c3Enum'
+          - $ref: '#/components/schemas/BlankEnum'
+          - $ref: '#/components/schemas/NullEnum'
+        student_class:
+          type: integer
+          maximum: 65535
+          minimum: 0
+          nullable: true
+          description: Class 1-12
+        phone:
+          type: string
+          maxLength: 15
+        is_leader:
+          type: boolean
+      required:
+      - first_name
+      - full_name
+      - id
+      - last_name
+      - member_order
+    SchoolParticipant:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        school:
+          type: integer
+        school_name:
+          type: string
+          readOnly: true
+        participant_id:
+          type: string
+          description: School-assigned participant ID
+          maxLength: 100
+        first_name:
+          type: string
+          maxLength: 100
+        last_name:
+          type: string
+          maxLength: 100
+        student_class:
+          type: integer
+          maximum: 65535
+          minimum: 0
+          description: Class 1-12
+        section:
+          type: string
+          readOnly: true
+        gender:
+          nullable: true
+          oneOf:
+          - $ref: '#/components/schemas/Gender8c3Enum'
+          - $ref: '#/components/schemas/BlankEnum'
+          - $ref: '#/components/schemas/NullEnum'
+        events:
+          type: array
+          items:
+            type: integer
+        events_display:
+          type: string
+          readOnly: true
+        submitted_at:
+          type: string
+          format: date-time
+          readOnly: true
+        verified_by_volunteer:
+          type: boolean
+          readOnly: true
+        verified_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        volunteer:
+          type: integer
+          readOnly: true
+          nullable: true
+        user_account:
+          type: string
+          readOnly: true
+        status:
+          type: string
+          readOnly: true
+      required:
+      - events
+      - events_display
+      - first_name
+      - id
+      - last_name
+      - participant_id
+      - school
+      - school_name
+      - section
+      - status
+      - student_class
+      - submitted_at
+      - user_account
+      - verified_at
+      - verified_by_volunteer
+      - volunteer
+    SchoolStanding:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        school:
+          type: integer
+        school_name:
+          type: string
+          readOnly: true
+        school_category:
+          type: string
+          readOnly: true
+        total_points:
+          type: integer
+          readOnly: true
+        total_gold:
+          type: integer
+          readOnly: true
+        total_silver:
+          type: integer
+          readOnly: true
+        total_bronze:
+          type: integer
+          readOnly: true
+        total_participants:
+          type: integer
+          readOnly: true
+        last_updated:
+          type: string
+          format: date-time
+          readOnly: true
+        rank:
+          type: string
+          readOnly: true
+      required:
+      - id
+      - last_updated
+      - rank
+      - school
+      - school_category
+      - school_name
+      - total_bronze
+      - total_gold
+      - total_participants
+      - total_points
+      - total_silver
+    Score:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        event:
+          type: integer
+        event_name:
+          type: string
+          readOnly: true
+        participant:
+          type: integer
+        participant_name:
+          type: string
+          readOnly: true
+        judge:
+          type: integer
+          readOnly: true
+        judge_name:
+          type: string
+          readOnly: true
+        technical_skill:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,3}(?:\.\d{0,1})?$
+          nullable: true
+          description: Technical Skill score (0-25)
+        artistic_expression:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,3}(?:\.\d{0,1})?$
+          nullable: true
+          description: Artistic Expression score (0-25)
+        stage_presence:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,3}(?:\.\d{0,1})?$
+          nullable: true
+          description: Stage Presence score (0-25)
+        overall_impression:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,3}(?:\.\d{0,1})?$
+          nullable: true
+          description: Overall Impression score (0-25)
+        criteria_scores:
+          description: 'Dynamic scoring criteria as JSON {criterion_id: score}'
+        total_score:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,4}(?:\.\d{0,1})?$
+          readOnly: true
+          description: Total score (sum of all criteria)
+        notes:
+          type: string
+          nullable: true
+          description: Additional comments from judge
+        submitted_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - event
+      - event_name
+      - id
+      - judge
+      - judge_name
+      - participant
+      - participant_name
+      - submitted_at
+      - total_score
+      - updated_at
+    SentimentAnalyticsResponse:
+      type: object
+      properties:
+        message:
+          type: string
+        total_count:
+          type: integer
+        overall_sentiment:
+          type: number
+          format: double
+          nullable: true
+        sentiment_distribution:
+          $ref: '#/components/schemas/SentimentDistribution'
+        sentiment_percentages:
+          $ref: '#/components/schemas/SentimentPercentages'
+        average_score:
+          type: number
+          format: double
+          nullable: true
+        recent_feedback:
+          type: array
+          items:
+            $ref: '#/components/schemas/RecentFeedback'
+      required:
+      - average_score
+      - overall_sentiment
+      - recent_feedback
+      - sentiment_distribution
+      - total_count
+    SentimentDistribution:
+      type: object
+      properties:
+        positive:
+          type: integer
+        neutral:
+          type: integer
+        negative:
+          type: integer
+      required:
+      - negative
+      - neutral
+      - positive
+    SentimentEnum:
+      enum:
+      - positive
+      - neutral
+      - negative
+      type: string
+      description: |-
+        * `positive` - Positive
+        * `neutral` - Neutral
+        * `negative` - Negative
+    SentimentLabelEnum:
+      enum:
+      - positive
+      - neutral
+      - negative
+      type: string
+      description: |-
+        * `positive` - Positive
+        * `neutral` - Neutral
+        * `negative` - Negative
+    SentimentPercentages:
+      type: object
+      properties:
+        positive:
+          type: number
+          format: double
+        neutral:
+          type: number
+          format: double
+        negative:
+          type: number
+          format: double
+      required:
+      - negative
+      - neutral
+      - positive
+    SourceEnum:
+      enum:
+      - manual
+      - bulk
+      type: string
+      description: |-
+        * `manual` - Manual
+        * `bulk` - Bulk Import
+    StatusDe3Enum:
+      enum:
+      - pending
+      - approved
+      - rejected
+      type: string
+      description: |-
+        * `pending` - Pending
+        * `approved` - Approved
+        * `rejected` - Rejected
+    StudentAllowedEventsResponse:
+      type: object
+      properties:
+        event_ids:
+          type: array
+          items:
+            type: integer
+        participant_id:
+          type: integer
+          nullable: true
+        school_id:
+          type: integer
+          nullable: true
+        group_event_ids:
+          type: array
+          items:
+            type: integer
+        group_entries:
+          type: array
+          items:
+            $ref: '#/components/schemas/StudentAllowedGroupEntry'
+      required:
+      - event_ids
+      - group_entries
+      - group_event_ids
+      - participant_id
+      - school_id
+    StudentAllowedGroupEntry:
+      type: object
+      properties:
+        group_entry_id:
+          type: integer
+        group_id:
+          type: string
+        leader_full_name:
+          type: string
+        leader_user_id:
+          type: integer
+          nullable: true
+        event_ids:
+          type: array
+          items:
+            type: integer
+        status:
+          type: string
+      required:
+      - event_ids
+      - group_entry_id
+      - group_id
+      - leader_full_name
+      - leader_user_id
+      - status
+    StudentGroupMemberUpdate:
+      type: object
+      properties:
+        id:
+          type: integer
+        member_order:
+          type: integer
+          minimum: 1
+        first_name:
+          type: string
+          maxLength: 100
+        last_name:
+          type: string
+          maxLength: 100
+        gender:
+          nullable: true
+          oneOf:
+          - $ref: '#/components/schemas/StudentGroupMemberUpdateGenderEnum'
+          - $ref: '#/components/schemas/NullEnum'
+        student_class:
+          type: integer
+          maximum: 12
+          minimum: 1
+          nullable: true
+        phone:
+          type: string
+          maxLength: 15
+      required:
+      - first_name
+      - last_name
+    StudentGroupMemberUpdateGenderEnum:
+      enum:
+      - BOYS
+      - GIRLS
+      type: string
+      description: |-
+        * `BOYS` - BOYS
+        * `GIRLS` - GIRLS
+    StudentGroupProfileUpdateGenderCategoryEnum:
+      enum:
+      - BOYS
+      - GIRLS
+      - MIXED
+      type: string
+      description: |-
+        * `BOYS` - BOYS
+        * `GIRLS` - GIRLS
+        * `MIXED` - MIXED
+    SystemInfoResponse:
+      type: object
+      properties:
+        python_version:
+          type: string
+        django_version:
+          type: string
+        debug_mode:
+          type: boolean
+        allowed_hosts:
+          type: array
+          items:
+            type: string
+        installed_apps_count:
+          type: integer
+        middleware_count:
+          type: integer
+        database_engine:
+          type: string
+        timezone:
+          type: string
+        language_code:
+          type: string
+        cors_enabled:
+          type: boolean
+        jwt_enabled:
+          type: boolean
+        oauth_enabled:
+          type: boolean
+      required:
+      - allowed_hosts
+      - cors_enabled
+      - database_engine
+      - debug_mode
+      - django_version
+      - installed_apps_count
+      - jwt_enabled
+      - language_code
+      - middleware_count
+      - oauth_enabled
+      - python_version
+      - timezone
+    TokenObtainPair:
+      type: object
+      properties:
+        username:
+          type: string
+          writeOnly: true
+        password:
+          type: string
+          writeOnly: true
+        access:
+          type: string
+          readOnly: true
+        refresh:
+          type: string
+          readOnly: true
+      required:
+      - access
+      - password
+      - refresh
+      - username
+    TokenRefresh:
+      type: object
+      properties:
+        access:
+          type: string
+          readOnly: true
+        refresh:
+          type: string
+      required:
+      - access
+      - refresh
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        username:
+          type: string
+          description: Required. 150 characters or fewer. Letters, digits and @/./+/-/_
+            only.
+          pattern: ^[\w.@+-]+$
+          maxLength: 150
+        email:
+          type: string
+          format: email
+          title: Email address
+          maxLength: 254
+        first_name:
+          type: string
+          maxLength: 150
+        last_name:
+          type: string
+          maxLength: 150
+        role:
+          $ref: '#/components/schemas/Role083Enum'
+        phone:
+          type: string
+          maxLength: 15
+        approval_status:
+          $ref: '#/components/schemas/ApprovalStatusEnum'
+        must_reset_password:
+          type: boolean
+        student_class:
+          type: integer
+          maximum: 65535
+          minimum: 0
+          nullable: true
+        section:
+          type: string
+          readOnly: true
+        school:
+          type: integer
+          nullable: true
+        school_category_extra:
+          type: string
+          nullable: true
+          maxLength: 10
+        gender:
+          nullable: true
+          oneOf:
+          - $ref: '#/components/schemas/Gender8c3Enum'
+          - $ref: '#/components/schemas/BlankEnum'
+          - $ref: '#/components/schemas/NullEnum'
+      required:
+      - id
+      - role
+      - section
+      - username
+    UserRegistration:
+      type: object
+      properties:
+        username:
+          type: string
+          description: Required. 150 characters or fewer. Letters, digits and @/./+/-/_
+            only.
+          pattern: ^[\w.@+-]+$
+          maxLength: 150
+        email:
+          type: string
+          format: email
+          title: Email address
+          maxLength: 254
+        password:
+          type: string
+          writeOnly: true
+        password_confirm:
+          type: string
+          writeOnly: true
+        first_name:
+          type: string
+          maxLength: 150
+        last_name:
+          type: string
+          maxLength: 150
+        phone:
+          type: string
+          maxLength: 15
+        role:
+          allOf:
+          - $ref: '#/components/schemas/UserRegistrationRoleEnum'
+          default: student
+        staff_id_photo:
+          type: string
+          format: uri
+          nullable: true
+        college_id_photo:
+          type: string
+          format: uri
+          nullable: true
+        school:
+          type: integer
+          nullable: true
+        school_category_extra:
+          type: string
+          nullable: true
+          maxLength: 10
+        student_class:
+          type: integer
+          maximum: 65535
+          minimum: 0
+          nullable: true
+        judge_id_photo:
+          type: string
+          format: uri
+          nullable: true
+        gender:
+          nullable: true
+          oneOf:
+          - $ref: '#/components/schemas/Gender8c3Enum'
+          - $ref: '#/components/schemas/BlankEnum'
+          - $ref: '#/components/schemas/NullEnum'
+    UserRegistrationRoleEnum:
+      enum:
+      - student
+      - judge
+      - volunteer
+      type: string
+      description: |-
+        * `student` - Student
+        * `judge` - Judge
+        * `volunteer` - Volunteer
+    Venue:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        name:
+          type: string
+          maxLength: 100
+        location:
+          type: string
+        capacity:
+          type: integer
+          maximum: 2147483647
+          minimum: -2147483648
+        event_limit:
+          type: integer
+          maximum: 2147483647
+          minimum: -2147483648
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - capacity
+      - created_at
+      - id
+      - location
+      - name
+      - updated_at
+    VolunteerAssignment:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        volunteer_details:
+          type: string
+          readOnly: true
+        shift_details:
+          allOf:
+          - $ref: '#/components/schemas/VolunteerShift'
+          readOnly: true
+        assigned_at:
+          type: string
+          format: date-time
+          readOnly: true
+        checked_in:
+          type: boolean
+        checked_out:
+          type: boolean
+        check_in_time:
+          type: string
+          format: date-time
+          nullable: true
+        check_out_time:
+          type: string
+          format: date-time
+          nullable: true
+        volunteer:
+          type: integer
+        shift:
+          type: integer
+      required:
+      - assigned_at
+      - id
+      - shift
+      - shift_details
+      - volunteer
+      - volunteer_details
+    VolunteerShift:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        event_details:
+          type: string
+          readOnly: true
+        volunteers_assigned:
+          type: string
+          readOnly: true
+        date:
+          type: string
+          format: date
+        start_time:
+          type: string
+          format: time
+        end_time:
+          type: string
+          format: time
+        description:
+          type: string
+        required_volunteers:
+          type: integer
+          maximum: 2147483647
+          minimum: -2147483648
+        status:
+          $ref: '#/components/schemas/VolunteerShiftStatusEnum'
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+        event:
+          type: integer
+      required:
+      - created_at
+      - date
+      - description
+      - end_time
+      - event
+      - event_details
+      - id
+      - required_volunteers
+      - start_time
+      - updated_at
+      - volunteers_assigned
+    VolunteerShiftStatusEnum:
+      enum:
+      - available
+      - assigned
+      - completed
+      type: string
+      description: |-
+        * `available` - Available
+        * `assigned` - Assigned
+        * `completed` - Completed
+  securitySchemes:
+    jwtAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT

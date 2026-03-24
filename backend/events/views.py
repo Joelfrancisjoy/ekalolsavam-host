@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from rest_framework import generics, status
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
@@ -11,6 +13,7 @@ from .services.event_state import transition_event, can_transition
 from django.core.mail import send_mail
 from django.shortcuts import get_object_or_404
 
+from .ml_models import get_schedule_recommender
 
 def _event_queryset():
     """
@@ -828,3 +831,88 @@ def transition_event_status(request, pk):
         return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
     except Exception as e:
         return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['POST'])
+@permission_classes([IsAdminRole])
+def recommend_event_timeslots(request, pk):
+    """
+    Recommend low-conflict timeslots for an existing event.
+
+    POST /api/events/{id}/recommend-timeslots/
+    {
+      "from_date": "2026-03-25",
+      "to_date": "2026-03-27",
+      "venue_id": 3,
+      "top_k": 5
+    }
+    """
+    event = get_object_or_404(Event, pk=pk)
+
+    from_date_raw = request.data.get('from_date')
+    to_date_raw = request.data.get('to_date')
+    top_k_raw = request.data.get('top_k', 5)
+    venue_id_raw = request.data.get('venue_id')
+
+    if not from_date_raw or not to_date_raw:
+        return Response(
+            {'error': 'from_date and to_date are required (YYYY-MM-DD).'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    try:
+        from_date = datetime.strptime(str(from_date_raw), "%Y-%m-%d").date()
+        to_date = datetime.strptime(str(to_date_raw), "%Y-%m-%d").date()
+    except ValueError:
+        return Response(
+            {'error': 'Invalid date format. Use YYYY-MM-DD.'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    try:
+        top_k = int(top_k_raw)
+    except (TypeError, ValueError):
+        return Response(
+            {'error': 'top_k must be an integer.'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    venue_id = None
+    if venue_id_raw not in (None, ""):
+        try:
+            venue_id = int(venue_id_raw)
+        except (TypeError, ValueError):
+            return Response(
+                {'error': 'venue_id must be an integer.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+    recommender = get_schedule_recommender()
+    try:
+        recommendations = recommender.recommend_timeslots(
+            event=event,
+            from_date=from_date,
+            to_date=to_date,
+            venue_id=venue_id,
+            top_k=top_k,
+        )
+    except ValueError as exc:
+        return Response({'error': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+
+    return Response(
+        {
+            'event': {
+                'id': event.id,
+                'name': event.name,
+                'category': event.category,
+            },
+            'recommendation_goal': 'conflict_avoidance',
+            'window': {
+                'from_date': from_date.isoformat(),
+                'to_date': to_date.isoformat(),
+            },
+            'count': len(recommendations),
+            'recommendations': recommendations,
+        },
+        status=status.HTTP_200_OK,
+    )
